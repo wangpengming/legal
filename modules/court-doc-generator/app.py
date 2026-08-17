@@ -9,10 +9,11 @@ from pathlib import Path
 
 import streamlit as st
 
-from src import database as db
-from src.config import OUTPUTS_DIR, save_json_config
-from src.generator import generate_court_matters, open_in_finder
-from src.feishu_api import get_feishu_status, is_feishu_enabled
+import database as db
+from config import OUTPUTS_DIR, save_json_config
+from generator import generate_court_matters, open_in_finder, sanitize_filename
+from feishu_api import get_feishu_status, is_feishu_enabled
+from pdf_viewer_component import is_pdfjs_ready, render_pdf_viewer
 
 
 # ============================================================
@@ -24,6 +25,74 @@ st.set_page_config(
     page_icon="⚖️",
     layout="wide",
     initial_sidebar_state="expanded",
+)
+
+
+# ============================================================
+# 全局 CSS（Vercel / Linear 风格）
+# ============================================================
+
+st.markdown(
+    """
+    <style>
+    /* 全局字体 */
+    html, body, [class*="css"] {
+        font-family: -apple-system, BlinkMacSystemFont, "Inter", "PingFang SC",
+                     "Microsoft YaHei", "Segoe UI", sans-serif;
+    }
+    /* 主按钮（生成） */
+    button[kind="primary"] {
+        background-color: #0a0a0a;
+        border: 1px solid #0a0a0a;
+        border-radius: 8px;
+        font-weight: 500;
+        transition: all 0.2s ease;
+    }
+    button[kind="primary"]:hover {
+        background-color: #262626;
+        border-color: #262626;
+    }
+    /* 二级按钮 */
+    button:not([kind="primary"]) {
+        border-radius: 8px;
+        border: 1px solid #d4d4d4;
+        transition: all 0.2s ease;
+    }
+    button:not([kind="primary"]):hover {
+        border-color: #0a0a0a;
+    }
+    /* 输入框 */
+    input, textarea, [data-baseweb="select"] {
+        border-radius: 8px !important;
+    }
+    /* Expander */
+    [data-testid="stExpander"] {
+        border: 1px solid #e5e5e5;
+        border-radius: 8px;
+    }
+    /* Divider */
+    hr {
+        margin: 1.5rem 0;
+        border-color: #f5f5f5;
+    }
+    /* Tab */
+    [data-baseweb="tab-list"] {
+        gap: 8px;
+    }
+    [data-baseweb="tab"] {
+        border-radius: 8px;
+        padding: 8px 16px;
+    }
+    /* 容器边框 */
+    [data-testid="stContainer"][data-border="true"] {
+        border: 1px solid #e5e5e5;
+        border-radius: 12px;
+        padding: 16px;
+        background: white;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
 )
 
 
@@ -46,36 +115,35 @@ initialize()
 # ============================================================
 
 def ensure_default_company_and_agent():
-    """首次启动时，从授权委托书模板预填默认公司/代理人。"""
-    companies = db.list_companies()
-    agents = db.list_agents()
+    """首次启动时，仅创建空公司/代理人记录，UI 引导用户填写真实信息。
 
-    if not companies:
-        # 从模板推断：雷石天地 / 马杰 / 总经理
-        default_co = {
-            "name": "北京雷石天地电子技术股份有限公司",
+    设计原则（v1.1+）：
+    - 严禁硬编码真实 PII（身份证号 / 手机号 / 公司全称）
+    - 默认数据仅作占位，提示用户必须填写真实信息
+    - 由 main() 调用，不是模块级副作用（避免 import 时写库）
+    """
+    if not db.list_companies():
+        # 仅创建一条空记录，UI 会提示“请填公司全称”并校验
+        db.upsert_company({
+            "name": "",  # 占位：用户必须填写真实公司全称
             "credit_code": "",
-            "legal_rep_name": "马杰",
-            "legal_rep_position": "总经理",
+            "legal_rep_name": "",
+            "legal_rep_position": "",
             "legal_rep_id_card": "",
-            "address": "北京市朝阳区望京东园四区1号楼29层2901号10",
+            "address": "",
             "phone": "",
-        }
-        db.upsert_company(default_co)
+        })
 
-    if not agents:
-        default_agent = {
-            "name": "张洋",
-            "gender": "女",
-            "id_card": "230230198609092143",
-            "position": "法务",
-            "phone": "18810282639",
+    if not db.list_agents():
+        # 仅创建一条空记录，UI 会提示并要求补全
+        db.upsert_agent({
+            "name": "",  # 占位：用户必须填写真实姓名
+            "gender": "男",
+            "id_card": "",
+            "position": "",
+            "phone": "",
             "company_id": None,
-        }
-        db.upsert_agent(default_agent)
-
-
-ensure_default_company_and_agent()
+        })
 
 
 # ============================================================
@@ -109,7 +177,12 @@ def render_sidebar():
                 c_credit = st.text_input("统一社会信用代码", value=current_company.get("credit_code", "") if current_company else "")
                 c_legal = st.text_input("法定代表人姓名*", value=current_company.get("legal_rep_name", "") if current_company else "")
                 c_position = st.text_input("法人职务", value=current_company.get("legal_rep_position", "") if current_company else "")
-                c_idcard = st.text_input("法人身份证号", value=current_company.get("legal_rep_id_card", "") if current_company else "")
+                c_idcard = st.text_input(
+                                    "法人身份证号",
+                                    value=current_company.get("legal_rep_id_card", "") if current_company else "",
+                                    max_chars=18,
+                                    help="可选·18 位·将出现在《法定代表人证明》中。请认真核对。",
+                                )
                 c_address = st.text_input("公司地址", value=current_company.get("address", "") if current_company else "")
                 c_phone = st.text_input("公司电话", value=current_company.get("phone", "") if current_company else "")
                 submitted = st.form_submit_button("保存")
@@ -146,7 +219,12 @@ def render_sidebar():
             with st.form("add_agent"):
                 a_name = st.text_input("代理人姓名*", value=current_agent["name"] if current_agent else "")
                 a_gender = st.selectbox("性别", ["男", "女"], index=1 if (current_agent and current_agent.get("gender") == "女") else 0)
-                a_idcard = st.text_input("身份证号", value=current_agent.get("id_card", "") if current_agent else "")
+                a_idcard = st.text_input(
+                                    "身份证号",
+                                    value=current_agent.get("id_card", "") if current_agent else "",
+                                    max_chars=18,
+                                    help="可选·18 位·将出现在《授权委托书》中。",
+                                )
                 a_position = st.text_input("职务", value=current_agent.get("position", "") if current_agent else "")
                 a_phone = st.text_input("电话", value=current_agent.get("phone", "") if current_agent else "")
                 submitted_a = st.form_submit_button("保存")
@@ -331,6 +409,17 @@ def render_new_case_form(current_company, current_agent):
 
             st.success(f"✅ 已生成 {file_count} 份文件！")
 
+            # ===== PDF 浏览器内预览（PDF.js 全内联）=====
+            merged_pdf = output_dir / f"00_合并出庭手续_{sanitize_filename(case_number)}.pdf"
+            if merged_pdf.exists() and is_pdfjs_ready():
+                with st.expander("📺 浏览器内预览 · 合并 PDF（推荐）", expanded=True):
+                    st.caption("使用 PDF.js 全内联渲染·可缩放/翻页/打印全部")
+                    render_pdf_viewer(merged_pdf, height=720, key=f"preview_{case_id}")
+            elif merged_pdf.exists() and not is_pdfjs_ready():
+                with st.info("📺 PDF 浏览器内预览需要 PDF.js 库。请联系相关人员下载 `pdf.min.js` + `pdf.worker.min.js` 到 `static/pdfjs/`。"):
+
+                    pass  # 占位
+
             # 列出生成的文件
             st.markdown("##### 📂 生成文件清单")
             files = sorted(output_dir.iterdir(), key=lambda x: x.name)
@@ -435,6 +524,13 @@ def render_case_history(current_company, current_agent):
 # ============================================================
 
 def main():
+    """Streamlit 主入口。
+
+    注意：
+    - ensure_default_company_and_agent() 必须在这里调用，避免模块级副作用
+    - 测试场景下 import app 不会创建默认记录
+    """
+    ensure_default_company_and_agent()
     current_company, current_agent = render_sidebar()
     render_main(current_company, current_agent)
 

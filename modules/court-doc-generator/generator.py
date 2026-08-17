@@ -11,11 +11,13 @@ from pathlib import Path
 
 from docx import Document
 
-from .config import (
+from config import (  # noqa: F401  # 顶层平铺
     OUTPUTS_DIR,
     STATIC_DIR,
     get_template_path,
 )
+from docx_to_pdf import docx_to_pdf
+from pdf_merger import merge_pdfs
 
 
 # ============================================================
@@ -192,14 +194,23 @@ def generate_court_matters(case: dict, company: dict, agent: dict) -> Path:
 
     输出结构：
       outputs/YYYY-MM-DD_<案号>/
+        ├── 00_合并出庭手续_<案号>.pdf       （7 份 PDF 合一份）
         ├── 01_营业执照.pdf
         ├── 02_法定代表人证明_<案号>.docx
+        ├── 02_法定代表人证明_<案号>.pdf
         ├── 03_法人身份证.pdf
         ├── 04_授权委托书_<案号>.docx
+        ├── 04_授权委托书_<案号>.pdf
         ├── 05_推荐信_<案号>.docx
+        ├── 05_推荐信_<案号>.pdf
         ├── 06_代理人劳动合同.pdf
         ├── 07_代理人身份证.pdf
         └── 出庭手续全套_<案号>.zip
+
+    鲁棒性（NFR-5.6）：
+    - 任一 DOCX→ PDF 转换失败只跳过该份 PDF，不阻塞其他文件
+    - 静态 PDF 缺失则跳过该份，不阻塞
+    - 最终的合并 PDF 也被加进 ZIP
     """
     case_number = case.get("case_number", "未命名案件")
     hearing_date = case.get("hearing_date") or datetime.now().strftime("%Y-%m-%d")
@@ -209,20 +220,24 @@ def generate_court_matters(case: dict, company: dict, agent: dict) -> Path:
 
     safe_case = sanitize_filename(case_number)
 
-    # === 动态生成 3 份 docx ===
-    legal_values = values_for_legal_rep_cert(case, company)
-    legal_rep_path = output_dir / f"02_法定代表人证明_{safe_case}.docx"
-    generate_dynamic_docx("legal_rep_cert", legal_values, legal_rep_path)
+    # === 动态生成 3 份 docx + PDF ===
+    dynamic_templates = [
+        ("legal_rep_cert", values_for_legal_rep_cert(case, company), "02_法定代表人证明"),
+        ("power_of_attorney", values_for_power_of_attorney(case, company, agent), "04_授权委托书"),
+        ("recommendation", values_for_recommendation(case, company, agent), "05_推荐信"),
+    ]
+    for template_key, values, base_name in dynamic_templates:
+        docx_path = output_dir / f"{base_name}_{safe_case}.docx"
+        pdf_path = output_dir / f"{base_name}_{safe_case}.pdf"
+        generate_dynamic_docx(template_key, values, docx_path)
+        # DOCX → PDF（鲁棒降级：失败仅警告，不阻塞）
+        try:
+            docx_to_pdf(docx_path, pdf_path)
+        except Exception as e:  # noqa: BLE001  # 转换异常仅警告
+            import warnings
+            warnings.warn(f"DOCX→PDF 转换失败（跳过）: {docx_path.name} → {e}", stacklevel=2)
 
-    poa_values = values_for_power_of_attorney(case, company, agent)
-    poa_path = output_dir / f"04_授权委托书_{safe_case}.docx"
-    generate_dynamic_docx("power_of_attorney", poa_values, poa_path)
-
-    rec_values = values_for_recommendation(case, company, agent)
-    rec_path = output_dir / f"05_推荐信_{safe_case}.docx"
-    generate_dynamic_docx("recommendation", rec_values, rec_path)
-
-    # === 复制静态 PDF（按出庭顺序）===
+    # === 复制静态 PDF（按出庭顺序，缺失则跳过）===
     static_files = [
         ("01_营业执照.pdf", STATIC_DIR / "1.营业执照复印件.pdf"),
         ("03_法人身份证.pdf", STATIC_DIR / "法人身份证.pdf"),
@@ -233,12 +248,29 @@ def generate_court_matters(case: dict, company: dict, agent: dict) -> Path:
         if src_path.exists():
             shutil.copy2(src_path, output_dir / target_name)
 
-    # === 打包 zip ===
+    # === 合并 7 份 PDF 为 1 份 ===
+    all_pdfs = sorted(output_dir.glob("0?_*.pdf"))  # 匹配 01-07
+    if all_pdfs:
+        merged_pdf = output_dir / f"00_合并出庭手续_{safe_case}.pdf"
+        try:
+            merge_pdfs(all_pdfs, merged_pdf)
+        except ValueError:
+            # 没有任何可合并的 PDF（所有 PDF 都生成失败）
+            pass
+
+    # === 打包 zip（合并 PDF 置顶 + 其余按出庭顺序）===
     zip_path = output_dir / f"出庭手续全套_{safe_case}.zip"
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+        # 1. 合并 PDF 最先
+        merged = output_dir / f"00_合并出庭手续_{safe_case}.pdf"
+        if merged.exists():
+            zf.write(merged, arcname=merged.name)
+        # 2. 其余按编号顺序
         for file in sorted(output_dir.iterdir()):
             if file.suffix == ".zip":
                 continue
+            if file.name == merged.name:
+                continue  # 上面已写
             zf.write(file, arcname=file.name)
 
     return output_dir

@@ -2,7 +2,7 @@
 import sqlite3
 from datetime import datetime
 from contextlib import contextmanager
-from .config import DB_PATH
+from config import DB_PATH
 
 
 SCHEMA_SQL = """
@@ -22,6 +22,8 @@ CREATE TABLE IF NOT EXISTS companies (
 );
 
 -- 代理人信息表
+-- UNIQUE (name, company_id)：同一公司下代理人姓名不重复
+-- 修复记录：旧版本用 (name, id_card) 唯一，会导致未填身份证的多名同姓名代理人被合并为同一记录
 CREATE TABLE IF NOT EXISTS agents (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,                        -- 代理人姓名
@@ -33,7 +35,8 @@ CREATE TABLE IF NOT EXISTS agents (
     is_default INTEGER DEFAULT 0,              -- 是否默认
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (company_id) REFERENCES companies(id)
+    FOREIGN KEY (company_id) REFERENCES companies(id),
+    UNIQUE (name, company_id)
 );
 
 -- 案件信息表
@@ -193,23 +196,28 @@ def get_default_agent() -> dict | None:
 
 
 def upsert_agent(data: dict) -> int:
-    """插入或更新代理人。"""
+    """插入或更新代理人（以 name+company_id 判重）。
+
+    修复：旧版本以 (name, id_card) 判重，当 id_card 为空字符串时，
+    同一公司下未填身份证的多名同姓名代理人会被错误地判定为同一人。
+    现改为 (name, company_id)，符合业务语义。
+    """
     with get_conn() as conn:
         existing = conn.execute(
-            "SELECT id FROM agents WHERE name = ? AND id_card = ?",
-            (data["name"], data.get("id_card", "")),
+            "SELECT id FROM agents WHERE name = ? AND company_id IS ?",
+            (data["name"], data.get("company_id")),
         ).fetchone()
         now = datetime.now().isoformat(timespec="seconds")
         if existing:
             conn.execute(
                 """UPDATE agents
-                SET gender=?, position=?, phone=?, company_id=?, updated_at=?
+                SET gender=?, id_card=?, position=?, phone=?, updated_at=?
                 WHERE id=?""",
                 (
                     data.get("gender"),
+                    data.get("id_card"),
                     data.get("position"),
                     data.get("phone"),
-                    data.get("company_id"),
                     now,
                     existing["id"],
                 ),
