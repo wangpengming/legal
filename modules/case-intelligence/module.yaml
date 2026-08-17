@@ -3,15 +3,7 @@ version: 3.0.0
 status: planning
 description: 同质化案件文档检索与规则系统（案件/卷宗/规则三对象，NocoDB + Paperless-ngx，方案设计阶段）
 entry: none
-deps:
-  - docker-compose
-  - nocodb/nocodb
-  - liuweitao/paperless-ngx
-  - postgres:16
-  - redis:7
-  - gotenberg/gotenberg
-  - apache/tika
-  - python-docx
+deps: [] # 直接依赖的其他模块（当前无；组件/镜像见 tech_stack 与 docker-compose）
 created: 2026-08-10
 integrated: 2026-08-17
 tech_stack:

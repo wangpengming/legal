@@ -27,13 +27,9 @@ legal/
 │       ├── docs/               # 模块文档
 │       ├── module.yaml          # 模块规格（Qoder可读）
 │       └── SPEC.md              # 模块规格
-├── shared/                     # 跨模块共享
-│   ├── common/                 # 公共代码
-│   ├── templates/             # 共用模板
-│   └── config/                # 共用配置
-├── .qoder/                    # Qoder项目配置
-│   └── projects/              # Qoder项目定义
-├── tools/                     # 工程工具脚本
+├── shared/                     # 跨模块共享（暂仅 config/；common/、templates/ 规划中）
+├── .qoder/                    # Qoder项目配置（Qoder 生成并纳入版本管理）
+├── tools/                     # 工程工具脚本（规划中，待建）
 ├── .gitignore
 └── README.md
 ```
@@ -46,7 +42,7 @@ legal/
 
 | 模块 | 状态 | 版本 | 一句话 |
 |------|------|------|--------|
-| court-doc-generator | active | 1.0.0 | 出庭手续文档生成器（7份材料一键生成 + PDF合并预览） |
+| court-doc-generator | active | 1.1.4 | 出庭手续文档生成器（7份材料一键生成 + PDF合并预览） |
 | litigation-system | active | 0.2.0 | 法务诉讼业务平台（飞书历年案件天级同步 + 检索/统计/AI 双模式） |
 | case-intelligence | planning | 3.0.0 | 同质化案件文档检索与规则系统（NocoDB + Paperless-ngx，不做 AI） |
 
@@ -83,7 +79,7 @@ cat modules/index.yaml
 1. 每个模块必须有 `module.yaml` 和 `SPEC.md`
 2. 所有需求写入 `docs/requirements/backlog.md`
 3. 模块间通过约定接口通信，禁止直接硬依赖
-4. 临时文件、构建产物、env文件不提交
+4. 临时文件、构建产物、密钥类文件（secrets/credentials）不提交；隐藏文件与项目规则（.qoder/）及 .env 允许提交（私有仓库）
 
 ## AI操作指南
 

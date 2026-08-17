@@ -4,10 +4,11 @@ modules:
   - name: court-doc-generator
     path: modules/court-doc-generator
     status: active
-    version: 1.0.0
+    version: 1.1.4
     description: 出庭手续文档生成器（7份材料一键生成）
     entry: app.py
     created: 2026-08-17
+    integrated: 2026-08-17
 
   - name: litigation-system
     path: modules/litigation-system

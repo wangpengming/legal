@@ -3,12 +3,7 @@ version: 0.2.0
 status: active
 description: 法务诉讼业务平台（飞书历年案件天级同步 + 组合检索/统计画像 + AI 双模式报告，数据基线 638 条）
 entry: backend/app/main.py
-deps:
-  - fastapi>=0.115
-  - sqlalchemy>=2.0
-  - apscheduler>=3.10
-  - jieba>=0.42.1
-  - openpyxl>=3.1
+deps: [] # 直接依赖的其他模块（当前无；Python 包见 tech_stack 与 requirements.txt）
 created: 2026-08-13
 integrated: 2026-08-17
 tech_stack:

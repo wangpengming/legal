@@ -16,14 +16,16 @@
 | 路径 | 用途 | 是否提交 |
 |------|------|---------|
 | `modules/` | 功能模块源码 | ✅ |
-| `shared/` | 跨模块共享代码 | ✅ |
+| `shared/config/` | 跨模块共享配置 | ✅ |
+| `shared/common/`、`shared/templates/` | 跨模块共享代码/模板 | 🚧 规划中，待建 |
 | `docs/` | 文档 | ✅ |
-| `tools/` | 工程脚本 | ✅ |
-| `.qoder/` | Qoder项目配置 | ✅ |
+| `tools/` | 工程脚本 | 🚧 规划中，待建 |
+| `.qoder/` | Qoder项目配置 | ✅（Qoder 生成并纳入版本管理） |
 | `.git/` | Git仓库数据 | ⚠️（自动管理） |
 | `*.tmp/*.log/*.zip` | 临时文件 | ❌ |
 | `node_modules/.venv/` | 依赖包 | ❌ |
-| `.env` | 环境变量 | ❌ |
+| `secrets.yaml/secrets.json/credentials.*` | 密钥类文件 | ❌（安全红线） |
+| `.env` | 环境变量 | ✅（私有仓库；真实密钥勿写入） |
 
 ## 2. 模块规范
 
@@ -72,8 +74,10 @@ env:
   - VAR_NAME: description
 ```
 
-> 注：并入模块允许保留子项目原始内部结构（如 litigation-system 的 backend/frontend 布局），
-> module.yaml / docs/ / SPEC.md 为登记标配，`entry: none` 表示尚无代码（planning 阶段）。
+> 注：
+> - 并入模块允许保留子项目原始内部结构（如 litigation-system 的 backend/frontend 布局），仅要求补 module.yaml / docs/ / SPEC.md 登记文件
+> - 原生开发模块（如 court-doc-generator）允许平铺布局（app.py 于模块根），不必强制 src/
+> - module.yaml / docs/ / SPEC.md 为登记标配，`entry: none` 表示尚无代码（planning 阶段）。
 
 ### 2.4 当前已注册模块
 
@@ -81,7 +85,7 @@ env:
 
 | 模块 | 状态 | 版本 | 职责 | 技术栈 | 并入日期 |
 |------|------|------|------|--------|----------|
-| court-doc-generator | active | 1.0.0 | 出庭手续文档生成器（7 份材料一键生成 + PDF 合并预览） | Streamlit + python-docx + reportlab（PDF.js 内联预览） | 2026-08-17（原生开发） |
+| court-doc-generator | active | 1.1.4 | 出庭手续文档生成器（7 份材料一键生成 + PDF 合并预览） | Streamlit + python-docx + reportlab（PDF.js 内联预览） | 2026-08-17（原生开发） |
 | litigation-system | active | 0.2.0 | 法务诉讼业务平台（飞书历年案件天级同步 + 检索/统计/AI 双模式，基线 638 条） | FastAPI + SQLAlchemy + SQLite FTS5 / React 18 + Vite + ECharts | 2026-08-17（并入 modules/） |
 | case-intelligence | planning | 3.0.0 | 同质化案件文档检索与规则系统（三对象模型，不做 AI，只做检索） | NocoDB + Paperless-ngx + Docker Compose（7 容器） | 2026-08-17（并入 modules/） |
 
@@ -164,12 +168,14 @@ project:
 
 ## 6. 环境变量规范
 
-环境变量写在 `.env.example`（可提交），实际 `.env` 不提交。
+本仓库为私有仓库：`.env` 及其变体（`.env.example` / `.env.local` 等）允许提交并纳入版本管理；
+密钥类文件（`secrets.yaml` / `secrets.json` / `credentials.*`）为安全红线，一律不提交。
+含真实密钥的环境变量请使用 `.local` 后缀随用随清，避免写入版本库。
 
 ## 7. 版本约定
 
-- 模块版本：语义化版本 `major.minor.patch`
-- 系统版本：日期版本 `YYYY.MM.DD`
+- 模块版本：语义化版本 `major.minor.patch`（如 court-doc-generator v1.1.4）
+- 系统版本：语义化版本，记录于 `docs/requirements/CHANGELOG.md`，与模块版本演进保持同步
 
 ## 8. 模块演进说明
 

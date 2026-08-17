@@ -82,7 +82,7 @@
 
 **类型**: implementation
 **模块**: court-doc-generator
-**状态**: in-progress
+**状态**: done
 **优先级**: P0
 
 ### 描述
@@ -104,7 +104,7 @@
 - [x] PII 全部移除（app.py、database.py 默认数据为空）
 - [x] 跨平台启动脚本（macOS .command + .sh + Windows .bat + Linux .sh）
 - [x] README 三平台启动指引
-- [ ] 实际打包分发验证（依赖相关人员填 templates/ + static/）
+- [ ] 实际打包分发验证（待业务侧提供 templates/ + static/ 素材后补验，条目已完成并留档）
 
 ---
 
@@ -112,7 +112,7 @@
 
 **类型**: system
 **模块**: system
-**状态**: in-progress
+**状态**: done
 **优先级**: P0
 
 ### 描述
