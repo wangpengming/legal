@@ -3,6 +3,14 @@ version: 3.0.0
 status: planning
 description: 同质化案件文档检索与规则系统（案件/卷宗/规则三对象，NocoDB + Paperless-ngx，方案设计阶段）
 entry: none
+port:
+  nocodb: 8090
+  paperless: 8091
+  gotenberg: 8092
+  postgres_nocodb: 5432
+  postgres_paperless: 5433
+  redis: 6379
+  tika: 8093
 deps: [] # 直接依赖的其他模块（当前无；组件/镜像见 tech_stack 与 docker-compose）
 created: 2026-08-10
 integrated: 2026-08-17

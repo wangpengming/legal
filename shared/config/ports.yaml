@@ -1,0 +1,46 @@
+# =============================================
+# 模块端口注册表 / Module Port Registry
+# =============================================
+# 原则（详见 AGENTS.md §10.4.2）：
+#   1. 每个模块端口必须在此登记，避免冲突
+#   2. module.yaml 强制声明 port 字段，与本表一致
+#   3. 启动前 start.py 必须检测端口占用
+#   4. 端口冲突时，先查本表定位占用方，再调整
+# =============================================
+
+# 端口分配规则速查
+# | 类型              | 推荐段          | 说明                         |
+# |-------------------|-----------------|------------------------------|
+# | Streamlit         | 18500-18599     | 避开 8501 默认端口            |
+# | FastAPI           | 8000-8099       | 8000 为首选                   |
+# | 前端（Vite/Nginx）| 5173 / 8080     | 5173=Vite dev；8080=生产      |
+# | 数据库容器        | 5432 / 8090+    | PostgreSQL/NocoDB/Paperless |
+# | OCR/文件转换      | 8092-8099       | Gotenberg/Tika              |
+
+allocations:
+  # Streamlit 模块
+  court-doc-generator:
+    app: 18501          # Streamlit 主端口（避开默认 8501）
+    fallback: 19000     # 默认端口被占用时备选
+
+  # FastAPI + 前端 模块
+  litigation-system:
+    api: 8000           # FastAPI 后端
+    web: 8080           # 前端 Nginx 容器对外端口
+    fallback_api: 18000 # 后端端口被占用时备选
+
+  # Docker Compose 模块
+  case-intelligence:
+    nocodb: 8090            # NocoDB Web UI
+    paperless: 8091         # Paperless-ngx Web UI
+    gotenberg: 8092         # Gotenberg（PDF/文档转换）
+    postgres_nocodb: 5432   # NocoDB 专用 PostgreSQL
+    postgres_paperless: 5433 # Paperless 专用 PostgreSQL
+    redis: 6379             # Paperless 缓存
+    tika: 8093              # Apache Tika（备用 OCR）
+
+# 端口冲突解决策略
+conflict_resolution:
+  - "默认端口被占用 → 自动切 fallback"
+  - "fallback 也被占用 → 报错并提示手动释放"
+  - "不要默默换端口（避免配置漂移，违反 §10.4.2）"

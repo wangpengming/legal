@@ -3,6 +3,9 @@ version: 1.1.4
 status: active
 description: 出庭手续文档生成器（7份材料一键生成 + PDF合并预览 + 拍照扫描功能规划中）
 entry: app.py
+port:
+  app: 18501          # Streamlit 主端口（避开默认 8501）
+  fallback: 19000     # 默认端口被占用时备选
 deps: [] # 直接依赖的其他模块（当前无）
 created: 2026-08-17
 tech_stack:
