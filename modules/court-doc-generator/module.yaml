@@ -1,0 +1,26 @@
+name: court-doc-generator
+version: 1.0.0
+status: active
+description: 出庭手续文档生成器（7份材料一键生成 + PDF合并预览 + 拍照扫描功能规划中）
+entry: app.py
+deps:
+  - streamlit
+  - python-docx
+  - pypdf
+  - pymupdf
+created: 2026-08-17
+tech_stack:
+  - Python 3.12
+  - Streamlit
+  - SQLite
+  - python-docx
+  - pypdf
+  - PyMuPDF
+features:
+  - Word模板填充（中文全角【】占位符）
+  - DOCX转PDF
+  - PDF合并
+  - 浏览器内PDF预览（PDF.js base64方案）
+  - ZIP打包
+  - 拍照扫描功能（规划中，待澄清需求）
+readme: docs/README.md

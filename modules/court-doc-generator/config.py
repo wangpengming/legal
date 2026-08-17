@@ -1,0 +1,81 @@
+"""配置管理：加载项目配置和静态信息。"""
+import json
+from pathlib import Path
+
+# 项目根目录
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+TEMPLATES_DIR = PROJECT_ROOT / "templates"
+STATIC_DIR = PROJECT_ROOT / "static"
+CONFIG_DIR = PROJECT_ROOT / "config"
+DATA_DIR = PROJECT_ROOT / "data"
+OUTPUTS_DIR = PROJECT_ROOT / "outputs"
+
+# 确保必要目录存在
+for d in [TEMPLATES_DIR, STATIC_DIR, CONFIG_DIR, DATA_DIR, OUTPUTS_DIR]:
+    d.mkdir(parents=True, exist_ok=True)
+
+# 数据库路径
+DB_PATH = DATA_DIR / "court_matters.db"
+
+# 模板文件清单
+TEMPLATE_FILES = {
+    "legal_rep_cert": "2.法定代表人证明.docx",
+    "power_of_attorney": "4.授权委托书.docx",
+    "recommendation": "5.推荐信.docx",
+}
+
+# 静态 PDF 文件清单（按出庭提交顺序）
+STATIC_FILES = [
+    "1.营业执照复印件.pdf",
+    "法人身份证.pdf",
+    "代理人劳动合同.pdf",
+    "代理人身份证.pdf",
+]
+
+
+def get_template_path(key: str) -> Path:
+    """获取模板文件路径。"""
+    if key not in TEMPLATE_FILES:
+        raise ValueError(f"未知模板: {key}")
+    return TEMPLATES_DIR / TEMPLATE_FILES[key]
+
+
+def get_static_files() -> list:
+    """获取所有静态文件路径（按出庭顺序）。"""
+    files = []
+    # 营业执照
+    biz_license = STATIC_DIR / "1.营业执照复印件.pdf"
+    if biz_license.exists():
+        files.append(biz_license)
+    # 法人身份证
+    legal_id = STATIC_DIR / "法人身份证.pdf"
+    if legal_id.exists():
+        files.append(legal_id)
+    # 劳动合同
+    labor_contract = STATIC_DIR / "代理人劳动合同.pdf"
+    if labor_contract.exists():
+        files.append(labor_contract)
+    # 代理人身份证
+    agent_id = STATIC_DIR / "代理人身份证.pdf"
+    if agent_id.exists():
+        files.append(agent_id)
+    return files
+
+
+def load_json_config(filename: str) -> dict:
+    """加载 JSON 配置文件。"""
+    config_path = CONFIG_DIR / filename
+    if not config_path.exists():
+        return {}
+    try:
+        with open(config_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return {}
+
+
+def save_json_config(filename: str, data: dict) -> None:
+    """保存 JSON 配置文件。"""
+    config_path = CONFIG_DIR / filename
+    with open(config_path, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
