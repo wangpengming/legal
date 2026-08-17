@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>指标口径中心 · 法务诉讼业务平台（原型）</title>
+<link rel="stylesheet" href="assets/prototype.css">
+<style>
+  .metric-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 14px; }
+  .m-code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; font-size: 11.5px; line-height: 1.7; margin: 8px 0; overflow-x: auto; white-space: nowrap; }
+  .m-env { font-size: 11px; color: var(--muted-2); margin-top: 6px; }
+  .ver-tag { font-size: 10px; padding: 1px 7px; border-radius: 5px; margin-left: 6px; font-weight: 500; }
+  .ver-tag.cur { background: color-mix(in srgb, var(--success) 14%, transparent); color: var(--success); border: 1px solid color-mix(in srgb, var(--success) 40%, transparent); }
+  .ver-tag.old { background: var(--surface-2); color: var(--muted-2); }
+  .diag { display: flex; gap: 6px; align-items: center; }
+  .diag i { width: 26px; height: 6px; border-radius: 3px; background: var(--surface-2); position: relative; }
+  .diag i b { position: absolute; left: 0; top: 0; height: 100%; border-radius: 3px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar" id="sidebar">
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <div class="brand" style="padding:6px 8px 14px">
+        <div class="brand-logo">法</div>
+        <div><div class="brand-name">法务诉讼平台</div><div class="brand-sub">Legal Case Workspace</div></div>
+      </div>
+      <button class="icon-btn btn-sm" id="collapseBtn" style="margin-bottom:8px">«</button>
+    </div>
+    <nav>
+      <div class="nav-group">
+        <div class="nav-label">工作台</div>
+        <a class="nav-item" href="01-overview.html"><span class="nav-ico">▦</span>态势总览</a>
+        <a class="nav-item" href="02-search.html"><span class="nav-ico">⌕</span>案件检索<span class="nav-count">638</span></a>
+        <a class="nav-item" href="09-ai.html"><span class="nav-ico">✦</span>AI 对话<span class="ph-badge">Beta</span></a>
+      </div>
+      <div class="nav-group">
+        <div class="nav-label">分析</div>
+        <a class="nav-item" href="04-parties.html"><span class="nav-ico">▣</span>对手方画像</a>
+        <a class="nav-item" href="05-analysis.html"><span class="nav-ico">◫</span>多维分析</a>
+        <a class="nav-item" href="06-songs.html"><span class="nav-ico">♪</span>歌曲维度</a>
+        <a class="nav-item" href="07-fees.html"><span class="nav-ico">¥</span>费用看板</a>
+        <a class="nav-item active" href="08-metrics.html"><span class="nav-ico">◎</span>指标口径中心</a>
+      </div>
+      <div class="nav-group">
+        <div class="nav-label">系统</div>
+        <a class="nav-item" href="10-sync.html"><span class="nav-ico">↻</span>同步管理</a>
+        <a class="nav-item" href="11-dicts.html"><span class="nav-ico">☰</span>词典与清洗规则</a>
+      </div>
+    </nav>
+    <div class="side-foot">v0.1.0 Preview<br>数据截至 2026-08-13 03:00</div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="search-box"><input placeholder="全局检索：案号 / 案由 / 歌曲 / 对手方…"><span class="kbd">/</span><span class="s-ico">⌕</span></div>
+      <div class="top-right">
+        <span class="badge status-green"><i class="dot"></i>已同步 · 638 条</span>
+        <button class="icon-btn" id="themeBtn">🌙</button>
+      </div>
+    </div>
+
+    <div class="content">
+      <div class="crumb-path">
+        <a href="00-index.html">原型导航</a><span class="sep">/</span>
+        <a href="08-metrics.html">指标口径中心</a><span class="sep">/</span>
+        <span class="cur">口径版本 v1.0（生效 2026-07-01）</span>
+      </div>
+
+      <div class="page-head">
+        <div><h1 class="page-title">指标口径中心</h1>
+          <div class="page-breadcrumb">8 项核心指标的计算口径、版本与审计轨迹 —— 指标改了名，历史报表必须可追溯</div>
+        </div>
+        <div class="page-actions">
+          <span class="badge status-green" style="height:26px"><i class="dot"></i>当前版本 v1.0</span>
+          <button class="btn btn-sm" onclick="toast('已从飞书多维表格拉取口径文档（bitable）')">↻ 拉取</button>
+          <button class="btn btn-sm btn-primary" onclick="toast('发起口径变更评审（流转到飞书审批）')">＋ 发起口径变更</button>
+        </div>
+      </div>
+
+      <div class="alert amber" style="margin-bottom:14px">
+        <span>⚠</span>
+        <span class="grow"><b>口径变更提示：</b>v0.9 → v1.0 两处变化 —— ①「胜诉率B」分母改为 已结案（含和解/撤回视为未胜诉）；②「单曲判赔」增加「关联歌曲去重」口径。v0.9 报表可在「历史版本」中回溯。</span>
+        <button class="btn btn-sm" onclick="toast('已打开 v0.9 口径快照（只读）')">查看 v0.9 →</button>
+      </div>
+
+      <!-- 8 指标卡 -->
+      <div class="metric-grid" id="metricGrid"></div>
+
+      <!-- 版本与变更 -->
+      <div class="grid-2" style="grid-template-columns:1fr 1fr;margin-top:14px">
+        <div class="card card-pad">
+          <div class="card-title">版本历史</div>
+          <div class="timeline">
+            <div class="tl-node done"><div class="tl-label">v1.0 · 当前</div><div class="tl-date">2026-07-01 生效 · 变更 2 项 · 影响报表 12 张</div></div>
+            <div class="tl-node done"><div class="tl-label">v0.9 · 基准</div><div class="tl-date">2026-03-15 生效 · 首次双口径（A/B）并存</div></div>
+            <div class="tl-node done"><div class="tl-label">v0.8</div><div class="tl-date">2025-11-02 · 引入系列案系数（series_coef）</div></div>
+            <div class="tl-node done"><div class="tl-label">v0.5</div><div class="tl-date">2025-06-18 · 全量指标首次固化</div></div>
+          </div>
+        </div>
+        <div class="card card-pad">
+          <div class="card-title">v0.9 → v1.0 变更明细</div>
+          <table class="tbl" style="width:100%">
+            <thead><tr><th>指标</th><th>变更前 v0.9</th><th>变更后 v1.0</th><th>审批</th></tr></thead>
+            <tbody>
+              <tr><td>胜诉率B</td><td>分母=已结+撤回</td><td>分母=已结案</td><td><span class="badge status-green" style="height:18px">已通过</span></td></tr>
+              <tr><td>单曲判赔</td><td>案内歌曲数</td><td>关联歌曲去重</td><td><span class="badge status-green" style="height:18px">已通过</span></td></tr>
+              <tr><td>开庭周期</td><td>自然日</td><td>工作日（调整）</td><td><span class="badge status-amber" style="height:18px">评审中</span></td></tr>
+            </tbody>
+          </table>
+          <div class="card-hint" style="margin-top:10px">审批流：口径变更 → 飞书审批 → 存档 → 自动重算全部报表并标注影响范围</div>
+        </div>
+      </div>
+
+      <footer class="footnote" style="text-align:right">口径版本随每条聚合结果快照保存 · 全部 8 项指标支持 SQL 断言测试 · 数据截至 2026-08-13 03:00</footer>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const themeBtn = document.getElementById('themeBtn');
+themeBtn.onclick=()=>{ const d=document.documentElement.dataset.theme==='dark'; document.documentElement.dataset.theme=d?'light':'dark'; themeBtn.textContent=d?'🌙':'☀'; };
+const sb=document.getElementById('sidebar'), cb=document.getElementById('collapseBtn');
+cb.onclick=()=>{ sb.classList.toggle('collapsed'); cb.textContent=sb.classList.contains('collapsed')?'»':'«'; };
+let tt;
+function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(tt); tt=setTimeout(()=>t.classList.remove('show'),2200); }
+
+const METRICS = [
+  {
+    name:'胜诉率A（win_rate_a）', cur:true,
+    val:'78.2% · v1.0', unit:'全库已结案',
+    code:`-- 分母：已结案总数；分子：结案原因 IN ('胜诉','驳回对方诉讼请求'…)\nSELECT count(*) FILTER (WHERE 结案原因 LIKE '胜诉%')::float\n     / count(*) FILTER (WHERE 案件状态 LIKE '已结案%') AS win_rate_a\nFROM 案件表 WHERE 对方诉求支持率 IS NOT NULL;`,
+    env:'示例值：244 / 312 · 生效版本 v1.0（2026-07-01）',
+    note:'与「胜诉率B」差异：B 将和解/撤回计入分母且视为未胜诉。',
+    diag: 78
+  },
+  {
+    name:'胜诉率B（win_rate_b）', cur:true,
+    val:'71.2% · v1.0', unit:'全库已结+撤回',
+    code:`-- v1.0 变更：分母=已结案；和解/撤回计入分母且记为未胜诉\nSELECT count(*) FILTER (WHERE 结案原因 IN ('胜诉','驳回对方诉讼请求'))::float\n     / count(*) FILTER (WHERE 案件状态 IN ('已结案')) AS win_rate_b\nFROM 案件表;`,
+    env:'示例值：244 / 343 · 生效版本 v1.0（分母口径调整）',
+    note:'v0.9 分母含已结+撤回（371）。历史报表需标注版本。',
+    diag: 71
+  },
+  {
+    name:'对方诉求支持率（support_rate）', cur:true,
+    val:'6.4% · 均值', unit:'公式字段 · 0~1',
+    code:`-- 飞书公式字段复刻：支持率 = 判赔金额 / 原告诉求金额\n-- 仅统计 判赔/部分支持 案件；胜诉案=0%\nSELECT avg(判赔金额::float / NULLIF(原告诉求金额,0)) AS support_rate\nFROM 案件表 WHERE 原告诉求金额 > 0;`,
+    env:'全库均值 6.4% · 车载线最高 14.2%',
+    note:'本地重算与飞书公式两路校验，误差 &lt;0.1pct。',
+    diag: 6
+  },
+  {
+    name:'判赔率（verdict_rate）', cur:true,
+    val:'31.2% · 均值', unit:'判赔案 · 仅判赔',
+    code:`-- 分母：结案原因=判赔 的案件；分子：判赔金额；产出百分率\nSELECT avg(判赔金额::float / NULLIF(原告诉求金额,0)) AS verdict_rate\nFROM 案件表 WHERE 结案原因='判赔' AND 原告诉求金额 > 0;`,
+    env:'示例：41 案判赔 · 单案最高 84%',
+    note:'排除「终本」与「未知」；与 support_rate 共用分子分母。',
+    diag: 31
+  },
+  {
+    name:'单曲判赔（per_song）', cur:true,
+    val:'¥870 · 均值', unit:'元 / 曲',
+    code:`-- v1.0：关联歌曲经 DuplexLink 解析后按歌曲去重\nSELECT avg(判赔金额::float / 去重歌曲数) AS per_song\nFROM 案件表 WHERE 结案原因='判赔' AND 去重歌曲数 > 0;`,
+    env:'案例：¥600~¥3,000 · 车载线最高',
+    note:'v0.9 按案内歌曲数（未去重）计，环比相差约 6%。',
+    diag: 0
+  },
+  {
+    name:'开庭周期（cycle）', cur:true,
+    val:'186 天 · 均值', unit:'收案→结案',
+    code:`-- 周期 = 结案日期 - 收案日期（v1.0 起按工作日）\nSELECT avg(workday_diff(收案日期, 结案日期)) AS cycle\nFROM 案件表 WHERE 结案日期 IS NOT NULL;`,
+    env:'最长 342 天（2023 系列案）· 最短 37 天',
+    note:'v1.0 尝试切换工作日口径，评审中待定案。',
+    diag: 0
+  },
+  {
+    name:'系列案系数（series_coef）', cur:true,
+    val:'1.0 · 9/9', unit:'父/子计数',
+    code:`-- 由 案件表.系列案父记录 SingleLink 展开计数\nSELECT 父记录, count(*) AS 子案数,\n  round(count(*)/9.0, 2) AS series_coef\nFROM 案件表 GROUP BY 父记录;`,
+    env:'示例：24571 号父节点 9 案 → 系数 1.0',
+    note:'系数用于批量案成本分摊与判赔单位对比。',
+    diag: 0
+  },
+  {
+    name:'在办未结（open_count）', cur:true,
+    val:'47 → 44 → 42', unit:'当前在办',
+    code:`-- 案件状态 NOT IN (结案类 15 项) 即记为在办\nSELECT count(*) FILTER (WHERE 案件状态 NOT IN ('已结案','终本','原告撤诉'…))\n       AS open_count FROM 案件表;`,
+    env:'较上月 −3 · 3 件处于上诉期',
+    note:'月度快照存历史，用于在办趋势回溯。',
+    diag: 0
+  },
+];
+
+document.getElementById('metricGrid').innerHTML = METRICS.map(m=>`
+  <div class="card card-pad">
+    <div class="card-title" style="display:flex;align-items:center">
+      ${m.name}<span class="ver-tag cur">v1.0</span><span style="margin-left:auto;font-size:11px;color:var(--muted-2)">${m.unit}</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;margin:8px 0 2px">
+      <div style="font-size:24px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--primary)">${m.val}</div>
+      ${m.diag>0?`<span class="diag" title="示例口径进度"><i><b style="width:${m.diag}%;background:var(--primary)"></b></i></span>`:''}
+      <button class="btn btn-sm btn-ghost" style="height:22px;font-size:11px;margin-left:auto" onclick="toast('已复制「${m.name}」口径 SQL 断言模板')">复制断言</button>
+    </div>
+    <div class="m-code">${m.code}</div>
+    <div class="m-env">${m.env}</div>
+    <div style="font-size:11.5px;color:var(--muted);margin-top:6px">${m.note}</div>
+  </div>`).join('');
+</script>
+</body>
+</html>

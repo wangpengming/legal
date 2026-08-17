@@ -1,0 +1,1 @@
+"""AI 集成层（Phase 3：Mode A 对话 / Mode B MCP / 报告模板 T1~T7）。"""

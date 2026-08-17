@@ -1,0 +1,38 @@
+# ── Python ─────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+
+# ── 环境与密钥（决策 D2：飞书凭证仅 env 注入，绝不落库/提交） ──
+.env
+.env.*
+!.env.example
+
+# ── 数据文件（SQLite(WAL)，卷外保存；保留 data/.gitkeep） ──
+data/*.db
+data/*.db-wal
+data/*.db-shm
+data/*.tmp
+*.db
+*.db-wal
+*.db-shm
+*.sqlite3
+
+# ── 前端 ───────────────────────────────────────────────
+node_modules/
+dist/
+frontend/dist/
+*.tsbuildinfo
+
+# ── 日志 / IDE / 系统 ──────────────────────────────────
+*.log
+.DS_Store
+.cache/
+.idea/
+.vscode/
+*.local

@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>歌曲维度 · 法务诉讼业务平台（原型）</title>
+<link rel="stylesheet" href="assets/prototype.css">
+<style>
+  .song-stat-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; margin-bottom: 16px; }
+  .song-line { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background .12s; }
+  .song-line:hover { background: var(--surface-2); }
+  .song-line:last-child { border-bottom: none; }
+  .s-cover { width: 40px; height: 40px; border-radius: 9px; background: linear-gradient(135deg, var(--primary-soft), color-mix(in srgb, var(--primary) 30%, transparent)); color: var(--primary); display: grid; place-items: center; font-size: 16px; flex-shrink: 0; }
+  .s-meta { font-size: 11.5px; color: var(--muted-2); margin-top: 2px; }
+  .s-cases { font-variant-numeric: tabular-nums; font-weight: 600; font-size: 13px; }
+  .s-amt { font-variant-numeric: tabular-nums; color: var(--text); font-weight: 500; }
+  .s-chip { font-size: 11px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px; padding: 1px 7px; color: var(--muted); white-space: nowrap; }
+  .s-chip.danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 40%, transparent); background: color-mix(in srgb, var(--danger) 8%, transparent); }
+  .s-chip.ok { color: var(--success); border-color: color-mix(in srgb, var(--success) 40%, transparent); background: color-mix(in srgb, var(--success) 8%, transparent); }
+  .song-head { display: flex; gap: 14px; align-items: center; padding: 18px; margin-bottom: 14px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar" id="sidebar">
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <div class="brand" style="padding:6px 8px 14px">
+        <div class="brand-logo">法</div>
+        <div><div class="brand-name">法务诉讼平台</div><div class="brand-sub">Legal Case Workspace</div></div>
+      </div>
+      <button class="icon-btn btn-sm" id="collapseBtn" style="margin-bottom:8px">«</button>
+    </div>
+    <nav>
+      <div class="nav-group">
+        <div class="nav-label">工作台</div>
+        <a class="nav-item" href="01-overview.html"><span class="nav-ico">▦</span>态势总览</a>
+        <a class="nav-item" href="02-search.html"><span class="nav-ico">⌕</span>案件检索<span class="nav-count">638</span></a>
+        <a class="nav-item" href="09-ai.html"><span class="nav-ico">✦</span>AI 对话<span class="ph-badge">Beta</span></a>
+      </div>
+      <div class="nav-group">
+        <div class="nav-label">分析</div>
+        <a class="nav-item" href="04-parties.html"><span class="nav-ico">▣</span>对手方画像</a>
+        <a class="nav-item" href="05-analysis.html"><span class="nav-ico">◫</span>多维分析</a>
+        <a class="nav-item active" href="06-songs.html"><span class="nav-ico">♪</span>歌曲维度</a>
+        <a class="nav-item" href="07-fees.html"><span class="nav-ico">¥</span>费用看板</a>
+        <a class="nav-item" href="08-metrics.html"><span class="nav-ico">◎</span>指标口径中心</a>
+      </div>
+      <div class="nav-group">
+        <div class="nav-label">系统</div>
+        <a class="nav-item" href="10-sync.html"><span class="nav-ico">↻</span>同步管理</a>
+        <a class="nav-item" href="11-dicts.html"><span class="nav-ico">☰</span>词典与清洗规则</a>
+      </div>
+    </nav>
+    <div class="side-foot">v0.1.0 Preview<br>数据截至 2026-08-13 03:00</div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="search-box"><input placeholder="全局检索：案号 / 案由 / 歌曲 / 对手方…"><span class="kbd">/</span><span class="s-ico">⌕</span></div>
+      <div class="top-right">
+        <span class="badge status-green"><i class="dot"></i>已同步 · 638 条</span>
+        <button class="icon-btn" id="themeBtn">🌙</button>
+      </div>
+    </div>
+
+    <div class="content">
+      <div class="crumb-path">
+        <a href="00-index.html">原型导航</a><span class="sep">/</span>
+        <a href="06-songs.html">歌曲维度</a><span class="sep">/</span>
+        <span class="cur">全曲库视图（TOP 40）</span>
+      </div>
+
+      <div class="page-head">
+        <div><h1 class="page-title">歌曲维度</h1>
+          <div class="page-breadcrumb">按歌曲聚合案件：涉案件数、平均单曲判赔、系列案集中度 —— 定位高风险曲目与可复用判例</div>
+        </div>
+        <div class="page-actions">
+          <button class="btn btn-sm" onclick="toast('已导出歌曲-案件矩阵 CSV（38 行）')">⬇ 导出矩阵</button>
+          <button class="btn btn-sm btn-primary" onclick="location.href='09-ai.html'">AI 分析风险歌曲</button>
+        </div>
+      </div>
+
+      <!-- KPI 4 卡 -->
+      <div class="song-stat-row">
+        <div class="card card-pad stat-card" onclick="toast('曲库去重后歌曲数（DuplexLink 歌曲表 tblCGACAzAMGd5eX）')">
+          <div class="stat-label">曲库歌曲（去重）</div>
+          <div class="stat-value" style="font-size:26px">1,284</div>
+          <div class="stat-delta">覆盖案件 612 / 638</div>
+        </div>
+        <div class="card card-pad stat-card" onclick="toast('公式字段：单曲判赔 = 判赔金额 / 涉诉歌曲数（按案平均）')">
+          <div class="stat-label">平均单曲判赔</div>
+          <div class="stat-value" style="font-size:26px">¥870</div>
+          <div class="stat-delta">中位数 ¥600 · 最高 ¥3,000</div>
+        </div>
+        <div class="card card-pad stat-card" onclick="toast('同一歌曲被重复起诉的数量（批量诉讼集中度）')">
+          <div class="stat-label">高频歌曲（≥5 案）</div>
+          <div class="stat-value" style="font-size:26px">36 首</div>
+          <div class="stat-delta">贡献案件 214 / 638（33.5%）</div>
+        </div>
+        <div class="card card-pad stat-card" onclick="toast('口径：歌曲备案年代，2018 前更常被音集协批量发起')">
+          <div class="stat-label">老歌备案（≤2010）</div>
+          <div class="stat-value" style="font-size:26px">528 首</div>
+          <div class="stat-delta">涉诉率 23.4%（全库 16.8%）</div>
+        </div>
+      </div>
+
+      <div class="grid-2" style="grid-template-columns:1.6fr 1fr">
+        <!-- TOP 歌曲列表 -->
+        <div class="card">
+          <div class="card-head" style="display:flex;align-items:center;padding:14px 16px;gap:10px;border-bottom:1px solid var(--border)">
+            <div class="card-title" style="margin:0">TOP 涉诉歌曲<span class="help" style="margin-left:6px">按涉案件数降序 · 点击行查看关联案件</span></div>
+            <div style="margin-left:auto;display:flex;gap:6px">
+              <input class="inp" id="songKw" placeholder="筛选歌曲 / 演唱 / 作曲…" style="width:180px;height:28px;font-size:12px">
+            </div>
+          </div>
+          <div class="tbl-wrap" style="border:none;border-radius:0;max-height:520px;overflow-y:auto">
+            <table class="tbl" style="width:100%">
+              <thead><tr><th>歌曲</th><th>演唱 / 作曲</th><th>涉案</th><th>平均判赔</th><th>系列案集中度</th><th>风险</th></tr></thead>
+              <tbody id="songRows"></tbody>
+            </table>
+          </div>
+          <div class="card-hint" style="padding:10px 16px">TOP 40 展示 · 其余 1,244 首涉诉 ≤2 案 · 📂 本地曲库唯一口径 / ⚖️ 案例库同曲判例 / 📜 备案信息</div>
+        </div>
+
+        <!-- 右侧：选中歌曲详情 -->
+        <div class="col" style="min-width:0">
+          <div class="card card-pad" id="songDetail">
+            <div class="card-title">歌曲画像 <span class="help">点击左侧歌曲行加载</span></div>
+            <div style="padding:18px 0;text-align:center;color:var(--muted-2);font-size:13px" id="songEmpty">
+              ← 从左侧选择一首歌曲<br><span style="font-size:11.5px">将聚合展示该曲全部 35 字段关联信息</span>
+            </div>
+          </div>
+          <div class="card card-pad" style="margin-top:14px">
+            <div class="card-title">风险提示（规则引擎）</div>
+            <div class="alert amber" style="margin-top:4px">
+              <span>⚠</span>
+              <span class="grow"><b>高集中度批量风险：</b>「可可西里」「故乡的云」等 6 首歌曲近 2 年新增批量案 ≥8 件，判赔单位价被持续压低（均值 712 → 480），建议纳入批量应对预案。</span>
+            </div>
+            <div class="alert blue" style="margin-top:10px">
+              <span>💡</span>
+              <span class="grow"><b>类推判例：</b>「可可西里」在粤地区 3 案被判赔 35~40%，远高于北京 6~8% —— 管辖策略可参考（详见对手方画像页）。</span>
+              <button class="btn btn-sm" style="height:24px;font-size:11px" onclick="location.href='04-parties.html'">查看 →</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer class="footnote" style="text-align:right">歌曲维度由 DuplexLink（歌曲表 tblCGACAzAMGd5eX · composer/member 边解析）聚合派生 · 口径 v1.0 · 数据截至 2026-08-13 03:00</footer>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<div class="drawer" id="songDrawer"><div class="drawer-mask" onclick="closeDrawer()"></div><div class="drawer-panel" id="songDrawerBox"></div></div>
+
+<script>
+const themeBtn = document.getElementById('themeBtn');
+themeBtn.onclick=()=>{ const d=document.documentElement.dataset.theme==='dark'; document.documentElement.dataset.theme=d?'light':'dark'; themeBtn.textContent=d?'🌙':'☀'; };
+const sb=document.getElementById('sidebar'), cb=document.getElementById('collapseBtn');
+cb.onclick=()=>{ sb.classList.toggle('collapsed'); cb.textContent=sb.classList.contains('collapsed')?'»':'«'; };
+let tt;
+function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(tt); tt=setTimeout(()=>t.classList.remove('show'),2200); }
+
+/* ===== TOP 歌曲示例数据（n=涉案件数 / amt=平均判赔 / ser=系列案集中度 / risk） ===== */
+const SONGS = [
+  ['可可西里','ansher / 词曲·李xx',16,'¥480','高','danger'],
+  ['故乡的云','费翔 / 作曲·谭健常',12,'¥720','高','danger'],
+  ['走四方','韩磊 / 词曲·李海鹰',11,'¥810','中','warn'],
+  ['春天里','汪峰 / 词曲·汪峰',9,'¥1,020','中','warn'],
+  ['大约在冬季','齐秦 / 词曲·齐秦',8,'¥900','低','ok'],
+  ['月亮代表我的心','邓丽君 / 词曲·孙仪',8,'¥660','低','ok'],
+  ['甜蜜蜜','邓丽君 / 词曲·庄奴',7,'¥1,400','低','ok'],
+  ['吻别','张学友 / 词曲·殷文琦',6,'¥1,150','低','ok'],
+  ['青藏高原','李娜 / 词曲·张千一',6,'¥2,300','低','ok'],
+  ['小苹果','筷子兄弟 / 词曲·王太利',5,'¥1,900','低','ok'],
+];
+
+function esc(s){ return s.replace(/'/g,"\\'"); }
+function renderSongs(kw){
+  const kwl = (kw||'').trim().toLowerCase();
+  const rows = SONGS.filter(r=>!kwl || r.join(' ').toLowerCase().includes(kwl));
+  document.getElementById('songRows').innerHTML = rows.map((r,i)=>{
+    const [song,credit,n,amt,ser,risk] = r;
+    const riskCls = risk==='danger' ? 's-chip danger' : risk==='warn' ? 's-chip' : 's-chip ok';
+    const riskTxt = risk==='danger' ? '⚠ 高' : risk==='warn' ? '▲ 中' : '✓ 低';
+    return `<tr style="cursor:pointer" onclick="showSong('${esc(song)}',${i})">
+      <td><div class="s-cover" style="width:30px;height:30px;font-size:13px;display:inline-grid">♪</div> <b style="font-size:13px">${song}</b></div></td>
+      <td><div style="font-size:12px">${credit}</div><div class="s-meta">备案 ${2005 + (i*2) % 15}</div></td>
+      <td class="s-cases">${n} 案</td>
+      <td class="s-amt">¥${amt}</td>
+      <td><span class="s-chip ${ser==='高'?'danger':''}" style="${ser==='中'?'color:var(--warning);border-color:color-mix(in srgb,var(--warning) 40%,transparent)':''}">${ser}</span></td>
+      <td><span class="${riskCls}" style="margin-left:auto">${riskTxt}</span></td>
+    </tr>`;
+  }).join('') || `<tr><td colspan="6" style="text-align:center;color:var(--muted-2);padding:30px">未找到匹配歌曲</td></tr>`;
+}
+function showSong(song, idx){
+  const d = document.getElementById('songDetail');
+  const r = SONGS[idx];
+  const [name,credit,n,amt,ser] = r;
+  d.innerHTML = `
+    <div class="card-title" style="display:flex;align-items:center;gap:8px">歌曲画像 <span class="badge status-blue" style="height:20px;margin-left:auto">${ser}集中度</span></div>
+    <div style="display:flex;gap:14px;align-items:center;margin:16px 0">
+      <div class="s-cover" style="width:52px;height:52px;font-size:22px">♪</div>
+      <div>
+        <div style="font-size:17px;font-weight:600">${name}</div>
+        <div class="s-meta" style="margin-top:4px">${credit} · 备案年份 ${2005 + (idx*2) % 15}</div>
+      </div>
+    </div>
+    <div class="detail-grid" style="grid-template-columns:repeat(2,1fr)">
+      <div class="dg-item"><div class="dg-label">涉诉案件</div><div class="dg-value" style="color:var(--primary)">${n} 件</div></div>
+      <div class="dg-item"><div class="dg-label">平均单曲判赔</div><div class="dg-value" style="color:var(--danger)">¥${amt}</div></div>
+      <div class="dg-item"><div class="dg-label">判赔率</div><div class="dg-value">${18 + idx*3}%</div></div>
+      <div class="dg-item"><div class="dg-label">主要对手方</div><div class="dg-value">音集协（${Math.round(n*0.85)} 件）</div></div>
+      <div class="dg-item"><div class="dg-label">主要业务线</div><div class="dg-value">VOD / 车载</div></div>
+      <div class="dg-item"><div class="dg-label">最新一案</div><div class="dg-value" style="font-size:11.5px">（2025）京0108民初24571号</div></div>
+    </div>
+    <div style="margin-top:14px;display:flex;gap:8px">
+      <button class="btn btn-sm btn-primary" onclick="openSongCases('${esc(name)}')">查看关联 ${n} 案</button>
+      <button class="btn btn-sm" onclick="toast('该曲新增打标：风险曲目')">+ 标为风险曲目</button>
+    </div>`;
+  document.getElementById('songEmpty') && (document.getElementById('songEmpty').style.display='none');
+}
+function openSongCases(song){
+  const box = document.getElementById('songDrawerBox');
+  box.innerHTML = `
+    <div class="drawer-title">「${song}」关联案件<span class="drawer-x" onclick="closeDrawer()">✕</span></div>
+    <div class="card-hint" style="margin:12px 0">曲库关联 16 件（近 3 年 9 件） · 三源校验：📂 本地 16 / ⚖️ 案例库 42 / 📜 备案 1</div>
+    <table class="tbl" style="width:100%">
+      <thead><tr><th>案号</th><th>年份</th><th>对手方</th><th>标的</th><th>结果</th></tr></thead>
+      <tbody>
+        <tr onclick="location.href='03-case-detail.html'"><td>（2025）京0108民初24571号</td><td>2025</td><td>音集协</td><td class="money">¥120,000</td><td><span class="badge status-green"><i class="dot"></i>胜诉</span></td></tr>
+        <tr onclick="location.href='03-case-detail.html'"><td>（2025）京0108民初24572号</td><td>2025</td><td>音集协</td><td class="money">¥120,000</td><td><span class="badge status-green"><i class="dot"></i>胜诉</span></td></tr>
+        <tr onclick="location.href='03-case-detail.html'"><td>（2026）湘0202民初2210号</td><td>2026</td><td>音集协</td><td class="money">¥105,000</td><td><span class="badge status-amber"><i class="dot"></i>判赔</span></td></tr>
+        <tr><td>…共 16 件（示例前 3 条）</td><td colspan="4" style="color:var(--muted-2)"></td></tr>
+      </tbody>
+    </table>
+    <div style="margin-top:14px"><button class="btn btn-sm" onclick="closeDrawer();location.href='02-search.html'">在检索页打开全部 →</button></div>`;
+  document.getElementById('songDrawer').classList.add('open');
+}
+function closeDrawer(){ document.getElementById('songDrawer').classList.remove('open'); }
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeDrawer(); });
+document.getElementById('songKw').addEventListener('input', e=> renderSongs(e.target.value));
+renderSongs('');
+</script>
+</body>
+</html>

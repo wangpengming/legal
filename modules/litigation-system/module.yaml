@@ -1,0 +1,38 @@
+name: litigation-system
+version: 0.2.0
+status: active
+description: 法务诉讼业务平台（飞书历年案件天级同步 + 组合检索/统计画像 + AI 双模式报告，数据基线 638 条）
+entry: backend/app/main.py
+deps:
+  - fastapi>=0.115
+  - sqlalchemy>=2.0
+  - apscheduler>=3.10
+  - jieba>=0.42.1
+  - openpyxl>=3.1
+created: 2026-08-13
+integrated: 2026-08-17
+tech_stack:
+  - Python 3.11 FastAPI
+  - React 18 + Vite + TypeScript
+  - SQLite WAL + FTS5
+  - Zustand + TanStack Query
+  - ECharts
+  - Docker Compose
+env:
+  - FEISHU_APP_ID: 飞书应用 App ID（docs/01，仅元数据）
+  - FEISHU_APP_SECRET: 飞书应用 App Secret（仅存 .env，不落文档/不提交）
+  - FEISHU_APP_TOKEN: 案例总表 Base App Token
+  - FEISHU_TABLE_CASES: 案件表 table_id
+  - FEISHU_TABLE_SONGS: 涉及歌曲清单表 table_id
+  - APP_TOKEN: 单用户 API 认证（可选）
+  - DATABASE_URL: 数据库地址（默认 sqlite:///<repo>/data/app.db）
+features:
+  - 飞书多维表格单向同步（天级 03:00 增量 / 手动全量 / 单条刷新，写读分离 + 3 次指数退避）
+  - 638 条案件基线落地 SQLite，SQLite FTS5 中文检索（jieba 分词）
+  - 数据清洗管道（规则表驱动 R01~R06，原始值/清洗值并存）
+  - 指标口径引擎（胜诉率 A/B 等 8 项，口径版本化，自动附脚注）
+  - 三源交叉验证框架（历史案件 / 网上判决 / 法律法规）
+  - AI 双模式：Mode A 内置对话 + Mode B MCP 报告模板（7 类）
+  - 12 个高保真可交互原型（docs/prototypes/）
+readme: docs/README.md
+spec: spec/SPEC.md

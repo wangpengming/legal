@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>对手方画像 · 法务诉讼业务平台（原型）</title>
+<link rel="stylesheet" href="assets/prototype.css">
+<style>
+  .profile-head { display: flex; gap: 16px; align-items: center; padding: 20px; margin-bottom: 16px; }
+  .p-logo { width: 52px; height: 52px; border-radius: 12px; background: linear-gradient(135deg, var(--primary), #60A5FA); color: #fff; display: grid; place-items: center; font-size: 22px; font-weight: 700; flex-shrink: 0; }
+  .p-name { font-size: 19px; font-weight: 600; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .p-meta { display: flex; gap: 16px; font-size: 12.5px; color: var(--muted); margin-top: 5px; flex-wrap: wrap; }
+  .p-meta b { color: var(--text); font-variant-numeric: tabular-nums; }
+  .year-bar { display: flex; align-items: flex-end; gap: 5px; height: 46px; margin-top: 8px; }
+  .year-bar i { flex: 1; background: linear-gradient(180deg, var(--danger), color-mix(in srgb, var(--danger) 50%, transparent)); border-radius: 3px 3px 0 0; min-height: 3px; }
+  .year-labels { display: flex; gap: 5px; font-size: 10px; color: var(--muted-2); margin-top: 3px; }
+  .year-labels span { flex: 1; text-align: center; }
+  .line-years { display: flex; gap: 0; border-left: 1px solid var(--border); padding-left: 12px; flex-direction: column; }
+  .ly-item { position: relative; padding: 2px 0 16px 12px; font-size: 12.5px; }
+  .ly-item::before { content: ""; position: absolute; left: -4.5px; top: 7px; width: 8px; height: 8px; border-radius: 50%; background: var(--primary); outline: 3px solid var(--primary-soft); }
+  .ly-item .ly-d { color: var(--muted); font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar" id="sidebar">
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <div class="brand" style="padding:6px 8px 14px">
+        <div class="brand-logo">法</div>
+        <div><div class="brand-name">法务诉讼平台</div><div class="brand-sub">Legal Case Workspace</div></div>
+      </div>
+      <button class="icon-btn btn-sm" id="collapseBtn" style="margin-bottom:8px">«</button>
+    </div>
+    <nav>
+      <div class="nav-group">
+        <div class="nav-label">工作台</div>
+        <a class="nav-item" href="01-overview.html"><span class="nav-ico">▦</span>态势总览</a>
+        <a class="nav-item" href="02-search.html"><span class="nav-ico">⌕</span>案件检索<span class="nav-count">638</span></a>
+        <a class="nav-item" href="09-ai.html"><span class="nav-ico">✦</span>AI 对话<span class="ph-badge">Beta</span></a>
+      </div>
+      <div class="nav-group">
+        <div class="nav-label">分析</div>
+        <a class="nav-item active" href="04-parties.html"><span class="nav-ico">▣</span>对手方画像</a>
+        <a class="nav-item" href="05-analysis.html"><span class="nav-ico">◫</span>多维分析</a>
+        <a class="nav-item" href="06-songs.html"><span class="nav-ico">♪</span>歌曲维度</a>
+        <a class="nav-item" href="07-fees.html"><span class="nav-ico">¥</span>费用看板</a>
+        <a class="nav-item" href="08-metrics.html"><span class="nav-ico">◎</span>指标口径中心</a>
+      </div>
+      <div class="nav-group">
+        <div class="nav-label">系统</div>
+        <a class="nav-item" href="10-sync.html"><span class="nav-ico">↻</span>同步管理</a>
+        <a class="nav-item" href="11-dicts.html"><span class="nav-ico">☰</span>词典与清洗规则</a>
+      </div>
+    </nav>
+    <div class="side-foot">v0.1.0 Preview<br>数据截至 2026-08-13 03:00</div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="search-box"><input placeholder="全局检索：案号 / 案由 / 歌曲 / 对手方…"><span class="kbd">/</span><span class="s-ico">⌕</span></div>
+      <div class="top-right">
+        <span class="badge status-green"><i class="dot"></i>已同步 · 638 条</span>
+        <button class="icon-btn" id="themeBtn">🌙</button>
+      </div>
+    </div>
+
+    <div class="content">
+      <div class="crumb-path">
+        <a href="00-index.html">原型导航</a><span class="sep">/</span>
+        <a href="04-parties.html">对手方画像</a><span class="sep">/</span>
+        <span class="cur">中国音像著作权集体管理协会</span>
+      </div>
+
+      <!-- 头卡 -->
+      <div class="card profile-head">
+        <div class="p-logo">音集协</div>
+        <div class="grow">
+          <div class="p-name">中国音像著作权集体管理协会
+            <span class="badge status-red"><i class="dot"></i>主要诉讼对手方</span>
+            <span class="badge status-blue">批量系列案发起方</span>
+          </div>
+          <div class="p-meta">
+            <span>我方案件 <b>312</b> 件（占全库 48.9%）</span>
+            <span>首次交锋 <b>2019-04</b></span>
+            <span>关联业务线：VOD / 车载 / 雷客</span>
+            <span>工商登记：北京市朝阳区 · 集体管理组织</span>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <button class="btn btn-sm" onclick="location.href='02-search.html?party=音集协'">查看全部案件 →</button>
+          <button class="btn btn-sm btn-ghost" onclick="toast('已加入标签「重点对手-音集协」')">+ 添加标签</button>
+        </div>
+      </div>
+
+      <!-- 对抗指标 4 卡 -->
+      <div class="stat-row" style="grid-template-columns:repeat(4,1fr)">
+        <div class="card card-pad stat-card" onclick="toast('口径：胜诉率A = 胜诉类结案数/已结案总数（v1.0）')">
+          <div class="stat-label">胜诉率（口径A）<span class="help">ⓘ</span></div>
+          <div class="stat-value" style="font-size:26px">78.2%</div>
+          <div class="stat-delta">= 244 / 312 已结 · v1.0</div>
+        </div>
+        <div class="card card-pad stat-card" onclick="toast('口径：对方诉求支持率（公式字段，0~1）均值')">
+          <div class="stat-label">平均支持率</div>
+          <div class="stat-value" style="font-size:26px">6.4%</div>
+          <div class="stat-delta"><span class="sup" style="width:100%"><span class="track"><span class="fill" style="width:6.4%;background:var(--success)"></span></span><span class="val">6.4%</span></span></div>
+        </div>
+        <div class="card card-pad stat-card" onclick="toast('口径：判赔率 = 判赔金额/标的（仅判赔案件）')">
+          <div class="stat-label">判赔率（均值）</div>
+          <div class="stat-value" style="font-size:26px">31.2%</div>
+          <div class="stat-delta"><span class="badge status-red" style="height:18px">判赔案 41 件</span></div>
+        </div>
+        <div class="card card-pad stat-card" onclick="toast('口径：单曲判赔均值（公式字段）')">
+          <div class="stat-label">平均单曲判赔</div>
+          <div class="stat-value" style="font-size:26px">¥1,240</div>
+          <div class="stat-delta">车载线最高 ¥3,000</div>
+        </div>
+      </div>
+
+      <div class="grid-2" style="grid-template-columns:1fr 1.2fr">
+        <!-- 对抗历程 -->
+        <div class="card card-pad">
+          <div class="card-title">对抗历程（按年聚合）<span class="help">柱高=当年案件数 · 红=判赔占比</span></div>
+          <div class="year-bar" id="yearBar"></div>
+          <div class="year-labels"><span>2019</span><span>2020</span><span>2021</span><span>2022</span><span>2023</span><span>2024</span><span>2025</span><span>2026</span></div>
+          <div class="legend"><span><i style="background:var(--danger)"></i>判赔</span><span><i style="background:var(--primary)"></i>全部案件</span></div>
+          <div class="line-years mt16">
+            <div class="ly-item">2024 音集协年度批量案（62 件）<div class="ly-d">聚焦 KTV 放映权 · 系列案系数 8.9 → 走合并审理</div></div>
+            <div class="ly-item">2023 音集协旧案回查 8 件（仲裁条款冲突）<div class="ly-d">法院字段混入仲裁机构 → R04 规则已拆分</div></div>
+            <div class="ly-item">2026 新一轮「可可西里」批量案 6 件立案<div class="ly-d">沿用 2025 案例策略（详情页 24571 号）</div></div>
+          </div>
+        </div>
+        <!-- 我方同类案件 -->
+        <div class="card card-pad">
+          <div class="card-title">我方 vs 音集协 近期案件 <a class="sub" href="02-search.html" style="text-decoration:none">检索全部 312 件 →</a></div>
+          <div class="tbl-wrap" style="border:none;border-radius:0">
+            <table class="tbl" style="width:100%">
+              <thead><tr><th>案号</th><th>业务线</th><th>标的</th><th>支持率</th><th>结案原因</th></tr></thead>
+              <tbody id="partyRows"></tbody>
+            </table>
+          </div>
+          <div class="card-hint" style="margin-top:10px">📂 本地 312 件唯一口径 · ⚖️ 案例库：同主体全国判决 1,120 件（裁判文书网 2025-06 停更前快照）· 📜 法规：《著作权集体管理条例》第 12 条</div>
+        </div>
+      </div>
+
+      <div class="alert amber mt12">
+        <span>💡</span>
+        <span class="grow"><b>策略提示（Mode B 生成 · 基于 312 案回归）：</b>音集协系案件 78% 以「权利链条瑕疵 / 授权范围限定」抗辩获胜；异地（湘/粤/川）法院支持率显著高于京内 12pct，有 6 件异地判赔可对比评估管辖策略。</span>
+        <button class="btn btn-sm" onclick="location.href='09-ai.html'">去 AI 追问｜生成报告</button>
+      </div>
+      <footer class="footnote" style="text-align:right">对手方画像由 35 字段中 21 个相关字段聚合派生 · 口径 v1.0 · 数据截至 2026-08-13 03:00</footer>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const themeBtn = document.getElementById('themeBtn');
+themeBtn.onclick=()=>{ const d=document.documentElement.dataset.theme==='dark'; document.documentElement.dataset.theme=d?'light':'dark'; themeBtn.textContent=d?'🌙':'☀'; };
+const sb=document.getElementById('sidebar'), cb=document.getElementById('collapseBtn');
+cb.onclick=()=>{ sb.classList.toggle('collapsed'); cb.textContent=sb.classList.contains('collapsed')?'»':'«'; };
+
+const yearData = [[ '19',18],['20',22],['21',30],['22',35],['23',41],['24',84],['25',66],['26',16] ];
+document.getElementById('yearBar').innerHTML = yearData.map(([y,v])=>
+  `<i style="height:${v/1.9}%" title="${y}年 ${v} 件"></i>`).join('');
+
+document.getElementById('partyRows').innerHTML = [
+  ['（2025）京0108民初24571号','VOD','¥120,000','8%','胜诉'],
+  ['（2025）京0108民初8421号','VOD','¥90,000','—','等待开庭'],
+  ['（2025）湘0202民初1975号','车载','¥105,000','35%','判赔'],
+  ['（2024）京0108民初17203号','VOD','¥75,000','2%','原告撤诉'],
+  ['（2024）京0101民初10822号','IPTV·OTT','¥210,000','40%','终本'],
+].map(r=>`<tr onclick="location.href='03-case-detail.html'">
+  <td>${r[0]}</td><td>${r[1]}</td><td class="money">${r[2]}</td>
+  <td><span class="sup"><span class="track"><span class="fill" style="width:${r[3]==='—'?0:parseInt(r[3])}%;background:${r[3]==='—'?'var(--surface-2)':parseInt(r[3])>15?'var(--warning)':'var(--success)'}"></span></span><span class="val">${r[3]}</span></span></td>
+  <td><span class="badge ${r[4]==='判赔'?'status-red':r[4]==='胜诉'?'status-green':r[4]==='原告撤诉'?'status-amber':'status-blue'}"><i class="dot"></i>${r[4]}</span></td></tr>`).join('');
+
+let tt;
+function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(tt); tt=setTimeout(()=>t.classList.remove('show'),2200); }
+</script>
+</body>
+</html>

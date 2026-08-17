@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>多维分析 · 法务诉讼业务平台（原型）</title>
+<link rel="stylesheet" href="assets/prototype.css">
+<style>
+  .dim-bar { display: flex; align-items: center; gap: 10px; padding: 12px 16px; margin-bottom: 14px; flex-wrap: wrap; }
+  .heat-table { width: 100%; border-collapse: collapse; }
+  .heat-table th, .heat-table td { border-bottom: 1px solid var(--border); padding: 6px 4px; text-align: center; }
+  .heat-table th { font-size: 11.5px; color: var(--muted); font-weight: 500; }
+  .heat-table td:first-child { text-align: left; font-size: 12.5px; font-weight: 500; width: 76px; }
+  .hcell { min-height: 40px; display: grid; place-items: center; border-radius: 8px; cursor: pointer; transition: all .12s; font-size: 12px; font-variant-numeric: tabular-nums; }
+  .hcell:hover { outline: 2px solid var(--primary); outline-offset: 1px; transform: scale(1.04); }
+  .hcell.sel { outline: 2px solid var(--text); }
+  .hcell .n { font-weight: 600; }
+  .hcell .p { font-size: 9.5px; opacity: .75; }
+  .drill-panel { margin-top: 14px; }
+  .dim-switch { display:flex;gap:6px; }
+  .leg { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--muted-2); }
+  .leg i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar" id="sidebar">
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <div class="brand" style="padding:6px 8px 14px">
+        <div class="brand-logo">法</div>
+        <div><div class="brand-name">法务诉讼平台</div><div class="brand-sub">Legal Case Workspace</div></div>
+      </div>
+      <button class="icon-btn btn-sm" id="collapseBtn" style="margin-bottom:8px">«</button>
+    </div>
+    <nav>
+      <div class="nav-group">
+        <div class="nav-label">工作台</div>
+        <a class="nav-item" href="01-overview.html"><span class="nav-ico">▦</span>态势总览</a>
+        <a class="nav-item" href="02-search.html"><span class="nav-ico">⌕</span>案件检索<span class="nav-count">638</span></a>
+        <a class="nav-item" href="09-ai.html"><span class="nav-ico">✦</span>AI 对话<span class="ph-badge">Beta</span></a>
+      </div>
+      <div class="nav-group">
+        <div class="nav-label">分析</div>
+        <a class="nav-item" href="04-parties.html"><span class="nav-ico">▣</span>对手方画像</a>
+        <a class="nav-item active" href="05-analysis.html"><span class="nav-ico">◫</span>多维分析</a>
+        <a class="nav-item" href="06-songs.html"><span class="nav-ico">♪</span>歌曲维度</a>
+        <a class="nav-item" href="07-fees.html"><span class="nav-ico">¥</span>费用看板</a>
+        <a class="nav-item" href="08-metrics.html"><span class="nav-ico">◎</span>指标口径中心</a>
+      </div>
+      <div class="nav-group">
+        <div class="nav-label">系统</div>
+        <a class="nav-item" href="10-sync.html"><span class="nav-ico">↻</span>同步管理</a>
+        <a class="nav-item" href="11-dicts.html"><span class="nav-ico">☰</span>词典与清洗规则</a>
+      </div>
+    </nav>
+    <div class="side-foot">v0.1.0 Preview<br>数据截至 2026-08-13 03:00</div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="search-box"><input placeholder="全局检索：案号 / 案由 / 歌曲 / 对手方…"><span class="kbd">/</span><span class="s-ico">⌕</span></div>
+      <div class="top-right">
+        <span class="badge status-green"><i class="dot"></i>已同步 · 638 条</span>
+        <button class="icon-btn" id="themeBtn">🌙</button>
+      </div>
+    </div>
+
+    <div class="content">
+      <div class="page-head">
+        <div><h1 class="page-title">多维分析</h1>
+          <div class="page-breadcrumb">下钻协议：点击单元格 → 面包屑同步 → 案由分布 → 案件明细；任意层级可「在检索中打开」</div>
+        </div>
+        <div class="page-actions">
+          <div class="dim-switch">
+            <button class="btn btn-sm btn-primary" data-dim="bizYear">业务线 × 年份</button>
+            <button class="btn btn-sm" data-dim="causeYear">案由 × 年份</button>
+            <button class="btn btn-sm" data-dim="payerStatus">支付主体 × 状态</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 面包屑 -->
+      <div class="crumb-path" id="crumbs">
+        <a href="javascript:drill(0)">全部</a><span class="sep">/</span>
+        <span class="cur" style="color:var(--muted-2)">未选择维度 → 点击上方热力单元格下钻</span>
+      </div>
+
+      <!-- 热力图 -->
+      <div class="card card-pad">
+        <div class="card-title">案件数热力（n=案件数 · p=判赔占比）<span class="help">颜色深浅 = 案件数密度（h1~h5）</span>
+          <div class="leg" style="margin-left:auto"><i style="background:color-mix(in srgb,var(--primary) 12%,var(--surface))"></i>少<i style="background:color-mix(in srgb,var(--primary) 48%,var(--surface))"></i>中<i style="background:var(--primary)"></i>多</div>
+        </div>
+        <div id="heatWrap"></div>
+      </div>
+
+      <!-- 下钻面板 -->
+      <div class="drill-panel" id="drillPanel" style="display:none">
+        <div class="card card-pad">
+          <div class="card-title" id="drillTitle">下钻明细</div>
+          <div style="display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap">
+            <div style="flex:1;min-width:280px">
+              <div class="stat-label" style="margin-bottom:8px">按案由分布（点击进一步下钻）</div>
+              <div class="heat-grid" id="causeGrid"></div>
+            </div>
+            <div style="flex:1.4;min-width:360px">
+              <div class="stat-label" style="margin-bottom:8px">案件明细（12 件 · 示例）</div>
+              <div class="tbl-wrap">
+                <table class="tbl" style="width:100%">
+                  <thead><tr><th>案号</th><th>对方</th><th>标的</th><th>结案原因</th></tr></thead>
+                  <tbody id="drillRows"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          <div class="card-hint" style="margin-top:12px">下钻条件已序列化：<code id="drillUrl">/analysis?biz=VOD&year=2025&cause=放映权纠纷</code> · <button class="btn btn-sm btn-ghost" style="height:22px;font-size:11px" onclick="toast('已在检索页打开（模拟跳转）')">在检索中打开 →</button></div>
+        </div>
+      </div>
+
+      <footer class="footnote" style="text-align:right">聚合口径：案件数=收案时间落入该年/业务线字段精确匹配 · 判赔占比=结案原因=判赔 · 口径 v1.0 · 638 条</footer>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const themeBtn = document.getElementById('themeBtn');
+themeBtn.onclick=()=>{ const d=document.documentElement.dataset.theme==='dark'; document.documentElement.dataset.theme=d?'light':'dark'; themeBtn.textContent=d?'🌙':'☀'; };
+const sb=document.getElementById('sidebar'), cb=document.getElementById('collapseBtn');
+cb.onclick=()=>{ sb.classList.toggle('collapsed'); cb.textContent=sb.classList.contains('collapsed')?'»':'«'; };
+let tt;
+function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(tt); tt=setTimeout(()=>t.classList.remove('show'),2200); }
+
+/* ===== 数据：业务线 × 年份 案件数 & 判赔占比 ===== */
+const BIZ = ['VOD','IPTV·OTT','车载','雷客','人力','哇屋','研发','默霆'];
+const YEARS = ['2019','2020','2021','2022','2023','2024','2025','2026'];
+const MAT = {
+  VOD:[8,9,12,15,18,30,42,10], 'IPTV·OTT':[3,4,6,8,9,14,10,3],
+  车载:[1,2,3,5,8,12,16,8], 雷客:[4,5,6,7,8,10,12,4],
+  人力:[2,3,4,5,6,8,6,2], 哇屋:[1,2,2,3,4,5,4,1],
+  研发:[1,1,2,2,3,4,3,1], 默霆:[1,2,2,3,4,3,2,1]
+};
+const LOSE = { // 判赔占比 %
+  VOD:[5,6,8,10,12,15,12,4], 'IPTV·OTT':[10,10,12,18,22,25,20,12],
+  车载:[0,0,8,12,20,25,18,15], 雷客:[8,10,12,12,10,12,10,5],
+  人力:[0,0,5,8,10,12,8,5], 哇屋:[0,10,10,15,12,16,10,10],
+  研发:[0,0,0,5,8,10,8,0], 默霆:[20,22,25,20,18,22,18,10]
+};
+const CAUSE_BY_BIZ = {
+  VOD: [['侵害作品信息网络传播权',120],['侵害作品放映权纠纷',62],['视听作品著作权侵权',16]],
+  'IPTV·OTT': [['侵害录音录像制作者权',40],['侵害作品信息网络传播权',24],['信息网络传播权其他',3]],
+  车载: [['放映权纠纷',58],['侵害作品信息网络传播权',9],['著作权合同违约',1]],
+  雷客: [['侵害作品信息网络传播权',40],['商标/不正当竞争',8],['其他合同纠纷',4]],
+  人力: [['服务合同纠纷',22],['劳动合同纠纷',12],['其他',2]],
+  哇屋: [['侵害作品信息网络传播权',19],['租赁合同纠纷',3],['其他',0]],
+  研发: [['软件著作权纠纷',14],['技术合同纠纷',3],['其他',0]],
+  默霆: [['侵害作品信息网络传播权',15],['著作权权属纠纷',3],['其他',0]]
+};
+let dim = 'bizYear', sel = { r:null, c:null, cause:null };
+
+function heatClass(n){
+  const m = { 5:12, 10:28, 20:48, 35:72, 99:100 };
+  for(const [max, cls] of Object.entries(m)) if(n <= max) return 'h'+[...[1,2,3,4,5]][Object.keys(m).indexOf(max)] ;
+  return 'h5';
+}
+function renderHeat(){
+  const wrap = document.getElementById('heatWrap');
+  let html = '<table class="heat-table"><tr><th></th>' + YEARS.map(y=>`<th>${y}</th>`).join('') + '</tr>';
+  html += BIZ.map((b)=>{
+    const cells = YEARS.map((y,i)=>{
+      const n = MAT[b][i], p = LOSE[b][i];
+      const selCls = (sel.r===b && sel.c===y) ? ' sel' : '';
+      return `<td><div class="hcell ${heatClass(n)}${selCls}" onclick="drill('${b}','${y}')" title="${b} · ${y} · ${n} 件 · 判赔 ${p}%"><span class="n">${n}</span><span class="p">${p}%赔</span></div></td>`;
+    }).join('');
+    return `<tr><td>${b}</td>${cells}</tr>`;
+  }).join('');
+  wrap.innerHTML = html + '</table>';
+}
+function drill(b, y){
+  sel.r = b || null; sel.c = y || null; sel.cause = null;
+  renderHeat();
+  renderDrill();
+}
+function drillCause(c){
+  sel.cause = c;
+  document.getElementById('causeGrid').innerHTML = CAUSE_BY_BIZ[sel.r].map(([cn,n])=>
+    `<div class="hcell ${heatClass(n)}${c===cn?' sel':''}" data-c="${cn}" onclick="drillCause('${cn}')"><b>${n}</b><span>${cn}</span></div>`).join('');
+  document.getElementById('drillRows').innerHTML = buildRows();
+  document.getElementById('drillTitle').innerHTML = c
+    ? `${sel.r} · ${sel.c||'全部年份'} · ${c} · ${CAUSE_BY_BIZ[sel.r].find(x=>x[0]===c)[1]} 件`
+    : `${sel.r} · ${sel.c ? sel.c+' 年' : '全部年份'} · ${totalFor(sel.r, sel.c)} 件案件`;
+  const cur = document.querySelector('#crumbs .cur');
+  if(cur) cur.textContent = `${sel.r} · ${sel.c||'全部年份'}${c ? ' · '+c : ''}`;
+}
+function totalFor(b, y){
+  return y ? MAT[b][YEARS.indexOf(y)] : MAT[b].reduce((a,x)=>a+x,0);
+}
+function buildRows(){
+  const b = sel.r;
+  const rows = [
+    ['（2025）京0108民初24571号','中国音像著作权集体管理协会','¥120,000','胜诉'],
+    ['（2025）京0108民初24572号','中国音像著作权集体管理协会','¥120,000','胜诉'],
+    ['（2025）京0108民初8421号','中国音像著作权集体管理协会','¥90,000','等待开庭'],
+    ['（2025）湘0202民初1975号','中国音像著作权集体管理协会','¥105,000','判赔'],
+  ];
+  const shown = rows.slice(0, sel.cause ? 3 : 4).map(r=>
+    `<tr onclick="location.href='03-case-detail.html'"><td>${r[0]}</td><td>${r[1]}</td><td class="money">${r[2]}</td><td><span class="badge ${r[3]==='判赔'?'status-red':r[3]==='胜诉'?'status-green':'status-blue'}"><i class="dot"></i>${r[3]}</span></td></tr>`).join('');
+  const cnt = sel.cause ? CAUSE_BY_BIZ[b].find(x=>x[0]===sel.cause)[1] : totalFor(b, sel.c);
+  return shown + `<tr><td colspan="4" style="color:var(--muted-2);font-size:11.5px">… 共 ${cnt} 件（示例展示前几条）</td></tr>`;
+}
+function renderDrill(){
+  const p = document.getElementById('drillPanel');
+  const b = sel.r, y = sel.c;
+  if(!b){
+    p.style.display = 'none';
+    document.getElementById('crumbs').innerHTML =
+      `<a href="javascript:drill(null,null)">全部</a><span class="sep">/</span><span class="cur" style="color:var(--muted-2)">未选择维度 → 点击上方热力单元格下钻</span>`;
+    return;
+  }
+  p.style.display = 'block';
+  document.getElementById('crumbs').innerHTML =
+    `<a href="javascript:drill(null,null)">全部</a><span class="sep">/</span>` +
+    `<a href="javascript:drill('${b}', null)">${b}</a><span class="sep">/</span>` +
+    (y ? `<a href="javascript:drill('${b}', '${y}')">${y}</a><span class="sep">/</span>` : '') +
+    `<span class="cur">${b} · ${y||'全部年份'}${sel.cause ? ' · '+sel.cause : ''}</span>`;
+  document.getElementById('drillTitle').innerHTML = `${b} · ${y ? y+' 年' : '全部年份'} · ${totalFor(b, y)} 件案件`;
+  document.getElementById('causeGrid').innerHTML = CAUSE_BY_BIZ[b].map(([cn,n])=>
+    `<div class="hcell ${heatClass(n)}${sel.cause===cn?' sel':''}" data-c="${cn}" onclick="drillCause('${cn}')"><b>${n}</b><span>${cn}</span></div>`).join('');
+  document.getElementById('drillRows').innerHTML = buildRows();
+  document.getElementById('drillUrl').textContent = `/analysis?biz=${b}&year=${y||''}${sel.cause?'&cause='+encodeURIComponent(sel.cause):''}`;
+}
+renderHeat();
+</script>
+</body>
+</html>

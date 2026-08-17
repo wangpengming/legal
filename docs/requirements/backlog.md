@@ -4,6 +4,59 @@
 
 ---
 
+## 2026-08-17 出庭手续生成器增加拍照扫描功能
+
+**类型**: feature
+**模块**: court-doc-generator
+**状态**: proposed
+**优先级**: P2
+
+### 描述
+
+出庭手续生成器新增「拍照扫描」能力，方向暂定两种，具体场景待业务确认后选定：
+
+1. **拍照识别内容** — 通过摄像头/手机拍照，OCR 识别证件/文书内容，自动提取并填充表单字段（如营业执照、身份证、授权材料等）
+2. **拍照生成 PDF** — 拍照后直接转为 PDF 文件，作为附件材料并入出庭手续全套打包（替代扫描仪）
+
+未决事项（暂不定义，业务确认后补入）：
+- 适用场景：哪些材料需要拍照、单张还是批量、是否需前端预处理（裁剪/增强/去斜）
+- OCR 路线：本机引擎（如 Tesseract）抑或云端服务（飞书/云 OCR）
+- 识别结果是否需要人工校对环节
+
+### 验收标准
+- [ ] 确认场景：识别内容 or 生成 PDF（二选一或双路线）
+- [ ] 拍照/图片上传入口集成到生成流程
+- [ ] 产出物可并入出庭手续全套打包
+
+---
+
+## 2026-08-17 双子模块并入 legal（litigation-system + case-intelligence）
+
+**类型**: improvement
+**模块**: cross-module
+**状态**: done
+**优先级**: P1
+
+### 描述
+
+将 `~/code/tmp/dev` 下两个法务项目并入 `legal/modules/`，与 court-doc-generator 并列形成「文书生成 · 诉讼数据平台 · 卷宗检索规则」三角模块布局：
+
+1. **litigation-system**（active, v0.2.0）— 完整迁移 backend/（FastAPI + SQLite FTS5，exclude litig.db/.venv）、frontend/（React 18 + Vite，exclude node_modules/dist）、docs/ research/ requirements/ spec/、docker-compose.yml、.env.example；补 module.yaml + docs/README.md
+2. **case-intelligence**（planning, v3.0.0）— 迁移 README.md、requirements/、spec/（方案设计 v3）；补 module.yaml + docs/README.md + spec/SPEC.md（三对象模型/架构/演化路线/6 项待确认）
+3. **系统文档** — modules/index.yaml 注册两模块；根 README.md 增加目录结构、模块注册表、模块间关系图；docs/README.md 增加模块文档入口表；docs/SPEC.md 升 v1.1（模块清单/数据流/演进说明）
+
+排除项：`.env`（飞书凭证）、node_modules、dist、data/*.db*、backend/litig.db、__pycache__、.DS_Store 等运行时与临时产物。
+
+### 验收标准
+- [x] litigation-system 128 文件迁入 modules/，无 node_modules/dist/db/.env 混入
+- [x] case-intelligence 3 份文档迁入 modules/，补 SPEC.md 模块规格
+- [x] 两模块补 module.yaml（tech_stack / features / env / created / integrated）
+- [x] modules/index.yaml 注册生效（litigation-system=active，case-intelligence=planning）
+- [x] 根 README.md / docs/README.md / docs/SPEC.md 同步更新
+- [x] git status 无敏感文件混入，index.yaml 可被 AI 解析
+
+---
+
 ## 2026-08-17 出庭手续生成器需求与 SPEC 重新整合
 
 **类型**: improvement

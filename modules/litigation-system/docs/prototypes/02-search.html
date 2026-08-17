@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>案件检索 · 法务诉讼业务平台（原型）</title>
+<link rel="stylesheet" href="assets/prototype.css">
+<style>
+  .filter-panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); margin-bottom: 14px; }
+  .col-menu { position: absolute; right: 0; top: 34px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow-pop); padding: 10px; display: none; z-index: 50; width: 300px; }
+  .col-menu.open { display: block; }
+  .col-menu label { display: flex; align-items: center; gap: 8px; font-size: 12.5px; padding: 4px 6px; border-radius: 6px; cursor: pointer; }
+  .col-menu label:hover { background: var(--surface-2); }
+  .col-menu label input { accent-color: var(--primary); }
+  .density-btn.on { background: var(--primary-soft); color: var(--primary); border-color: var(--primary); }
+  .pager { display: flex; align-items: center; gap: 10px; padding: 10px 16px; font-size: 12.5px; color: var(--muted); }
+  .pager b { color: var(--text); font-variant-numeric: tabular-nums; }
+  .pager .pg { display: flex; gap: 4px; margin-left: auto; }
+  .pager .pg button { width: 26px; height: 26px; border: 1px solid var(--border); background: var(--surface); border-radius: 6px; font-size: 12px; }
+  .pager .pg button.on { background: var(--primary); color: #fff; border-color: var(--primary); }
+  tr.collapsed td { padding-top: 3px; padding-bottom: 3px; }
+  .kw-hit { background: var(--warning-soft); color: var(--warning); padding: 0 2px; border-radius: 3px; }
+  .col-head { cursor: pointer; user-select: none; }
+  .col-head:hover { color: var(--primary); }
+  .col-head .arr { font-size: 10px; opacity: 0; }
+  .col-head.sorted .arr { opacity: 1; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar" id="sidebar">
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <div class="brand" style="padding:6px 8px 14px">
+        <div class="brand-logo">法</div>
+        <div><div class="brand-name">法务诉讼平台</div><div class="brand-sub">Legal Case Workspace</div></div>
+      </div>
+      <button class="icon-btn btn-sm" id="collapseBtn" style="margin-bottom:8px">«</button>
+    </div>
+    <nav>
+      <div class="nav-group">
+        <div class="nav-label">工作台</div>
+        <a class="nav-item" href="01-overview.html"><span class="nav-ico">▦</span>态势总览</a>
+        <a class="nav-item active" href="02-search.html"><span class="nav-ico">⌕</span>案件检索<span class="nav-count">638</span></a>
+        <a class="nav-item" href="09-ai.html"><span class="nav-ico">✦</span>AI 对话<span class="ph-badge">Beta</span></a>
+      </div>
+      <div class="nav-group">
+        <div class="nav-label">分析</div>
+        <a class="nav-item" href="04-parties.html"><span class="nav-ico">▣</span>对手方画像</a>
+        <a class="nav-item" href="05-analysis.html"><span class="nav-ico">◫</span>多维分析</a>
+        <a class="nav-item" href="06-songs.html"><span class="nav-ico">♪</span>歌曲维度</a>
+        <a class="nav-item" href="07-fees.html"><span class="nav-ico">¥</span>费用看板</a>
+        <a class="nav-item" href="08-metrics.html"><span class="nav-ico">◎</span>指标口径中心</a>
+      </div>
+      <div class="nav-group">
+        <div class="nav-label">系统</div>
+        <a class="nav-item" href="10-sync.html"><span class="nav-ico">↻</span>同步管理</a>
+        <a class="nav-item" href="11-dicts.html"><span class="nav-ico">☰</span>词典与清洗规则</a>
+      </div>
+    </nav>
+    <div class="side-foot">v0.1.0 Preview<br>数据截至 2026-08-13 03:00</div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="search-box">
+        <input placeholder="全局检索：案号 / 案由 / 歌曲 / 对手方…">
+        <span class="kbd">/</span><span class="s-ico">⌕</span>
+      </div>
+      <div class="top-right">
+        <span class="badge status-green"><i class="dot"></i>已同步 · 638 条</span>
+        <button class="icon-btn" id="themeBtn">🌙</button>
+      </div>
+    </div>
+
+    <div class="content">
+      <div class="page-head">
+        <div>
+          <h1 class="page-title">案件检索</h1>
+          <div class="page-breadcrumb">638 条 · 检索耗时 164 ms（预算 &lt;300ms）· 条件已同步至 URL</div>
+        </div>
+        <div class="page-actions">
+          <div style="position:relative">
+            <button class="btn btn-sm" id="colBtn">☰ 列设置</button>
+            <div class="col-menu" id="colMenu"></div>
+          </div>
+          <button class="btn btn-sm" id="densityBtn">密度：紧凑</button>
+          <button class="btn btn-sm" onclick="toast('已导出 ' + ROWS.length + ' 条 → cases_20260813.csv（含口径脚注行）')">⬇ 导出 CSV</button>
+          <button class="btn btn-primary btn-sm" onclick="toast('筛选已保存为视图「批量系列案待办」')">💾 保存视图</button>
+        </div>
+      </div>
+
+      <!-- 筛选面板 -->
+      <div class="filter-panel">
+        <div class="filter-bar">
+          <div class="filter-group"><label>收案年份</label>
+            <select id="f_year"><option value="">全部</option><option>2019</option><option>2020</option><option>2021</option><option>2022</option><option>2023</option><option>2024</option><option>2025</option><option>2026</option></select></div>
+          <div class="filter-group"><label>业务线</label>
+            <select id="f_biz"><option value="">全部</option><option>VOD</option><option>IPTV·OTT</option><option>车载</option><option>雷客</option><option>人力</option><option>哇屋</option><option>研发</option><option>默霆</option></select></div>
+          <div class="filter-group"><label>案件状态</label>
+            <select id="f_status"><option value="">全部</option><option>一审待判决</option><option>二审待判决</option><option>等待开庭</option><option>强制执行中</option><option>执行终本</option><option>已结案(胜诉类)</option><option>已结案(判赔类)</option><option>已撤诉</option><option>已和解</option></select></div>
+          <div class="filter-group"><label>结案原因</label>
+            <select id="f_resolve"><option value="">全部</option><option>胜诉</option><option>判赔</option><option>双方和解</option><option>原告撤诉</option><option>终本</option></select></div>
+          <div class="filter-group"><label>支付主体</label>
+            <select id="f_payer"><option value="">全部</option><option>雷石</option><option>雷客</option><option>诉讼相对方</option></select></div>
+          <div class="filter-group"><label>标的(≥元)</label><input id="f_amount" type="number" placeholder="如 100000" style="width:96px"></div>
+          <button class="btn btn-sm btn-primary" onclick="applyFilter()">筛选</button>
+          <button class="btn btn-sm btn-ghost" onclick="resetFilter()">重置</button>
+          <button class="btn btn-sm" onclick="setEmpty()">⚡ 空态演示</button>
+        </div>
+        <div class="filter-active-bar" id="activeBar">
+          <span style="font-size:11px;color:var(--muted-2)">已选条件：</span>
+          <span class="chip on">业务线 = VOD <span class="x">✕</span></span>
+          <span class="chip on">年份 = 2025 <span class="x">✕</span></span>
+          <span style="font-size:11px;color:var(--muted)">共命中 17 条（示例行集）</span>
+        </div>
+      </div>
+
+      <!-- 表格 -->
+      <div class="tbl-wrap">
+        <table class="tbl" id="tbl">
+          <thead id="thead"></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+        <div class="pager">
+          <span>共 <b id="tot">17</b> 条 · 每页 10 条</span>
+          <div class="pg">
+            <button>‹</button><button class="on">1</button><button>2</button><button>›</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 空态 -->
+      <div class="card empty" id="emptyBox" style="display:none">
+        <div class="e-ico">🗂</div>
+        <div class="e-title">没有符合条件的案件</div>
+        <div class="e-desc">尝试放宽「结案原因 = 判赔」或清除「标的额 ≥ 1,000,000」等条件；或去同步飞书新数据。</div>
+        <button class="btn btn-primary btn-sm" onclick="resetFilter()">清除全部条件</button>
+      </div>
+
+      <footer class="footnote">行内 ⚠ 表示清洗角标（原值≠清洗值，悬停查看原始值）；「对方诉求支持率」为公式字段本地复刻值（口径 v1.0）；导出文件首行携带口径脚注。</footer>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ===== 主题 / 折叠 ===== */
+document.getElementById('themeBtn').onclick = () => {
+  const dark = document.documentElement.dataset.theme === 'dark';
+  document.documentElement.dataset.theme = dark ? 'light' : 'dark';
+  document.getElementById('themeBtn').textContent = dark ? '🌙' : '☀';
+};
+const sb = document.getElementById('sidebar'), cb = document.getElementById('collapseBtn');
+cb.onclick = () => { sb.classList.toggle('collapsed'); cb.textContent = sb.classList.contains('collapsed') ? '»' : '«'; };
+
+/* ===== 列定义（14 列，docs/02 §4.2 默认配置表） ===== */
+const columns = [
+  { key:'case_no', label:'案号', width:'180px', show:true },
+  { key:'year', label:'年份', width:'70px', show:true },
+  { key:'cause', label:'案由', width:'150px', show:true },
+  { key:'biz', label:'业务线', width:'90px', show:true },
+  { key:'status', label:'状态', width:'110px', show:true, badge:true },
+  { key:'plaintiff', label:'对方当事人（原告）', width:'200px', show:true },
+  { key:'accept', label:'收案时间', width:'86px', show:true },
+  { key:'court', label:'受理法院', width:'150px', show:false },
+  { key:'amount', label:'标的（元）', width:'100px', show:true, num:true },
+  { key:'per_song', label:'单曲判赔', width:'90px', show:false, num:true },
+  { key:'support', label:'对方诉求支持率', width:'120px', show:true, sup:true },
+  { key:'resolve', label:'结案原因', width:'100px', show:true, badge:true },
+  { key:'payer', label:'支付主体', width:'90px', show:true, badge:true },
+  { key:'dirty', label:'清洗', width:'72px', show:true }
+];
+
+/* ===== 数据（638 条基线派生的示例行） ===== */
+const ROWS = [
+  ['（2025）京0108民初24571号','2025','侵害作品信息网络传播权','VOD','已结案(胜诉类)','中国音像著作权集体管理协会','2025-03-12','北京市海淀区人民法院','120,000','600','0.08','胜诉','雷石','⚠ 2'],
+  ['（2025）京0108民初24572号','2025','侵害作品信息网络传播权','VOD','已结案(胜诉类)','中国音像著作权集体管理协会','2025-03-12','北京市海淀区人民法院','120,000','600','0.08','胜诉','雷石',''],
+  ['（2025）粤0305民初10663号','2025','侵害作品信息网络传播权','车载','一审待判决','大连沐语文化传媒有限公司','2025-06-18','深圳市南山区人民法院','60,000','—','—','—','—','⚠ 1'],
+  ['（2025）京0108民初8421号','2025','放映权纠纷','VOD','等待开庭','中国音像著作权集体管理协会','2025-07-02','北京市海淀区人民法院','90,000','—','—','—','—','⚠ 1'],
+  ['（2025）湘0202民初1975号','2025','放映权纠纷','车载','已结案(判赔类)','中国音像著作权集体管理协会','2025-04-21','湖南省株洲市荷塘区人民法院','105,000','3,000','0.35','判赔','雷石',''],
+  ['（2024）京0101民初10822号','2024','侵害录音录像制作者权纠纷','IPTV·OTT','执行终本','上海灿星文化传媒股份有限公司','2024-08-15','北京市东城区人民法院','210,000','—','0.40','终本','雷客','⚠ 1'],
+  ['（2024）京0108民初17203号','2024','侵害作品放映权纠纷','VOD','已撤诉','中国音像著作权集体管理协会','2024-10-09','北京市海淀区人民法院','75,000','—','0.02','原告撤诉','诉讼相对方','⚠ 2'],
+  ['（2024）沪0115民初61334号','2024','侵害作品信息网络传播权','IPTV·OTT','强制 执行中','宁波市江北雪人文化传播工作室','2024-12-03','上海市浦东新区人民法院','130,000','—','0.22','—','雷石',''],
+  ['（2023）京0108民初23144号','2023','视听作品著作权侵权纠纷','雷客','已结案(胜诉类)','昆明索峰科技有限公司','2023-05-22','北京市海淀区人民法院','330,000','4,500','0.05','驳回对方诉求','雷客','⚠ 1'],
+  ['（2023）川0104民初9811号','2023','侵害作品信息网络传播权','人力','双方和解','成都兰花草文化传播有限公司','2023-09-14','成都市锦江区人民法院','55,000','—','0.30','双方和解','诉讼相对方',''],
+  ['（2023）京0108民初6120号','2023','作品放映权纠纷','车载','二审待判决','北京时光煮雨科技有限公司','2023-03-08','北京市海淀区人民法院','180,000','2,000','0.28','—','—',''],
+  ['（2022）京0108民初34120号','2022','侵害作品信息网络传播权','VOD','已结案(胜诉类)','北京律所催收','2022-07-19','北京市海淀区人民法院','88,000','—','0.03','胜诉','雷石',''],
+  ['（2022）粤0305民初8081号','2022','信息网络传播权纠纷','雷客','已和解','上海新梨视网络科技有限公司','2022-11-02','深圳市南山区人民法院','96,000','—','0.18','双方和解','雷客',''],
+  ['（2021）京0108民初50122号','2021','著作权许可使用合同纠纷','研发','已结案(胜诉类)','北京律所策略','2021-06-30','北京市海淀区人民法院','460,000','—','0.02','胜诉','诉讼相对方',''],
+  ['（2021）浙8601民初1105号','2021','侵害作品信息网络传播权','默霆','已结案(判赔类)','杭州华数传媒网络有限公司','2021-04-16','杭州铁路运输法院','150,000','1,800','0.42','判赔','雷石',''],
+  ['（2020）京0108民初37290号','2020','著作权权属、侵权纠纷','哇屋','执行终本','北京原创力动科技有限公司','2020-09-08','北京市海淀区人民法院','240,000','—','0.55','终本','雷客',''],
+  ['（2019）京0108民初20140号','2019','侵害作品放映权纠纷','VOD','已撤诉','中国音像著作权集体管理协会','2019-05-27','北京市海淀区人民法院','60,000','—','0.01','原告撤诉','—',''],
+];
+
+/* ===== 状态/结案原因 → 色 ===== */
+const stColor = s => s.includes('胜诉')||s.includes('撤诉')||s.includes('和解')||s.includes('驳回对方') ? 'status-green'
+  : s.includes('判赔') ? 'status-red'
+  : s.includes('终本') ? 'status-amber'
+  : (s.includes('待判决')||s.includes('开庭')||s.includes('执行')) ? 'status-blue' : 'status-gray';
+const rzColor = r => r==='胜诉'||r==='驳回对方诉求' ? 'status-green' : r==='判赔' ? 'status-red' : (r==='双方和解'||r==='原告撤诉') ? 'status-amber' : 'status-gray';
+
+let columnsOn = columns.map(c=>c.show);
+function renderColMenu(){
+  document.getElementById('colMenu').innerHTML = columns.map((c,i)=>
+    `<label><input type="checkbox" ${columnsOn[i]?'checked':''} data-i="${i}"> ${c.label}</label>`).join('');
+  document.querySelectorAll('#colMenu input').forEach(inp=>inp.onchange=()=>{
+    columnsOn[+inp.dataset.i] = inp.checked; renderTable();
+  });
+}
+document.getElementById('colBtn').onclick = e => { e.stopPropagation(); document.getElementById('colMenu').classList.toggle('open'); };
+document.addEventListener('click',()=>document.getElementById('colMenu').classList.remove('open'));
+
+/* ===== 表格渲染 ===== */
+function renderTable(){
+  document.getElementById('thead').innerHTML = '<tr>' + columns.map((c,i)=> columnsOn[i] ?
+    `<th class="col-head ${c.num?'num':''}" data-k="${c.key}" style="width:${c.width}">${c.label} <span class="arr">↕</span></th>` : '').join('') + '</tr>';
+  const rows = document.getElementById('emptyBox').style.display==='block' ? [] : ROWS;
+  document.getElementById('tbody').innerHTML = rows.map(r=>
+    '<tr data-k="row" onclick="location.href=\'03-case-detail.html\'" title="查看案件详情">' +
+    columns.map((c,i)=>{
+      if(!columnsOn[i]) return '';
+      let v = c.key==='year' ? r[1] : {case_no:r[0],cause:r[2],biz:r[3],status:r[4],plaintiff:r[5],accept:r[6],court:r[7],amount:r[8],per_song:r[9],support:r[10],resolve:r[11],payer:r[12],dirty:r[13]}[c.key];
+      if(c.badge){ const cls = c.key==='status' ? stColor(v) : rzColor(v); v = `<span class="badge ${cls}"><i class="dot"></i>${v}</span>`; }
+      if(c.sup){ if(v==='—'||isNaN(parseFloat(v))){ v = '<span class="muted2">—</span>'; } else { const p = parseFloat(v); const col = p>0.4?'var(--danger)':p>0.15?'var(--warning)':'var(--success)';
+        v = `<span class="sup"><span class="track"><span class="fill" style="width:${Math.round(p*100)}%;background:${col}"></span></span><span class="val" style="color:${col}">${Math.round(p*100)}%</span></span>`; } }
+      if(c.key==='case_no') v = `<a style="font-family:ui-monospace,Menlo,monospace;font-size:12px">${v}</a>`;
+      if(c.num) v = v==='—' ? '<span class="muted2">—</span>' : `<span class="money">${v}</span>`;
+      if(c.key==='dirty') v = v==='—'||v==='' ? '<span class="muted2">—</span>' : `<span class="badge status-amber" title="清洗角标：原值≠清洗值">⚠ ${v.replace('⚠ ','')}</span>`;
+      if(c.key==='plaintiff') v = `<span class="thumb-cell"><span class="avatar" style="background:var(--primary)">音</span>${v}<span style="font-size:10px;color:var(--muted-2)">×${r[0].includes('245') ? 9 : 1}</span></span>`;
+      return `<td class="${c.num?'num':''}">${v}</td>`;
+    }).join('') + '</tr>').join('');
+}
+renderColMenu(); renderTable();
+
+/* ===== 筛选 / 空态 ===== */
+function setEmpty(){ document.getElementById('emptyBox').style.display='block'; document.getElementById('tbl').style.display='none'; document.getElementById('tot').textContent='0'; }
+function resetFilter(){ document.getElementById('emptyBox').style.display='none'; document.getElementById('tbl').style.display=''; document.getElementById('tot').textContent=ROWS.length; toast('已重置全部筛选条件'); }
+function applyFilter(){ const kw = [f_year.value, f_biz.value, f_status.value, f_resolve.value, f_payer.value, f_amount.value].filter(Boolean).join(' · ');
+  document.getElementById('activeBar').innerHTML = `<span style="font-size:11px;color:var(--muted-2)">已选条件：</span>` + (kw ? `<span class="chip on">${kw} <span class="x">✕</span></span>` : '') + `<span style="font-size:11px;color:var(--muted)">命中 ${Math.max(1, ROWS.length - (f_amount.value*0.02|0))} 条 · 检索 158ms</span>`; toast('筛选已应用'); }
+
+/* toast */
+let tt;
+function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(tt); tt=setTimeout(()=>t.classList.remove('show'),2200); }
+
+/* 密度切换 */
+const db = document.getElementById('densityBtn');
+db.onclick = () => {
+  const compact = db.textContent.includes('紧凑');
+  document.querySelectorAll('#tbody tr').forEach(tr=>tr.classList.toggle('collapsed', compact));
+  db.textContent = compact ? '密度：舒适' : '密度：紧凑';
+  if(compact) db.classList.add('on'); else db.classList.remove('on');
+};
+</script>
+</body>
+</html>

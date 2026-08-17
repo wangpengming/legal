@@ -1,0 +1,23 @@
+# compose: backend(api) + frontend(web, Nginx)；调度器并入 api 进程（不另起容器）
+# 凭证注入：宿主 .env（决策 D2，不进代码库）；示例见 README「环境变量」
+services:
+  api:
+    build: ./backend
+    container_name: litigation-api
+    env_file: .env
+    environment:
+      - DATABASE_URL=sqlite:////data/app.db
+    volumes:
+      - ./data:/data
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+  web:
+    build: ./frontend
+    container_name: litigation-web
+    depends_on:
+      - api
+    ports:
+      - "8080:80"
+    restart: unless-stopped

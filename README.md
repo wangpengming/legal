@@ -14,10 +14,14 @@ legal/
 │   ├── README.md               # 文档索引
 │   ├── SPEC.md                 # 系统规格
 │   └── requirements/           # 需求池
-│       └── backlog.md           # 待办需求（AI可解析格式）
+│       ├── backlog.md           # 待办需求（AI可解析格式）
+│       └── CHANGELOG.md         # 变更记录
 ├── modules/                    # 功能模块
 │   ├── index.yaml              # 模块注册表
-│   └── [module-name]/          # 模块目录
+│   ├── court-doc-generator/    # 出庭手续文档生成器（Streamlit）
+│   ├── litigation-system/      # 法务诉讼业务平台（FastAPI + React）
+│   ├── case-intelligence/      # 同质化案件文档检索与规则系统（NocoDB + Paperless，规划中）
+│   └── [module-name]/          # 通用模块目录
 │       ├── src/                # 源代码
 │       ├── tests/              # 测试
 │       ├── docs/               # 模块文档
@@ -37,6 +41,29 @@ legal/
 ## 模块注册
 
 查看所有可用模块：`cat modules/index.yaml`
+
+当前已注册模块：
+
+| 模块 | 状态 | 版本 | 一句话 |
+|------|------|------|--------|
+| court-doc-generator | active | 1.0.0 | 出庭手续文档生成器（7份材料一键生成 + PDF合并预览） |
+| litigation-system | active | 0.2.0 | 法务诉讼业务平台（飞书历年案件天级同步 + 检索/统计/AI 双模式） |
+| case-intelligence | planning | 3.0.0 | 同质化案件文档检索与规则系统（NocoDB + Paperless-ngx，不做 AI） |
+
+## 模块间关系
+
+```
+                    ┌─────────────────────┐
+                    │   litigation-system  │ 飞书结构化案件数据：同步/检索/统计/AI
+                    └──────────┬──────────┘
+                               │ 案件互通（远期）
+┌─────────────────┐  ┌────────▼──────────────┐
+│ court-doc-generator│ │  case-intelligence     │ 卷宗文档/审核规则：OCR/全文检索/清单
+└─────────────────┘  └───────────────────────┘
+ 出庭手续材料生成          新案件受理/审核工作流入口
+```
+
+三角布局：**文书生成 · 诉讼数据平台 · 卷宗检索规则**，三者独立演进、按需集成。
 
 ## 快速开始
 
@@ -62,5 +89,5 @@ cat modules/index.yaml
 
 **识别模块**：`cat modules/index.yaml`
 **查看需求**：`cat docs/requirements/backlog.md`
-**模块规格**：`cat modules/<name>/SPEC.md`
+**模块规格**：`cat modules/<name>/SPEC.md` 或 `cat modules/<name>/module.yaml`
 **全局配置**：`cat shared/config/`

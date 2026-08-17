@@ -1,0 +1,56 @@
+/* Tailwind v4 入口：主题变量 → 原子类桥接。
+   运行方式：tokens.css 定义 :root 运行时变量，@theme inline 引用后生成
+   bg-primary / text-muted / border-border / bg-surface2 等原子类；
+   亮暗切换无需重建（变量运行时替换，docs/02 §2.1）。 */
+@import "tailwindcss";
+@import "./theme/tokens.css";
+@import "./theme/components.css";
+
+@theme inline {
+  --color-primary: var(--primary);
+  --color-primary-fg: var(--primary-fg);
+  --color-primary-soft: var(--primary-soft);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface2: var(--surface-2);
+  --color-border: var(--border);
+  --color-text: var(--text);
+  --color-muted: var(--muted);
+  --color-muted2: var(--muted-2);
+  --font-sans: var(--font);
+  --shadow-card: var(--shadow-card);
+  --shadow-pop: var(--shadow-pop);
+}
+
+@layer base {
+  html, body { height: 100%; }
+  body {
+    font-family: var(--font);
+    font-size: 13px;
+    color: var(--text);
+    background: var(--bg);
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.6;
+  }
+  a { color: var(--primary); text-decoration: none; cursor: pointer; }
+  a:hover { text-decoration: underline; }
+  button { font-family: inherit; cursor: pointer; }
+  input, select, textarea { font-family: inherit; font-size: 13px; color: var(--text); }
+  ::selection { background: var(--primary-soft); }
+  code, .tabular { font-variant-numeric: tabular-nums; }
+  /* 全局滚动条（暗色友好） */
+  * { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--muted-2) 45%, transparent) transparent; }
+}
+
+/* 旋转动画（Spinner / 同步状态） */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}

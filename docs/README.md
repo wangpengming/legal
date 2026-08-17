@@ -10,7 +10,13 @@
 
 ## 模块文档
 
-各模块文档位于 `modules/<module-name>/docs/`
+各模块文档位于 `modules/<module-name>/docs/`：
+
+| 模块 | 文档入口 | 状态 |
+|------|---------|------|
+| court-doc-generator | [modules/court-doc-generator/docs/](../modules/court-doc-generator/docs/) | active |
+| litigation-system | [modules/litigation-system/docs/](../modules/litigation-system/docs/) | active |
+| case-intelligence | [modules/case-intelligence/docs/](../modules/case-intelligence/docs/) | planning |
 
 ## 更新日志
 

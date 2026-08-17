@@ -8,3 +8,21 @@ modules:
     description: 出庭手续文档生成器（7份材料一键生成）
     entry: app.py
     created: 2026-08-17
+
+  - name: litigation-system
+    path: modules/litigation-system
+    status: active
+    version: 0.2.0
+    description: 法务诉讼业务平台（飞书历年案件天级同步 + 检索/统计/AI 双模式，基线 638 条）
+    entry: backend/app/main.py
+    created: 2026-08-13
+    integrated: 2026-08-17
+
+  - name: case-intelligence
+    path: modules/case-intelligence
+    status: planning
+    version: 3.0.0
+    description: 同质化案件文档检索与规则系统（NocoDB + Paperless-ngx，方案设计阶段，不做 AI）
+    entry: none
+    created: 2026-08-10
+    integrated: 2026-08-17

@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>词典与清洗规则 · 法务诉讼业务平台（原型）</title>
+<link rel="stylesheet" href="assets/prototype.css">
+<style>
+  .rule-card { border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; }
+  .rule-card:last-child { margin-bottom: 0; }
+  .rule-head { display: flex; align-items: flex-start; gap: 10px; }
+  .rule-id { font-family: ui-monospace, Menlo, monospace; font-size: 11px; font-weight: 600; color: var(--primary); background: var(--primary-soft); border-radius: 6px; padding: 2px 8px; white-space: nowrap; margin-top: 1px; }
+  .rule-id.off { color: var(--muted-2); background: var(--surface-2); }
+  .rule-name { font-size: 13px; font-weight: 600; }
+  .rule-desc { font-size: 11.5px; color: var(--muted); margin-top: 2px; line-height: 1.6; }
+  .rule-stat { margin-left: auto; text-align: right; font-size: 11px; color: var(--muted-2); white-space: nowrap; }
+  .rule-foot { display: flex; gap: 14px; font-size: 10.5px; color: var(--muted-2); margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--border); flex-wrap: wrap; }
+  .switch { position: relative; width: 34px; height: 19px; flex-shrink: 0; cursor: pointer; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .switch .sl { position: absolute; inset: 0; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--border); transition: .15s; }
+  .switch .sl::before { content: ''; position: absolute; width: 13px; height: 13px; border-radius: 50%; background: #fff; top: 2px; left: 2px; box-shadow: 0 1px 2px rgba(0,0,0,.25); transition: .15s; }
+  .switch input:checked + .sl { background: var(--success); border-color: var(--success); }
+  .switch input:checked + .sl::before { left: 16px; }
+  .dict-search { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
+  .dict-search input { flex: 1; border: 1px solid var(--border); border-radius: 8px; padding: 6px 12px; font-size: 12.5px; background: var(--surface); color: var(--text); }
+  .dict-search input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
+  .rule-tag { display: inline-flex; align-items: center; gap: 3px; font-size: 10.5px; border-radius: 5px; padding: 1px 7px; background: var(--surface); border: 1px solid var(--border); color: var(--muted); }
+  .rule-tag.green { color: var(--success); border-color: color-mix(in srgb, var(--success) 40%, transparent); background: color-mix(in srgb, var(--success) 8%, transparent); }
+  .rule-tag.amber { color: #D97706; border-color: color-mix(in srgb, #D97706 40%, transparent); background: color-mix(in srgb, #D97706 8%, transparent); }
+  .duplexlet { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-top: 10px; }
+  .duplex-item { border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; text-align: center; }
+  .duplex-item .n { font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .duplex-item .l { font-size: 10.5px; color: var(--muted-2); margin-top: 2px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar" id="sidebar">
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <div class="brand" style="padding:6px 8px 14px">
+        <div class="brand-logo">法</div>
+        <div><div class="brand-name">法务诉讼平台</div><div class="brand-sub">Legal Case Workspace</div></div>
+      </div>
+      <button class="icon-btn btn-sm" id="collapseBtn" style="margin-bottom:8px">«</button>
+    </div>
+    <nav>
+      <div class="nav-group">
+        <div class="nav-label">工作台</div>
+        <a class="nav-item" href="01-overview.html"><span class="nav-ico">▦</span>态势总览</a>
+        <a class="nav-item" href="02-search.html"><span class="nav-ico">⌕</span>案件检索<span class="nav-count">638</span></a>
+        <a class="nav-item" href="09-ai.html"><span class="nav-ico">✦</span>AI 对话<span class="ph-badge">Beta</span></a>
+      </div>
+      <div class="nav-group">
+        <div class="nav-label">分析</div>
+        <a class="nav-item" href="04-parties.html"><span class="nav-ico">▣</span>对手方画像</a>
+        <a class="nav-item" href="05-analysis.html"><span class="nav-ico">◫</span>多维分析</a>
+        <a class="nav-item" href="06-songs.html"><span class="nav-ico">♪</span>歌曲维度</a>
+        <a class="nav-item" href="07-fees.html"><span class="nav-ico">¥</span>费用看板</a>
+        <a class="nav-item" href="08-metrics.html"><span class="nav-ico">◎</span>指标口径中心</a>
+      </div>
+      <div class="nav-group">
+        <div class="nav-label">系统</div>
+        <a class="nav-item" href="10-sync.html"><span class="nav-ico">↻</span>同步管理</a>
+        <a class="nav-item active" href="11-dicts.html"><span class="nav-ico">☰</span>词典与清洗规则</a>
+      </div>
+    </nav>
+    <div class="side-foot">v0.1.0 Preview<br>数据截至 2026-08-13 03:00</div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="search-box"><input placeholder="全局检索：案号 / 案由 / 歌曲 / 对手方…"><span class="kbd">/</span><span class="s-ico">⌕</span></div>
+      <div class="top-right">
+        <span class="badge status-green"><i class="dot"></i>已同步 · 638 条</span>
+        <button class="icon-btn" id="themeBtn">🌙</button>
+      </div>
+    </div>
+
+    <div class="content">
+      <div class="crumb-path">
+        <a href="00-index.html">原型导航</a><span class="sep">/</span>
+        <a href="11-dicts.html">词典与清洗规则</a><span class="sep">/</span>
+        <span class="cur">规则集 v3.2 · 生效 2026-07-20</span>
+      </div>
+
+      <div class="page-head">
+        <div><h1 class="page-title">词典与清洗规则</h1>
+          <div class="page-breadcrumb">原始记录 → 词典归一 → 规则清洗 → 事实表 —— 所有统计口径的第一道闸门</div>
+        </div>
+        <div class="page-actions">
+          <button class="btn btn-sm" onclick="toast('已触发规则集只读校验：R01~R06 语法全部通过')">↻ 校验规则集</button>
+          <button class="btn btn-sm" onclick="toast('已打开新建规则向导（模板：日期/金额/名称/拆分）')">＋ 新增清洗规则</button>
+          <button class="btn btn-sm btn-primary" onclick="saveRules()">💾 保存变更</button>
+        </div>
+      </div>
+
+      <div class="alert amber" style="margin-bottom:14px">
+        <span>⚠</span>
+        <span class="grow"><b>自同步管理页转入：</b>清洗管道当前存在 <b>47 处脏标记待确认</b> —— 案由混入仲裁机构 23 · 金额单位歧义 11 · 原告名变体 13。下方规则命中后仍无法自动判定的记录，需人工确认（存疑队列）。</span>
+        <button class="btn btn-sm" onclick="toast('已展开存疑队列：47 条（按规则分组）')">查看存疑队列 →</button>
+      </div>
+
+      <div class="stat-row" style="grid-template-columns:repeat(4,1fr)">
+        <div class="card stat-card">
+          <div class="stat-label">词典条目<span class="help">ⓘ</span></div>
+          <div class="stat-value" onclick="dictTab('cause')">51 <span style="font-size:13px;color:var(--muted-2)">项</span></div>
+          <div class="stat-delta">案由 12 · 状态 21 · 结案原因 15 · 支付主体 3</div>
+        </div>
+        <div class="card stat-card">
+          <div class="stat-label">清洗规则</div>
+          <div class="stat-value" onclick="toast('规则列表见右侧，支持单独启停')">6 <span style="font-size:13px;color:var(--muted-2)">条</span></div>
+          <div class="stat-delta">启用 <span class="up-green">5</span> · 停用 <span class="up-red">1</span>（评审中）</div>
+        </div>
+        <div class="card stat-card">
+          <div class="stat-label">管线命中</div>
+          <div class="stat-value" onclick="toast('来自最近全量运行 08-12 03:00')">1,174</div>
+          <div class="stat-delta">占比 99.0% · 平均 1.6 条规则/记录</div>
+        </div>
+        <div class="card stat-card">
+          <div class="stat-label">脏标记<span class="help">ⓘ</span></div>
+          <div class="stat-value" style="color:var(--warning)" onclick="toast('23 案由 + 11 金额 + 13 原告名')">47</div>
+          <div class="stat-delta">待确认 · 较昨日 -3（自愈 3）</div>
+        </div>
+      </div>
+
+      <div class="grid-2" style="grid-template-columns:1.15fr 1fr">
+        <!-- 词典 -->
+        <div class="card card-pad">
+          <div class="card-title">规范词典<span class="sub">原始变体 → 规范值（去重后共 51 项）</span></div>
+          <div class="tabs" id="dictTabs">
+            <div class="tab on" onclick="dictTab('cause')">案由 · 12</div>
+            <div class="tab" onclick="dictTab('status')">案件状态 · 21</div>
+            <div class="tab" onclick="dictTab('reason')">结案原因 · 15</div>
+            <div class="tab" onclick="dictTab('payer')">支付主体 · 3</div>
+          </div>
+          <div class="dict-search">
+            <input id="dictKw" placeholder="过滤：输入规范值 / 原始变体均可…" oninput="renderDict(currentTab, this.value)">
+            <button class="btn btn-sm" onclick="toast('词典变更需走审批流（飞书审批 → 生效）')">＋ 新增条目</button>
+          </div>
+          <table class="tbl" style="width:100%">
+            <thead><tr><th style="width:44%">规范值</th><th>原始变体（命中数）</th></tr></thead>
+            <tbody id="dictBody"></tbody>
+          </table>
+          <div class="card-hint">变体按出现次数降序 · 命中计数基于全量 1,174 条已入湖记录</div>
+        </div>
+
+        <!-- 清洗规则 -->
+        <div class="card card-pad">
+          <div class="card-title">清洗规则<span class="sub">管线执行顺序 R01 → R06</span></div>
+          <div id="ruleList"></div>
+          <div class="card-hint">停用规则不参与管线 · 命中计数为最近一次全量运行（08-12 03:00）</div>
+        </div>
+      </div>
+
+      <!-- DuplexLink 解析器 + 版本回滚 -->
+      <div class="grid-2" style="grid-template-columns:1fr 1.15fr;margin-top:14px">
+        <div class="card card-pad">
+          <div class="card-title">DuplexLink 解析器<span class="ph-badge">composer/member</span></div>
+          <div class="card-hint" style="margin-top:0">飞书「关联记录 + 反查」字段：<b>composer</b>（原告侧主体）· <b>member</b>（共同被告）——每条记录可嵌套多组。</div>
+          <div class="duplexlet">
+            <div class="duplex-item"><div class="n" style="color:var(--success)">612</div><div class="l">已解析 composer</div></div>
+            <div class="duplex-item"><div class="n" style="color:var(--warning)">23</div><div class="l">未解析（源字段空）</div></div>
+            <div class="duplex-item"><div class="n" style="color:var(--danger)">0</div><div class="l">解析异常（环形引用）</div></div>
+          </div>
+          <div class="rule-foot" style="margin-top:10px">
+            <span class="rule-tag green">✓ 幂等校验通过</span>
+            <span class="rule-tag">样本 5% 人工比对 100%</span>
+            <span class="rule-tag amber">深层嵌套 3 层+ 待扩展</span>
+          </div>
+        </div>
+
+        <div class="card card-pad">
+          <div class="card-title">规则版本与回滚<span class="sub">每次变更留痕，可随时回退</span></div>
+          <table class="tbl" style="width:100%">
+            <thead><tr><th>版本</th><th>变更</th><th>生效时间</th><th>操作</th></tr></thead>
+            <tbody>
+              <tr><td><span class="badge status-green" style="height:18px">v3.2 当前</span></td><td>R03 金额归一：补充「万元」单位识别</td><td>2026-07-20</td><td><button class="btn btn-sm" onclick="toast('已导出 v3.2 规则集快照（JSON）')">导出</button></td></tr>
+              <tr><td>v3.1</td><td>R02 原告归一：新增音集协变体 1 个</td><td>2026-06-02</td><td><button class="btn btn-sm" onclick="rollback()">回滚至此</button></td></tr>
+              <tr><td>v3.0</td><td>R04 案由拆分：仲裁机构字段落位</td><td>2026-04-11</td><td><button class="btn btn-sm" onclick="toast('v3.0 为 v3.1 的前置版本，建议先回滚 v3.1')">回滚至此</button></td></tr>
+              <tr><td>v2.8</td><td>词典基线：支付主体第 3 项「诉讼相对方」</td><td>2025-12-30</td><td><button class="btn btn-sm" onclick="toast('v2.8 与 v3.x 差异过大，需人工确认')">回滚至此</button></td></tr>
+            </tbody>
+          </table>
+          <div class="card-hint">回滚 v3.1：保留脏标记现状，仅重跑受影响的 13 条原告名记录（预计 40s）</div>
+        </div>
+      </div>
+
+      <footer class="footnote" style="text-align:right">词典与规则变更均走飞书审批 · 回滚操作每日限 3 次 · 完整规则定义见 docs/03 后端详细设计 §3.3 · 数据截至 2026-08-13 03:00</footer>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const themeBtn = document.getElementById('themeBtn');
+themeBtn.onclick=()=>{ const d=document.documentElement.dataset.theme==='dark'; document.documentElement.dataset.theme=d?'light':'dark'; themeBtn.textContent=d?'🌙':'☀'; };
+const sb=document.getElementById('sidebar'), cb=document.getElementById('collapseBtn');
+cb.onclick=()=>{ sb.classList.toggle('collapsed'); cb.textContent=sb.classList.contains('collapsed')?'»':'«'; };
+let tt;
+function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(tt); tt=setTimeout(()=>t.classList.remove('show'),2200); }
+
+const esc = s => String(s).replace(/'/g, "&#39;");
+
+/* 四本词典：v=规范值 · raw=原始变体 · cnt=命中数 */
+const DICTS = {
+  cause: [
+    { v:'侵害作品信息网络传播权纠纷', raw:[['侵害作品信息网络传播权',356],['信息网络传播权纠纷',41]], cnt:397 },
+    { v:'侵害表演权纠纷', raw:[['表演权纠纷',88],['邻接权-表演',5]], cnt:93 },
+    { v:'著作权侵权纠纷（通用）', raw:[['著作权侵权',31],['著作权纠纷',12]], cnt:43 },
+    { v:'侵害放映权纠纷', raw:[['放映权纠纷',24]], cnt:24 },
+    { v:'侵害广播权纠纷', raw:[['广播权纠纷',12]], cnt:12 },
+    { v:'侵害复制权纠纷', raw:[['复制权纠纷',9]], cnt:9 },
+    { v:'侵害改编权纠纷', raw:[['改编权纠纷',4]], cnt:4 },
+    { v:'音像制品权利纠纷', raw:[['音像制品侵权',3]], cnt:3 },
+    { v:'买卖合同纠纷（设备）', raw:[['设备买卖纠纷',8],['购销合同纠纷',3]], cnt:11 },
+    { v:'技术服务合同纠纷', raw:[['技术合同纠纷',5]], cnt:5 },
+    { v:'劳动争议', raw:[['劳动仲裁',2],['工资争议',1]], cnt:3 },
+    { v:'其他/待拆分 ⚠', raw:[['含仲裁机构混入（23）',23]], cnt:23 }
+  ],
+  status: [
+    { v:'已结案', raw:[['已结案',311],['结案',2]], cnt:313 },
+    { v:'一审', raw:[['一审中',52],['审理中-一审',6]], cnt:58 },
+    { v:'二审', raw:[['二审',17],['上诉中',3]], cnt:20 },
+    { v:'再审', raw:[['申请再审',2],['再审审查',1]], cnt:3 },
+    { v:'执行中', raw:[['执行',9],['执行（恢复）',2]], cnt:11 },
+    { v:'已终本', raw:[['终本',4]], cnt:4 },
+    { v:'执行完毕', raw:[['执行完毕',6],['已执行',1]], cnt:7 },
+    { v:'调解-已履行', raw:[['调解结案',5],['调解履行完毕',1]], cnt:6 },
+    { v:'和解-已履行', raw:[['和解',3],['和解协议履行',2]], cnt:5 },
+    { v:'撤回起诉', raw:[['撤回',8],['撤诉',4]], cnt:12 },
+    { v:'驳回起诉', raw:[['驳回起诉',6]], cnt:6 },
+    { v:'移送管辖', raw:[['移送',3]], cnt:3 },
+    { v:'中止诉讼', raw:[['中止',2]], cnt:2 },
+    { v:'公告送达中', raw:[['公告',1]], cnt:1 },
+    { v:'待立案', raw:[['待立',5],['立案审查',2]], cnt:7 },
+    { v:'审理中', raw:[['在办',18]], cnt:18 },
+    { v:'评估/鉴定中', raw:[['鉴定中',1]], cnt:1 },
+    { v:'管辖权异议审理中', raw:[['管辖异议',2]], cnt:2 },
+    { v:'上诉-审理中', raw:[['上诉审理',3]], cnt:3 },
+    { v:'执行异议', raw:[['执行异议',1]], cnt:1 },
+    { v:'其他 ⚠', raw:[['（未归类）',4]], cnt:4 }
+  ],
+  reason: [
+    { v:'胜诉', raw:[['胜诉',206],['全部支持',12]], cnt:218 },
+    { v:'部分胜诉（判赔）', raw:[['判赔',41],['部分支持',3]], cnt:44 },
+    { v:'驳回对方诉讼请求', raw:[['驳回对方诉请',26]], cnt:26 },
+    { v:'驳回起诉', raw:[['驳回起诉',6]], cnt:6 },
+    { v:'和解', raw:[['庭外和解',9],['和解协议',2]], cnt:11 },
+    { v:'调解', raw:[['调解结案',7]], cnt:7 },
+    { v:'撤回起诉', raw:[['撤诉',10]], cnt:10 },
+    { v:'原告撤诉', raw:[['原告撤诉',3]], cnt:3 },
+    { v:'终本', raw:[['终本',4]], cnt:4 },
+    { v:'执行完毕', raw:[['执行完毕',6]], cnt:6 },
+    { v:'移送', raw:[['移送法院',3]], cnt:3 },
+    { v:'中止', raw:[['中止',2]], cnt:2 },
+    { v:'管辖权转移', raw:[['管辖转移',2]], cnt:2 },
+    { v:'未结', raw:[['在办',18]], cnt:18 },
+    { v:'其他 ⚠', raw:[['（空值/未知）',5]], cnt:5 }
+  ],
+  payer: [
+    { v:'雷石（我司）', raw:[['北京雷石',284],['雷石世纪',11],['雷石科技',3]], cnt:298 },
+    { v:'雷客（关联公司）', raw:[['北京雷客',16],['雷客文化',1]], cnt:17 },
+    { v:'诉讼相对方', raw:[['原告/被告主体',306]], cnt:306 }
+  ]
+};
+
+let currentTab = 'cause';
+function dictTab(k){
+  currentTab = k;
+  document.querySelectorAll('#dictTabs .tab').forEach(t=>t.classList.remove('on'));
+  document.querySelectorAll('#dictTabs .tab')[['cause','status','reason','payer'].indexOf(k)].classList.add('on');
+  document.getElementById('dictKw').value = '';
+  renderDict(k, '');
+}
+function renderDict(k, kw){
+  const rows = DICTS[k].filter(d => !kw || d.v.includes(kw) || d.raw.some(r=>r[0].includes(kw)));
+  document.getElementById('dictBody').innerHTML = rows.length
+    ? rows.map(d=>`<tr><td>${d.v}</td><td>${d.raw.map(r=>`<span class="rule-tag" style="margin:1px 3px 1px 0">${esc(r[0])} <b style="color:var(--primary)">${r[1]}</b></span>`).join('')}</td></tr>`).join('')
+    : `<tr><td colspan="2" style="color:var(--muted-2);text-align:center;padding:18px">未命中「${esc(kw)}」的词典条目</td></tr>`;
+}
+
+/* 清洗规则：R01→R06 · on=是否启用 · hit=命中数 */
+const RULES = [
+  { id:'R01', name:'日期补全', on:true,
+    desc:'补齐「仅年月 / 仅月日」源值 → 标准 ISO 日期；非法格式进异常队列（08-10 曾跳过 1 条）',
+    hit:214, last:'03:00:03 · 42s', sample:'2026/8 → 2026-08-01' },
+  { id:'R02', name:'原告名归一（音集协 3 变体）', on:true,
+    desc:'合并「中国音像著作权集体管理协会 / 音集协 / 中音集协」→ 规范名；13 条脏标记待人工确认归属',
+    hit:312, last:'03:00:05 · 6s', sample:'音集协 → 中国音像著作权集体管理协会' },
+  { id:'R03', name:'金额归一（单位识别）', on:true,
+    desc:'「万」「k」等聚合单位换算为元；缺单位存疑值（¥66,00?）转入存疑队列，不阻断管线',
+    hit:47, last:'03:00:07 · 8s', sample:'12.5万 → 125,000' },
+  { id:'R04', name:'案由拆分（仲裁机构落位）', on:true,
+    desc:'命中案由字段内嵌「×仲裁委员会」→ 拆分为独立仲裁机构字段；当前 23 处待确认',
+    hit:23, last:'03:00:06 · 4s', sample:'著作权纠纷（北京仲裁委）→ 案由+仲裁机构' },
+  { id:'R05', name:'重复记录合并', on:true,
+    desc:'按 案号 + 案由 + 收案日期 三维指纹去重；保留最新版本，历史版本留痕',
+    hit:12, last:'03:00:08 · 3s', sample:'指纹命中 → upsert 同一 case_id' },
+  { id:'R06', name:'当事人 DuplexLink 展开', on:false,
+    desc:'解析 composer/member 嵌套结构落事实表；因深层嵌套（3 层+）方案评审中，暂停启用',
+    hit:635, last:'07-28 评审会 · 23 条待补', sample:'composer=[{主体,角色}] → 当事人事实表' }
+];
+
+function renderRules(){
+  document.getElementById('ruleList').innerHTML = RULES.map(r=>`
+    <div class="rule-card">
+      <div class="rule-head">
+        <span class="rule-id${r.on?'':' off'}">${r.id}</span>
+        <div style="flex:1">
+          <div class="rule-name">${r.name}</div>
+          <div class="rule-desc">${r.desc}</div>
+        </div>
+        <span class="rule-stat">命中 <b style="color:${r.on?'var(--primary)':'var(--muted-2)'}">${r.hit}</b></span>
+        <label class="switch"><input type="checkbox" ${r.on?'checked':''} onchange="toggleRule('${r.id}')"><span class="sl"></span></label>
+      </div>
+      <div class="rule-foot"><span>上次运行：${r.last}</span><span>示例：${r.sample}</span></div>
+    </div>`).join('');
+}
+function toggleRule(id){
+  const r = RULES.find(x=>x.id===id);
+  r.on = !r.on;
+  renderRules();
+  toast(`${id} 已${r.on?'启用':'停用'} — 保存后将${r.on?'参与':'移出'}清洗管线`);
+}
+function saveRules(){
+  const on = RULES.filter(r=>r.on).length;
+  toast(`已保存规则配置：启用 ${on} / 停用 ${RULES.length-on} · 触发增量重跑（预计 35s）`);
+}
+
+function rollback(){
+  toast('已确认回滚 v3.1：重跑受影响 13 条原告名记录（预计 40s）· 或点击取消');
+}
+
+renderRules();
+renderDict(currentTab, '');
+</script>
+</body>
+</html>

@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>同步管理 · 法务诉讼业务平台（原型）</title>
+<link rel="stylesheet" href="assets/prototype.css">
+<style>
+  .sync-hero { display: grid; grid-template-columns: 1.4fr 1fr; gap: 14px; margin-bottom: 14px; }
+  .pulse-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); animation: pulse 2s infinite; display: inline-block; }
+  @keyframes pulse { 0%{ box-shadow: 0 0 0 0 color-mix(in srgb, var(--success) 50%, transparent);} 70%{ box-shadow: 0 0 0 8px transparent;} 100%{ box-shadow: 0 0 0 0 transparent;} }
+  .job-row { display: flex; align-items: center; gap: 10px; padding: 10px 4px; border-bottom: 1px solid var(--border); font-size: 12.5px; }
+  .job-row:last-child { border-bottom: none; }
+  .job-name { font-weight: 500; flex: 1; }
+  .log-line { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; color: var(--muted); line-height: 1.8; }
+  .log-line .t { color: var(--muted-2); }
+  .log-line.ok { color: var(--success); }
+  .log-line.err { color: var(--danger); }
+  .fld-map { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 18px; font-size: 12px; margin-top: 10px; }
+  .fld-map .fm { display: flex; justify-content: space-between; gap: 6px; }
+  .fld-map .fm .l { color: var(--muted); white-space: nowrap; }
+  .fld-map .fm .r { font-family: ui-monospace, monospace; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar" id="sidebar">
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <div class="brand" style="padding:6px 8px 14px">
+        <div class="brand-logo">法</div>
+        <div><div class="brand-name">法务诉讼平台</div><div class="brand-sub">Legal Case Workspace</div></div>
+      </div>
+      <button class="icon-btn btn-sm" id="collapseBtn" style="margin-bottom:8px">«</button>
+    </div>
+    <nav>
+      <div class="nav-group">
+        <div class="nav-label">工作台</div>
+        <a class="nav-item" href="01-overview.html"><span class="nav-ico">▦</span>态势总览</a>
+        <a class="nav-item" href="02-search.html"><span class="nav-ico">⌕</span>案件检索<span class="nav-count">638</span></a>
+        <a class="nav-item" href="09-ai.html"><span class="nav-ico">✦</span>AI 对话<span class="ph-badge">Beta</span></a>
+      </div>
+      <div class="nav-group">
+        <div class="nav-label">分析</div>
+        <a class="nav-item" href="04-parties.html"><span class="nav-ico">▣</span>对手方画像</a>
+        <a class="nav-item" href="05-analysis.html"><span class="nav-ico">◫</span>多维分析</a>
+        <a class="nav-item" href="06-songs.html"><span class="nav-ico">♪</span>歌曲维度</a>
+        <a class="nav-item" href="07-fees.html"><span class="nav-ico">¥</span>费用看板</a>
+        <a class="nav-item" href="08-metrics.html"><span class="nav-ico">◎</span>指标口径中心</a>
+      </div>
+      <div class="nav-group">
+        <div class="nav-label">系统</div>
+        <a class="nav-item active" href="10-sync.html"><span class="nav-ico">↻</span>同步管理</a>
+        <a class="nav-item" href="11-dicts.html"><span class="nav-ico">☰</span>词典与清洗规则</a>
+      </div>
+    </nav>
+    <div class="side-foot">v0.1.0 Preview<br>数据截至 2026-08-13 03:00</div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="search-box"><input placeholder="全局检索：案号 / 案由 / 歌曲 / 对手方…"><span class="kbd">/</span><span class="s-ico">⌕</span></div>
+      <div class="top-right">
+        <span class="badge status-green"><i class="dot"></i>已同步 · 638 条</span>
+        <button class="icon-btn" id="themeBtn">🌙</button>
+      </div>
+    </div>
+
+    <div class="content">
+      <div class="crumb-path">
+        <a href="00-index.html">原型导航</a><span class="sep">/</span>
+        <a href="10-sync.html">同步管理</a><span class="sep">/</span>
+        <span class="cur">飞书多维表格源 · 最近运行 03:00</span>
+      </div>
+
+      <div class="page-head">
+        <div><h1 class="page-title">同步管理</h1>
+          <div class="page-breadcrumb">从飞书多维表格（App cli_aac3b1323ab8dbea · Base bascnjWi0aitMksjCVkhy9SNVjd）读取案件表/歌曲表，经清洗管道落库</div>
+        </div>
+        <div class="page-actions">
+          <button class="btn btn-sm" onclick="toast('已开始试运行（dry-run），不写入）')">▶ 试运行 dry-run</button>
+          <button class="btn btn-sm" onclick="toast('已排队全量同步任务')">↻ 全量同步</button>
+          <button class="btn btn-sm btn-primary" onclick="toast('增量同步已启动：拉取最近 15 分钟变更')">⏱ 增量同步</button>
+        </div>
+      </div>
+
+      <!-- 状态总览 -->
+      <div class="sync-hero">
+        <div class="card card-pad">
+          <div class="card-title">近 24h 同步状态<span class="help">ⓘ</span></div>
+          <div class="syncbar ok" style="margin-top:6px">
+            <span>✓</span><span class="grow">最近同步成功 · 2026-08-13 03:00 · 增量 6 条（案件 4 + 歌曲 2）· 耗时 42s</span>
+          </div>
+          <div class="syncbar warn" style="margin-top:8px">
+            <span>⚠</span><span class="grow">清洗管道：47 处脏标记待确认（案由混入仲裁机构 23 · 金额单位歧义 11 · 原告名变体 13）</span>
+            <button class="btn btn-sm" style="height:22px;font-size:11px" onclick="location.href='11-dicts.html'">去处理 →</button>
+          </div>
+          <div class="grid-2" style="grid-template-columns:repeat(4,1fr);margin-top:14px">
+            <div><div class="stat-label">源记录数</div><div style="font-size:20px;font-weight:600">1,186<span style="font-size:11px;color:var(--muted-2)"> 案件+歌曲</span></div></div>
+            <div><div class="stat-label">已入湖</div><div style="font-size:20px;font-weight:600">1,174</div></div>
+            <div><div class="stat-label">跳过/重复</div><div style="font-size:20px;font-weight:600">12</div></div>
+            <div><div class="stat-label">错误</div><div style="font-size:20px;font-weight:600;color:var(--danger)">0 <span style="font-size:11px;color:var(--muted-2)">本轮</span></div></div>
+          </div>
+          <div class="fld-map">
+            <div class="fm"><span class="l">案件表</span><span class="r">tblCuET1IuQPysak · 35 字段</span></div>
+            <div class="fm"><span class="l">歌曲表</span><span class="r">tblCGACAzAMGd5eX · DuplexLink</span></div>
+            <div class="fm"><span class="l">分页</span><span class="r">page_size=500 · 20 QPS</span></div>
+            <div class="fm"><span class="l">增量游标</span><span class="r">record_id 自增 + 更新事件</span></div>
+          </div>
+        </div>
+
+        <div class="card card-pad">
+          <div class="card-title">作业调度<span class="ph-badge">cron</span></div>
+          <div class="job-row"><span class="pulse-dot"></span><span class="job-name">增量同步（案件表）</span><span>每 15 分钟</span><span class="badge status-green" style="height:18px">运行中</span></div>
+          <div class="job-row"><span class="pulse-dot"></span><span class="job-name">增量同步（歌曲表）</span><span>每 15 分钟</span><span class="badge status-green" style="height:18px">运行中</span></div>
+          <div class="job-row">◆<span class="job-name">清洗管道全量重跑</span><span>每日 03:00</span><span class="badge status-blue" style="height:18px">上次 OK</span></div>
+          <div class="job-row">◆<span class="job-name">指标重算 + 报表刷新</span><span>每日 03:40</span><span class="badge status-blue" style="height:18px">上次 OK</span></div>
+          <div class="job-row">◆<span class="job-name">案例库快照拉取</span><span>每周一 22:00</span><span class="badge status-amber" style="height:18px">2026-05 停更</span></div>
+          <div class="card-hint" style="margin-top:8px">调度器失败自动重试 3 次（指数退避）· 连续失败进入飞书告警群</div>
+        </div>
+      </div>
+
+      <div class="grid-2" style="grid-template-columns:1.2fr 1fr">
+        <!-- 运行日志 -->
+        <div class="card card-pad">
+          <div class="card-title">本次运行日志（03:00 → 03:00:42）</div>
+          <div style="max-height:300px;overflow-y:auto">
+            <div class="log-line ok"><span class="t">03:00:00</span> [sync] start incremental · cursor=rec_AB12xY</div>
+            <div class="log-line"><span class="t">03:00:01</span> [bitable] GET /records?page_size=500&filter=… → 6 条</div>
+            <div class="log-line"><span class="t">03:00:04</span> [parse] 拆 DuplexLink composer=1 member=1（歌曲·可可西里）</div>
+            <div class="log-line"><span class="t">03:00:05</span> [clean] R02 原告归一：音集协 3 个变体 → 规范名</div>
+            <div class="log-line"><span class="t">03:00:06</span> [clean] 案由拆分：R04 命中 1 处 → 仲裁机构字段</div>
+            <div class="log-line err"><span class="t">03:00:07</span> [warn] 金额歧义：¥66,00? 缺单位（存疑队列）</div>
+            <div class="log-line"><span class="t">03:00:10</span> [lake] upsert 案件 4 / 歌曲 2 · 版本 v123</div>
+            <div class="log-line"><span class="t">03:00:40</span> [metrics] 重算 8 项指标 → 口径 v1.0</div>
+            <div class="log-line ok"><span class="t">03:00:42</span> [done] success · 42s · latency p95=310ms</div>
+          </div>
+        </div>
+
+        <!-- 历史运行 -->
+        <div class="card card-pad">
+          <div class="card-title">历史运行（最近 6 次）</div>
+          <table class="tbl" style="width:100%">
+            <thead><tr><th>时间</th><th>类型</th><th>记录</th><th>耗时</th><th>结果</th></tr></thead>
+            <tbody>
+              <tr><td>08-13 03:00</td><td>增量</td><td>+6</td><td>42s</td><td><span class="badge status-green" style="height:18px">成功</span></td></tr>
+              <tr><td>08-12 03:00</td><td>全量</td><td>1,174</td><td>3m12s</td><td><span class="badge status-green" style="height:18px">成功</span></td></tr>
+              <tr><td>08-11 03:00</td><td>增量</td><td>+3</td><td>38s</td><td><span class="badge status-green" style="height:18px">成功</span></td></tr>
+              <tr><td>08-10 03:00</td><td>增量</td><td>+11</td><td>1m04s</td><td><span class="badge status-amber" style="height:18px">2 条跳过</span></td></tr>
+              <tr><td>08-09 03:00</td><td>增量</td><td>+0</td><td>31s</td><td><span class="badge status-green" style="height:18px">成功</span></td></tr>
+              <tr><td>08-08 03:00</td><td>全量</td><td>1,163</td><td>2m58s</td><td><span class="badge status-green" style="height:18px">成功</span></td></tr>
+            </tbody>
+          </table>
+          <div class="card-hint" style="margin-top:10px">⚠ 08-10 跳过 2 条：1 条缺案号必填、1 条日期格式非法（YYYY/MM/DD）→ 已入异常队列可人工补录</div>
+        </div>
+      </div>
+
+      <footer class="footnote" style="text-align:right">同步网关按 20 QPS 限流 · 失败重试 3 次 · 完整字段映射见 docs/03 后端详细设计 §3.2 · 数据截至 2026-08-13 03:00</footer>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const themeBtn = document.getElementById('themeBtn');
+themeBtn.onclick=()=>{ const d=document.documentElement.dataset.theme==='dark'; document.documentElement.dataset.theme=d?'light':'dark'; themeBtn.textContent=d?'🌙':'☀'; };
+const sb=document.getElementById('sidebar'), cb=document.getElementById('collapseBtn');
+cb.onclick=()=>{ sb.classList.toggle('collapsed'); cb.textContent=sb.classList.contains('collapsed')?'»':'«'; };
+let tt;
+function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(tt); tt=setTimeout(()=>t.classList.remove('show'),2200); }
+</script>
+</body>
+</html>

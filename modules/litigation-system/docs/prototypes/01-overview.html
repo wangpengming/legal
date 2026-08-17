@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>态势总览 · 法务诉讼业务平台（原型）</title>
+<link rel="stylesheet" href="assets/prototype.css">
+<style>
+  .hero-block { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 6px; }
+  .hero-block h1 { font-size: 20px; font-weight: 600; }
+  .hero-block .date { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .schedule-item { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px dashed var(--border); }
+  .schedule-item:last-child { border-bottom: none; }
+  .sch-date { width: 44px; text-align: center; flex-shrink: 0; }
+  .sch-date b { display: block; font-size: 16px; font-variant-numeric: tabular-nums; }
+  .sch-date span { font-size: 10px; color: var(--muted-2); }
+  .sch-main { flex: 1; min-width: 0; }
+  .sch-title { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sch-meta { font-size: 11.5px; color: var(--muted); }
+  .days-left { font-size: 11px; padding: 2px 8px; border-radius: 99px; flex-shrink: 0; }
+  .d-today { background: var(--primary-soft); color: var(--primary); font-weight: 600; }
+  .d-soon { background: var(--warning-soft); color: var(--warning); }
+  .d-later { background: var(--info-soft); color: var(--info); }
+  .mini-table td { padding: 5px 0; font-size: 12.5px; border: none; }
+  .mini-table td:last-child { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 11.5px; color: var(--muted); margin-top: 10px; }
+  .legend i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 5px; }
+  .kpi-sub { font-size: 11.5px; color: var(--muted-2); }
+  .drawer-tbl td:first-child { color: var(--muted); }
+  .drawer-tbl td:last-child { text-align: right; font-variant-numeric: tabular-nums; font-weight: 500; }
+  .sparkline { width: 130px; height: 34px; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ===== 侧栏 ===== -->
+  <aside class="sidebar" id="sidebar">
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <div class="brand" style="padding:6px 8px 14px">
+        <div class="brand-logo">法</div>
+        <div>
+          <div class="brand-name">法务诉讼平台</div>
+          <div class="brand-sub">Legal Case Workspace</div>
+        </div>
+      </div>
+      <button class="icon-btn btn-sm" id="collapseBtn" title="收起侧栏" style="margin-bottom:8px">«</button>
+    </div>
+    <nav>
+      <div class="nav-group">
+        <div class="nav-label">工作台</div>
+        <a class="nav-item active" href="01-overview.html"><span class="nav-ico">▦</span>态势总览</a>
+        <a class="nav-item" href="02-search.html"><span class="nav-ico">⌕</span>案件检索<span class="nav-count">638</span></a>
+        <a class="nav-item" href="09-ai.html"><span class="nav-ico">✦</span>AI 对话<span class="ph-badge">Beta</span></a>
+      </div>
+      <div class="nav-group">
+        <div class="nav-label">分析</div>
+        <a class="nav-item" href="04-parties.html"><span class="nav-ico">▣</span>对手方画像</a>
+        <a class="nav-item" href="05-analysis.html"><span class="nav-ico">◫</span>多维分析</a>
+        <a class="nav-item" href="06-songs.html"><span class="nav-ico">♪</span>歌曲维度</a>
+        <a class="nav-item" href="07-fees.html"><span class="nav-ico">¥</span>费用看板</a>
+        <a class="nav-item" href="08-metrics.html"><span class="nav-ico">◎</span>指标口径中心</a>
+      </div>
+      <div class="nav-group">
+        <div class="nav-label">系统</div>
+        <a class="nav-item" href="10-sync.html"><span class="nav-ico">↻</span>同步管理</a>
+        <a class="nav-item" href="11-dicts.html"><span class="nav-ico">☰</span>词典与清洗规则</a>
+      </div>
+    </nav>
+    <div class="side-foot">v0.1.0 Preview<br>数据截至 2026-08-13 03:00</div>
+  </aside>
+
+  <!-- ===== 主区 ===== -->
+  <div class="main">
+    <div class="topbar">
+      <div class="search-box">
+        <input placeholder="全局检索：案号 / 案由 / 歌曲 / 对手方…">
+        <span class="kbd">/</span><span class="s-ico">⌕</span>
+      </div>
+      <div class="top-right">
+        <span class="badge status-green"><i class="dot"></i>已同步 · 638 条</span>
+        <select style="height:28px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:12px;color:var(--muted);padding:0 6px">
+          <option>全部业务线</option><option>VOD</option><option>IPTV·OTT</option><option>车载</option><option>雷客</option><option>人力</option><option>哇屋</option><option>研发</option><option>默霆</option>
+        </select>
+        <button class="icon-btn" id="themeBtn" title="切换主题">🌙</button>
+        <button class="icon-btn" title="通知">🔔</button>
+      </div>
+    </div>
+
+    <div class="content">
+      <!-- 同步状态条 -->
+      <div class="syncbar warn">
+        <span>⚠</span>
+        <span class="grow">最近一次增量同步（2026-08-13 03:00）：拉取 638 条，清洗命中 47 处脏标记；其中 <b>3 处「收案年份」待人工确认</b>。</span>
+        <a href="11-dicts.html">去处理 →</a>
+      </div>
+
+      <div class="hero-block">
+        <div>
+          <h1>态势总览</h1>
+          <div class="date">2026-08-13 周四 · 本月第 10 个工作日 · 口径：v1.0（口径中心 08 页可切换）</div>
+        </div>
+        <div class="page-actions">
+          <button class="btn btn-sm">📅 2026-08-01 ~ 2026-08-13</button>
+          <button class="btn btn-primary btn-sm" onclick="location.href='02-search.html'">+ 案件检索</button>
+        </div>
+      </div>
+
+      <!-- 数字卡 -->
+      <div class="stat-row">
+        <div class="card card-pad stat-card" onclick="openDrawer('draft')" title="点击下钻">
+          <div class="stat-label">在办案件 <span class="help" title="状态 ∈ 审理中/执行中 的未结案件（口径中心 open_count）">ⓘ</span></div>
+          <div class="stat-value">42</div>
+          <div class="stat-delta">环比 <span class="up-green">↓ 5</span> <span class="flat">・待开庭 12</span></div>
+          <div class="spark"><svg class="sparkline" viewBox="0 0 130 34"><polyline fill="none" stroke="#2563EB" stroke-width="2" points="0,26 15,24 30,27 45,20 60,22 75,16 90,18 105,12 120,14 130,8"/></svg></div>
+        </div>
+        <div class="card card-pad stat-card" onclick="openDrawer('new')" title="点击下钻">
+          <div class="stat-label">本月新收 <span class="help" title="收案时间 ∈ 本月 的案件数">ⓘ</span></div>
+          <div class="stat-value">8</div>
+          <div class="stat-delta">环比 <span class="up-red">↑ 3</span> <span class="flat">・车载线 4 件</span></div>
+          <div class="spark"><svg class="sparkline" viewBox="0 0 130 34"><polyline fill="none" stroke="#16A34A" stroke-width="2" points="0,30 15,28 30,29 45,24 60,22 75,18 90,20 105,14 120,12 130,10"/></svg></div>
+        </div>
+        <div class="card card-pad stat-card" onclick="openDrawer('pay')" title="点击下钻">
+          <div class="stat-label">本年判赔金额 <span class="help" title="结案原因=判赔 且 支付时间∈本年 的支付总金额合计（元）">ⓘ</span></div>
+          <div class="stat-value">¥3,280,000</div>
+          <div class="stat-delta">同比 <span class="up-red">↑ 18.6%</span> <span class="flat">・IP 案件占 71%</span></div>
+          <div class="spark"><svg class="sparkline" viewBox="0 0 130 34"><polyline fill="none" stroke="#DC2626" stroke-width="2" points="0,24 15,26 30,22 45,23 60,17 75,19 90,13 105,15 120,9 130,10"/></svg></div>
+        </div>
+        <div class="card card-pad stat-card" onclick="openDrawer('cycle')" title="点击下钻">
+          <div class="stat-label">平均结案周期 <span class="help" title="结案日期 − 收案时间（天），仅已结案案件（口径中心 cycle）">ⓘ</span></div>
+          <div class="stat-value">214<span style="font-size:14px;color:var(--muted)">天</span></div>
+          <div class="stat-delta">同比 <span class="up-green">↓ 26 天</span> <span class="flat">・执行类拖长</span></div>
+          <div class="spark"><svg class="sparkline" viewBox="0 0 130 34"><polyline fill="none" stroke="#D97706" stroke-width="2" points="0,8 15,10 30,8 45,14 60,13 75,18 90,17 105,22 120,21 130,26"/></svg></div>
+        </div>
+      </div>
+
+      <!-- 副指标：与验收清单 G2-01 对齐（音集协 / 判赔累计） -->
+      <div class="stat-row" style="grid-template-columns:repeat(2,1fr)">
+        <div class="card card-pad stat-card" style="padding:10px 14px" onclick="openDrawer('acmc')" title="点击下钻">
+          <div class="stat-label">音集协系列案 <span class="help" title="原告归一后「中国音像著作权集体管理协会」规范名命中（含 3 变体合并），与 04 页画像/08 口径中心一致">ⓘ</span><span class="chip on" style="height:18px;margin-left:8px">48.9%</span></div>
+          <div class="stat-value" style="font-size:22px">312 <span style="font-size:12px;color:var(--muted)">案 / 全库 638</span></div>
+          <div class="stat-delta">2024 年度 62 案批量导入 · <a href="04-parties.html" style="color:var(--primary)">对手方画像 →</a></div>
+        </div>
+        <div class="card card-pad stat-card" style="padding:10px 14px" onclick="openDrawer('accu')" title="点击下钻">
+          <div class="stat-label">判赔累计 <span class="help" title="结案原因=判赔 的支付金额合计（元），与 07 费用看板/08 口径中心一致">ⓘ</span></div>
+          <div class="stat-value" style="font-size:22px">¥1,284,600 <span style="font-size:12px;color:var(--muted)">· 获赔 ¥1,062,300（82.7%）</span></div>
+          <div class="stat-delta"><a href="07-fees.html" style="color:var(--primary)">费用看板 →</a><span class="flat"> ・ 口径 v1.0</span></div>
+        </div>
+      </div>
+
+      <!-- 两层 -->
+      <div class="grid-2">
+        <div class="col">
+          <!-- 收案趋势 -->
+          <div class="card card-pad">
+            <div class="card-title">近 12 个月收案趋势 <span class="help" title="按收案时间月聚合；2025-09 峰值来自音集协系列批量案">ⓘ</span>
+              <div class="sub"><span class="chip on">案件数</span><span class="chip">标的额</span></div>
+            </div>
+            <div class="bar-mini" style="height:120px" id="trendBars"></div>
+            <div class="legend">
+              <span><i style="background:var(--primary)"></i>收案数（件）</span>
+              <span><i style="background:var(--success)"></i>其中批量系列案（parent 已关联）</span>
+              <span style="margin-left:auto" class="muted2">9 月峰值 = 音集协 2024 年度 62 案批量导入</span>
+            </div>
+          </div>
+          <!-- 待确认事项 -->
+          <div class="card card-pad">
+            <div class="card-title">⚠ 待人工确认 <span class="badge status-amber" style="height:18px">3 项</span>
+              <a class="sub" href="11-dicts.html" style="text-decoration:none">进入清洗台 →</a>
+            </div>
+            <table class="tbl mini-table" style="width:100%">
+              <tr><td>「收案年份」= 2023？原始选项为「2023年收案案件（一批）」</td><td>52 条</td></tr>
+              <tr><td>「支付主体」= 雷石 但公司名缺失 → 疑似雷石网络科技有限公司</td><td>1 条</td></tr>
+              <tr><td>「案由」原始含仲裁机构字段，需拆分归档</td><td>7 条</td></tr>
+            </table>
+          </div>
+        </div>
+        <div class="col">
+          <!-- 案由分布 -->
+          <div class="card card-pad">
+            <div class="card-title">结案原因分布（v1.0 三色胜负判定）<span class="help" title="结案原因 15 项 → 胜/败/中性（docs/02 §2.2）">ⓘ</span></div>
+            <div style="display:flex;gap:16px;align-items:center">
+              <div class="donut" style="background:conic-gradient(var(--success) 0 47%, var(--danger) 47% 58%, var(--warning) 58% 72%, var(--info) 72% 100%)">
+                <div class="donut-txt">638</div>
+              </div>
+              <div class="grow">
+                <div class="legend" style="flex-direction:column;gap:6px;margin:0">
+                  <span><i style="background:var(--success)"></i>胜诉类（含撤诉/和解） 300 件 · 47%</span>
+                  <span><i style="background:var(--danger)"></i>判赔类 70 件 · 11%</span>
+                  <span><i style="background:var(--warning)"></i>和解待定/终本 90 件 · 14%</span>
+                  <span><i style="background:var(--info)"></i>程序性/其他 178 件 · 28%</span>
+                </div>
+                <div class="card-hint" style="margin-top:4px">胜诉率口径 B（去掉程序性案件）见 08 页：<b>65.2%</b></div>
+              </div>
+            </div>
+          </div>
+          <!-- 开庭日程 -->
+          <div class="card card-pad" style="position:relative">
+            <div class="card-title">📅 开庭日程 <a class="sub" href="02-search.html?filter=court_upcoming" style="text-decoration:none">全部 12 个 →</a></div>
+            <div class="schedule-item">
+              <div class="sch-date"><b>14</b><span>8月·明日</span></div>
+              <div class="sch-main"><div class="sch-title">株洲中院 · 二审开庭 · 中国音像著作权集体管理协会 v. 雷石</div>
+              <div class="sch-meta">车载线 · 案由：放映权纠纷 · 承办法官 陈xx</div></div>
+              <span class="days-left d-today">今天</span>
+            </div>
+            <div class="schedule-item">
+              <div class="sch-date"><b>18</b><span>8月</span></div>
+              <div class="sch-main"><div class="sch-title">海淀法院 · 证据交换 · 律所代理费合同纠纷</div>
+              <div class="sch-meta">人力线 · 案由：服务合同纠纷</div></div>
+              <span class="days-left d-soon">4 天</span>
+            </div>
+            <div class="schedule-item">
+              <div class="sch-date"><b>25</b><span>8月</span></div>
+              <div class="sch-main"><div class="sch-title">朝阳法院 · 一审开庭 · 单曲滥用案（批量 9 案合并审理）</div>
+              <div class="sch-meta">VOD 线 · 案由：侵害作品信息网络传播权</div></div>
+              <span class="days-left d-later">12 天</span>
+            </div>
+            <div class="schedule-item">
+              <div class="sch-date"><b>09</b><span>9月</span></div>
+              <div class="sch-main"><div class="sch-title">北京知识产权法院 · 执行异议听证</div>
+              <div class="sch-meta">雷客线 · 执行终本异议</div></div>
+              <span class="days-left d-later">27 天</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer class="footnote" style="text-align:right">数据截至 2026-08-13 03:00 增量同步 · 638 条 · 口径版本 v1.0 · 三源交叉验证（📂本地 638 / ⚖️案例 41 / 📜法规 27 命中）</footer>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- 抽屉：下钻 -->
+<div class="drawer-mask" id="mask" onclick="closeDrawer()"></div>
+<div class="drawer" id="drawer">
+  <div class="drawer-head">
+    <div class="drawer-title" id="dTitle">下钻明细</div>
+    <button class="icon-btn" style="margin-left:auto" onclick="closeDrawer()">✕</button>
+  </div>
+  <div class="drawer-body" id="dBody"></div>
+  <div class="drawer-foot">
+    <button class="btn btn-ghost" onclick="closeDrawer()">关闭</button>
+    <button class="btn btn-primary" onclick="location.href='02-search.html'">在检索中查看 →</button>
+  </div>
+</div>
+
+<script>
+/* ===== 主题 / 折叠 / toast ===== */
+const themeBtn = document.getElementById('themeBtn');
+themeBtn.onclick = () => {
+  const dark = document.documentElement.dataset.theme === 'dark';
+  document.documentElement.dataset.theme = dark ? 'light' : 'dark';
+  themeBtn.textContent = dark ? '🌙' : '☀';
+};
+const sb = document.getElementById('sidebar'), cb = document.getElementById('collapseBtn');
+cb.onclick = () => { sb.classList.toggle('collapsed'); cb.textContent = sb.classList.contains('collapsed') ? '»' : '«'; };
+let tt;
+function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(tt); tt=setTimeout(()=>t.classList.remove('show'),2200); }
+
+/* ===== 趋势柱 ===== */
+const trend = [26,31,35,29,38,96,47,33,30,36,41,38];
+const trend2 = [8,9,12,6,11,62,18,10,8,9,11,8];
+const trendBars = document.getElementById('trendBars');
+trendBars.innerHTML = trend.map((v,i)=>
+  `<div style="flex:1;display:flex;flex-direction:column;gap:4px;align-items:center;height:120px;justify-content:flex-end">
+    <i style="flex:${v/2.2};width:100%;background:linear-gradient(180deg,var(--primary),#60A5FA)" title="${v} 件"></i>
+    <i style="flex:${trend2[i]/2.2};width:60%;background:linear-gradient(180deg,var(--success),#86EFAC)" title="系列案 ${trend2[i]} 件"></i>
+    <span style="font-size:10px;color:var(--muted-2)">${i===0?'2025-09':''}${['25-09','25-10','25-11','25-12','26-01','26-02','26-03','26-04','26-05','26-06','26-07','26-08'][i]}</span>
+  </div>`).join('');
+
+/* ===== 抽屉数据 ===== */
+const drawers = {
+  draft: { t:'在办案件 42 件 · 按状态构成', rows:[['一审待判决', 14],['二审待判决', 5],['等待开庭', 12],['强制执行中', 8],['执行终本', 3],['协助执行', 0]] },
+  new:   { t:'本月新收 8 件 · 按业务线构成', rows:[['车载', 4],['VOD', 2],['IPTV·OTT', 1],['雷客', 1],['人力', 0],['哇屋', 0],['研发', 0],['默霆', 0]] },
+  pay:   { t:'本年判赔 ¥3,280,000 · 按支付主体构成', rows:[['雷石（公司本体）', '¥2,210,000'],['雷客', '¥720,000'],['诉讼相对方（判由对方承担）', '¥350,000']] },
+  cycle: { t:'平均结案周期 214 天 · 按案件类型（结案原因）', rows:[['终本（执行程序）', '486 天'],['判赔', '231 天'],['胜诉类', '178 天'],['和解', '152 天'],['撤诉', '96 天']] },
+  acmc:  { t:'音集协系列案 312 件 / 48.9% · 按业务线构成', rows:[['VOD', '186'],['IPTV·OTT', '52'],['车载', '34'],['雷客', '21'],['人力', '9'],['哇屋', '4'],['研发', '4'],['默霆', '2']] },
+  accu:  { t:'判赔累计 ¥1,284,600 · 按支付主体构成', rows:[['雷石（公司本体）', '¥810,000'],['雷客', '¥310,000'],['诉讼相对方（判由对方承担）', '¥164,600']] }
+};
+function openDrawer(k){
+  const d = drawers[k];
+  document.getElementById('dTitle').textContent = d.t;
+  document.getElementById('dBody').innerHTML =
+    `<table class="tbl drawer-tbl" style="width:100%">
+      ${d.rows.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('')}
+     </table>
+     <p class="footnote">ⓘ 口径：${k==='draft'?'open_count（进行中案件，不含终态）':k==='new'?'收案时间 ∈ 本月':'支付时间 ∈ 本年 / 结案周期 = 结案日期−收案时间'} · 版本 v1.0 · 点击「在检索中查看」回到检索页并自动带入条件</p>`;
+  document.getElementById('mask').classList.add('open');
+  document.getElementById('drawer').classList.add('open');
+}
+function closeDrawer(){
+  document.getElementById('mask').classList.remove('open');
+  document.getElementById('drawer').classList.remove('open');
+}
+document.addEventListener('keydown', e => { if(e.key==='Escape') closeDrawer(); });
+</script>
+</body>
+</html>

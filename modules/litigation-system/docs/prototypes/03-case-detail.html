@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>案件详情 · 法务诉讼业务平台（原型）</title>
+<link rel="stylesheet" href="assets/prototype.css">
+<style>
+  .case-head { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .case-no { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 19px; font-weight: 600; }
+  .head-meta { display: flex; gap: 14px; font-size: 12.5px; color: var(--muted); margin-top: 4px; flex-wrap: wrap; }
+  .switch { display: inline-flex; background: var(--surface-2); border-radius: 8px; padding: 2px; gap: 2px; }
+  .switch button { border: none; background: transparent; height: 26px; padding: 0 12px; border-radius: 6px; font-size: 12px; color: var(--muted); }
+  .switch button.on { background: var(--surface); color: var(--primary); font-weight: 500; box-shadow: var(--shadow-card); }
+  .raw-inline { font-size: 12px; color: var(--muted-2); font-variant-numeric: tabular-nums; }
+  .song-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px dashed var(--border); }
+  .song-row:last-child { border-bottom: none; }
+  .song-idx { width: 22px; height: 22px; border-radius: 6px; background: var(--primary-soft); color: var(--primary); font-size: 11px; font-weight: 600; display: grid; place-items: center; flex-shrink: 0; }
+  .series-node { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: 12.5px; }
+  .series-node .tree { color: var(--muted-2); font-family: ui-monospace, monospace; font-size: 12px; }
+  .rel-pill { margin-left: auto; font-size: 11px; color: var(--muted-2); }
+  .sim-score { font-size: 11.5px; font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
+  .sim-score b { color: var(--primary); }
+  .tags-line { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+  .tag-plain { font-size: 11.5px; background: var(--surface-2); color: var(--muted); border-radius: 6px; padding: 2px 8px; }
+  .tbl-amount { text-align: right; font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar" id="sidebar">
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <div class="brand" style="padding:6px 8px 14px">
+        <div class="brand-logo">法</div>
+        <div><div class="brand-name">法务诉讼平台</div><div class="brand-sub">Legal Case Workspace</div></div>
+      </div>
+      <button class="icon-btn btn-sm" id="collapseBtn" style="margin-bottom:8px">«</button>
+    </div>
+    <nav>
+      <div class="nav-group">
+        <div class="nav-label">工作台</div>
+        <a class="nav-item" href="01-overview.html"><span class="nav-ico">▦</span>态势总览</a>
+        <a class="nav-item active" href="02-search.html"><span class="nav-ico">⌕</span>案件检索<span class="nav-count">638</span></a>
+        <a class="nav-item" href="09-ai.html"><span class="nav-ico">✦</span>AI 对话<span class="ph-badge">Beta</span></a>
+      </div>
+      <div class="nav-group">
+        <div class="nav-label">分析</div>
+        <a class="nav-item" href="04-parties.html"><span class="nav-ico">▣</span>对手方画像</a>
+        <a class="nav-item" href="05-analysis.html"><span class="nav-ico">◫</span>多维分析</a>
+        <a class="nav-item" href="06-songs.html"><span class="nav-ico">♪</span>歌曲维度</a>
+        <a class="nav-item" href="07-fees.html"><span class="nav-ico">¥</span>费用看板</a>
+        <a class="nav-item" href="08-metrics.html"><span class="nav-ico">◎</span>指标口径中心</a>
+      </div>
+      <div class="nav-group">
+        <div class="nav-label">系统</div>
+        <a class="nav-item" href="10-sync.html"><span class="nav-ico">↻</span>同步管理</a>
+        <a class="nav-item" href="11-dicts.html"><span class="nav-ico">☰</span>词典与清洗规则</a>
+      </div>
+    </nav>
+    <div class="side-foot">v0.1.0 Preview<br>数据截至 2026-08-13 03:00</div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="search-box">
+        <input placeholder="全局检索：案号 / 案由 / 歌曲 / 对手方…">
+        <span class="kbd">/</span><span class="s-ico">⌕</span>
+      </div>
+      <div class="top-right">
+        <span class="badge status-green"><i class="dot"></i>已同步 · 638 条</span>
+        <button class="icon-btn" id="themeBtn">🌙</button>
+      </div>
+    </div>
+
+    <div class="content">
+      <div class="crumb-path">
+        <a href="00-index.html">原型导航</a><span class="sep">/</span>
+        <a href="02-search.html">案件检索</a><span class="sep">/</span>
+        <a href="02-search.html">筛选结果（24 条）</a><span class="sep">/</span>
+        <span class="cur">（2025）京0108民初24571号</span>
+      </div>
+
+      <div class="case-head">
+        <div>
+          <div class="case-no">（2025）京0108民初24571号</div>
+          <div class="head-meta">
+            <span>收案 2025-03-12 · 结案 2025-11-05（208 天）</span>
+            <span>业务线：VOD</span>
+            <span>案由：侵害作品信息网络传播权</span>
+            <span>承办法官：张xx（电话 010-xxxx 6088）</span>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-left:auto">
+          <span class="badge status-green" style="height:24px"><i class="dot"></i>已结案（胜诉类）</span>
+          <span class="badge status-blue" style="height:24px">系列案父节点 · 9 案</span>
+          <button class="btn btn-sm" onclick="location.href='04-parties.html'">对方画像</button>
+          <button class="btn btn-sm" onclick="toast('已导出本案完整信息 PDF（含口径脚注）')">⬇ 导出</button>
+        </div>
+      </div>
+
+      <!-- 原始/清洗对照开关 -->
+      <div class="syncbar ok" style="margin-top:14px">
+        <span>✓</span>
+        <span class="grow">清洗管道命中 <b>2 处</b>：① 案由含仲裁机构 → 已拆分为「仲裁机构」字段；② 原告公司名归一（“中国音像著作权集体管理协会”为规范名）。</span>
+        <span class="switch">
+          <button class="on" id="btnClean" onclick="swapView('clean')">清洗值</button>
+          <button id="btnRaw" onclick="swapView('raw')">原始值</button>
+        </span>
+      </div>
+
+      <!-- Tab：基本信息 / 涉及歌曲 / 系列案 / 相似案 -->
+      <div class="tabs">
+        <div class="tab on" data-t="base">基本信息</div>
+        <div class="tab" data-t="songs">涉及歌曲 <span style="font-size:11px;color:var(--muted-2)">2</span></div>
+        <div class="tab" data-t="series">系列案 <span style="font-size:11px;color:var(--muted-2)">9</span></div>
+        <div class="tab" data-t="similar">相似案类推 <span style="font-size:11px;color:var(--muted-2)">3</span></div>
+      </div>
+
+      <!-- 基本信息区 -->
+      <div id="tab-base">
+        <div class="grid-2" style="grid-template-columns:1.4fr 1fr">
+          <div class="col">
+            <div class="card card-pad">
+              <div class="card-title">基本情况<span class="help">✎ 点击字段可编辑（回写需权限）</span></div>
+              <div class="detail-grid" id="baseGrid"></div>
+              <div class="tags-line">
+                <span class="tag-plain"># 批量版权诉讼</span>
+                <span class="tag-plain"># 音集协</span>
+                <span class="tag-plain"># 已结-胜诉</span>
+                <button class="btn btn-sm btn-ghost" style="height:22px;font-size:11px">+ 打标</button>
+              </div>
+            </div>
+            <div class="card card-pad">
+              <div class="card-title">生命周期时间轴 <span class="help" title="由收案/开庭/文书/结案等 8 个时间字段自动合成">ⓘ</span></div>
+              <div class="timeline">
+                <div class="tl-node done"><div class="tl-label">收案</div><div class="tl-date">2025-03-12 · 批量导入（系列 9 案）</div></div>
+                <div class="tl-node done"><div class="tl-label">证据交换 · 海淀法院</div><div class="tl-date">2025-05-20</div></div>
+                <div class="tl-node done"><div class="tl-label">一审开庭（合并审理 9 案）</div><div class="tl-date">2025-07-15 · 承办法官 张xx</div></div>
+                <div class="tl-node done"><div class="tl-label">一审判决：驳回原告诉求（胜诉）</div><div class="tl-date">2025-09-02 · 文书 2025-09-08</div></div>
+                <div class="tl-node done"><div class="tl-label">原告未上诉，判决生效</div><div class="tl-date">2025-10-14</div></div>
+                <div class="tl-node now"><div class="tl-label">结案归档</div><div class="tl-date">2025-11-05 · 结案原因：胜诉</div></div>
+              </div>
+            </div>
+            <div class="card card-pad">
+              <div class="card-title">办案笔记 <span class="help" title="FTS5 全文索引字段，可被全局检索命中">ⓘ</span></div>
+              <p style="font-size:13px;color:var(--muted);line-height:1.7">9 案合并审理，对方当庭无法出示完整权利链条（原始词曲著作权登记晚于本公司取得授权）。核心证据为 2023-06-01 授权协议（编号 LEP-2023-0618）。二审放弃上诉，终局对我方有利。后续针对同名歌曲「可可西里」新一轮批量案（2026 年 3 月立案 6 件）默认沿用本案策略。</p>
+            </div>
+          </div>
+          <div class="col">
+            <div class="card card-pad">
+              <div class="card-title">涉及歌曲 <a class="sub" href="06-songs.html" style="text-decoration:none">歌曲维度 →</a></div>
+              <div class="song-row">
+                <span class="song-idx">1</span>
+                <div style="flex:1">
+                  <div style="font-weight:500;font-size:13px">可可西里</div>
+                  <div class="raw-inline">演唱：ansher · 备案 2015</div>
+                </div>
+                <span class="badge status-blue">本系列 9 案</span>
+              </div>
+              <div class="song-row">
+                <span class="song-idx">2</span>
+                <div style="flex:1">
+                  <div style="font-weight:500;font-size:13px">故乡的云</div>
+                  <div class="raw-inline">作曲：谭健常</div>
+                </div>
+                <span class="badge badge-plain">单案使用</span>
+              </div>
+              <div class="card-hint">DuplexLink 结构解析：composer=1 / member=1，边类型=主关联。</div>
+            </div>
+
+            <div class="card card-pad">
+              <div class="card-title">系列案树 <span class="help" title="父记录 SingleLink 展开 · 系列案系数 9/9·1.0">ⓘ</span></div>
+              <div class="series-node"><span class="tree">├─</span><b>本案</b><span class="badge status-green" style="height:18px">胜诉</span><span class="rel-pill">父节点</span></div>
+              <div class="series-node"><span class="tree">├─</span>（2025）京0108民初24572号<span class="badge status-green" style="height:18px">胜诉</span></div>
+              <div class="series-node"><span class="tree">├─</span>（2025）京0108民初24573号<span class="badge status-green" style="height:18px">胜诉</span></div>
+              <div class="series-node"><span class="tree">├─</span>（2025）京0108民初24574号<span class="badge status-amber" style="height:18px">上诉中</span></div>
+              <div class="series-node"><span class="tree">└─</span>…共 9 个关联案件<span class="rel-pill"><a href="02-search.html">在检索展开 →</a></span></div>
+              <div class="card-hint">系列案系数（series_coef）= 同批案总数 / 独立案由数 = 9 / 1 = <b>9.0</b>（口径 v1.0，见 08 页）</div>
+            </div>
+
+            <div class="card card-pad">
+              <div class="card-title">费用与支付 <span class="help" title="支付主体=雷石（我方公司本体）">ⓘ</span></div>
+              <table class="tbl" style="width:100%">
+                <tr><td>标的（对方诉求）</td><td class="tbl-amount money">¥120,000</td></tr>
+                <tr><td class="dirty-mark">支付总金额 <span class="raw-inline">原始：¥9,600</span></td><td class="tbl-amount money">¥9,600</td></tr>
+                <tr><td>对方诉求支持率（公式值）</td><td class="tbl-amount">8% <span class="sup" style="vertical-align:middle"><span class="track"><span class="fill" style="width:8%;background:var(--success)"></span></span></span></td></tr>
+                <tr><td>单曲判赔（公式值 1 首）</td><td class="tbl-amount money">¥600</td></tr>
+                <tr><td>律师代理费</td><td class="tbl-amount"><span class="badge badge-outline">未登记（枚举错配已修正）</span></td></tr>
+              </table>
+              <div class="card-hint">「律师代理费」原始为错配枚举（R09 规则推断费用性质），已留档原始值可回看。</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 涉及歌曲 Tab -->
+      <div id="tab-songs" style="display:none"></div>
+      <!-- 系列案 Tab -->
+      <div id="tab-series" style="display:none"></div>
+      <!-- 相似案 Tab -->
+      <div id="tab-similar" style="display:none">
+        <div class="card card-pad">
+          <div class="card-title">相似案类推 <span class="badge status-blue" style="height:18px">Phase 3</span>
+            <span class="help">特征：同案由 · 同对方 · 同歌曲 · 判赔区间相似 · 加权相似度 &gt; 0.6</span></div>
+          <table class="tbl" style="width:100%">
+            <thead><tr><th>案号</th><th>相似度</th><th>同款特征命中</th><th>单曲判赔</th><th>结案原因</th><th>参考结论</th></tr></thead>
+            <tbody>
+              <tr onclick="location.href='03-case-detail.html'">
+                <td>（2024）京0108民初17203号</td><td class="sim-score"><b>0.92</b> 高</td><td style="font-size:12px">案由+歌曲+对方+标的区间</td><td class="money">0</td><td><span class="badge status-green"><i class="dot"></i>原告撤诉</span></td>
+                <td style="font-size:12px;color:var(--muted)">对方通常因权利链瑕疵撤诉，可积极应诉</td></tr>
+              <tr onclick="location.href='03-case-detail.html'">
+                <td>（2023）京0108民初23144号</td><td class="sim-score"><b>0.78</b> 中</td><td style="font-size:12px">案由+对方+标的区间</td><td class="money">—</td><td><span class="badge status-green"><i class="dot"></i>驳回对方诉求</span></td>
+                <td style="font-size:12px;color:var(--muted)">音集协系诉讼策略雷同，主抗辩：权利链条</td></tr>
+              <tr onclick="location.href='03-case-detail.html'">
+                <td>（2022）粤0305民初8081号</td><td class="sim-score"><b>0.61</b> 中</td><td style="font-size:12px">案由+歌曲</td><td class="money">—</td><td><span class="badge status-amber"><i class="dot"></i>双方和解</span></td>
+                <td style="font-size:12px;color:var(--muted)">异地法院判例支持率较高 → 建议评估和解线</td></tr>
+            </tbody>
+          </table>
+          <div class="card-hint" style="margin-top:12px">
+            <span class="src src-local">📂 本地 3</span><span class="src src-case">⚖️ 案例库 1</span><span class="src src-law">📜 法规 2</span>
+            <span style="margin-left:6px">三源交叉验证命中：相似案检索依据本地维度 + 人民法院案例库同案由判例 1 件 + 信息网络传播权司法解释条文。</span>
+          </div>
+        </div>
+      </div>
+
+      <footer class="footnote" style="text-align:right">record_id: recXXXX24571 · 同步于 2026-08-13 03:00 · 数据指纹（hash）一致 · 口径版本 v1.0</footer>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const themeBtn = document.getElementById('themeBtn');
+themeBtn.onclick = () => { const d = document.documentElement.dataset.theme==='dark'; document.documentElement.dataset.theme = d?'light':'dark'; themeBtn.textContent = d?'🌙':'☀'; };
+const sb=document.getElementById('sidebar'), cb=document.getElementById('collapseBtn');
+cb.onclick=()=>{ sb.classList.toggle('collapsed'); cb.textContent = sb.classList.contains('collapsed')?'»':'«'; };
+
+/* 状态标识：dirty 字段为清洗命中 */
+const FIELDS = [
+  ['dirty','收案年份', '2025', '2025年收案案件（一批）'],
+  ['ok','收案时间', '2025-03-12', '2025-03-12'],
+  ['ok','对方当事人（原告）', '中国音像著作权集体管理协会', ''],
+  ['dirty','案由', '侵害作品信息网络传播权', '侵害作品信息网络传播权（仲裁：中国国际经济贸易仲裁委员会审理中）'],
+  ['dirty','受理法院', '北京市海淀区人民法院', '北京市海淀区人民法院（含CNAS仲裁条款）'],
+  ['ok','合并案件数', '9', '9'],
+  ['ok','标的（元）', '¥120,000', '120000'],
+  ['ok','单曲判赔（公式）', '¥600', '600'],
+  ['ok','对方诉求支持率（公式）', '8%', '0.08'],
+  ['ok','支付主体', '雷石', '雷石'],
+  ['ok','结案原因', '胜诉', '胜诉'],
+  ['ok','结案日期', '2025-11-05', '2025-11-05'],
+];
+function renderGrid(raw){
+  document.getElementById('baseGrid').innerHTML = FIELDS.map(f=>{
+    const val = raw ? (f[3] || f[2]) : f[2];
+    const dirty = raw ? '' : (f[0]==='dirty' ? ` <span class="badge status-amber" style="height:16px;font-size:10px" title="原值：${f[3]}">⚠ 已清洗</span>` : '');
+    const isMoney = val.startsWith('¥');
+    return `<div class="field"><span class="f-label">${f[1]}${dirty}</span><span class="f-value ${isMoney?'money':''}">${val}</span></div>`;
+  }).join('');
+}
+let rawMode = false;
+function swapView(mode){
+  rawMode = mode==='raw';
+  renderGrid(rawMode);
+  document.getElementById('btnClean').classList.toggle('on', !rawMode);
+  document.getElementById('btnRaw').classList.toggle('on', rawMode);
+}
+renderGrid(false);
+
+/* Tab 切换（歌曲/系列案 tab 直接复用对应区块简化演示） */
+const tabMaps = { base:'tab-base', songs:'tab-songs', series:'tab-series', similar:'tab-similar' };
+function renderSongsTab(){
+  document.getElementById('tab-songs').innerHTML = `
+    <div class="card card-pad">
+      <div class="card-title">涉及歌曲 × 案件明细</div>
+      <table class="tbl" style="width:100%">
+        <thead><tr><th>歌曲</th><th>艺人</th><th>关联案件数</th><th>单案判赔（均值）</th><th>系列案系数</th></tr></thead>
+        <tbody>
+          <tr onclick="location.href='06-songs.html'"><td><b>可可西里</b></td><td>ansher</td><td>9</td><td class="money">¥600</td><td>9.0</td></tr>
+          <tr onclick="location.href='06-songs.html'"><td>故乡的云</td><td>谭健常</td><td>1</td><td class="money">—</td><td>1.0</td></tr>
+        </tbody>
+      </table>
+    </div>`;
+}
+function renderSeriesTab(){
+  document.getElementById('tab-series').innerHTML = `
+    <div class="card card-pad">
+      <div class="card-title">系列案明细（父记录 = 本案）<span class="help">点 row 进入子案详情</span></div>
+      <table class="tbl" style="width:100%">
+        <thead><tr><th>案号</th><th>状态</th><th>结案原因</th><th>支付金额</th><th>支持率</th></tr></thead>
+        <tbody id="seriesRows"></tbody>
+      </table>
+    </div>`;
+  document.getElementById('seriesRows').innerHTML = [
+    ['（2025）京0108民初24571号','已结案(胜诉类)','胜诉','¥9,600','8%'],
+    ['（2025）京0108民初24572号','已结案(胜诉类)','胜诉','¥9,600','8%'],
+    ['（2025）京0108民初24573号','已结案(胜诉类)','胜诉','¥9,600','8%'],
+    ['（2025）京0108民初24574号','二审待判决','—','—','—'],
+  ].map(r=>`<tr><td>${r[0]}</td><td><span class="badge status-green"><i class="dot"></i>${r[1]}</span></td><td>${r[2]}</td><td class="money">${r[3]}</td><td>${r[4]}</td></tr>`).join('');
+}
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));
+  t.classList.add('on');
+  Object.values(tabMaps).forEach(id=>document.getElementById(id).style.display='none');
+  const id = tabMaps[t.dataset.t];
+  if(t.dataset.t==='songs') renderSongsTab();
+  if(t.dataset.t==='series') renderSeriesTab();
+  document.getElementById(id).style.display='';
+});
+
+let tt;
+function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(tt); tt=setTimeout(()=>t.classList.remove('show'),2200); }
+</script>
+</body>
+</html>

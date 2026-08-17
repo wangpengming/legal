@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 对话 · 法务诉讼业务平台（原型）</title>
+<link rel="stylesheet" href="assets/prototype.css">
+<style>
+  .ai-layout { display: grid; grid-template-columns: 220px 1fr; gap: 14px; height: calc(100vh - 210px); min-height: 480px; }
+  .conv-list { border-right: 1px solid var(--border); overflow-y: auto; }
+  .conv-item { padding: 10px 12px; border-radius: 8px; font-size: 12.5px; color: var(--muted); cursor: pointer; display: flex; gap: 8px; align-items: center; }
+  .conv-item:hover { background: var(--surface-2); }
+  .conv-item.on { background: var(--primary-soft); color: var(--primary); font-weight: 500; }
+  .conv-time { margin-left: auto; font-size: 10px; color: var(--muted-2); white-space: nowrap; }
+  .chat-wrap { display: flex; flex-direction: column; min-height: 0; }
+  .chat-scroll { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+  .msg { max-width: 82%; display: flex; gap: 10px; }
+  .msg.me { align-self: flex-end; flex-direction: row-reverse; }
+  .msg-av { width: 28px; height: 28px; border-radius: 8px; flex-shrink: 0; display: grid; place-items: center; font-size: 13px; background: var(--surface-2); color: var(--muted); }
+  .msg.me .msg-av { background: var(--primary); color: #fff; }
+  .msg-body { padding: 10px 13px; border-radius: 12px; font-size: 13px; line-height: 1.7; }
+  .msg.me .msg-body { background: var(--primary); color: #fff; border-top-right-radius: 3px; }
+  .msg.ai .msg-body { background: var(--surface-2); border-top-left-radius: 3px; }
+  .src-tag { display: inline-flex; align-items: center; gap: 4px; font-size: 10.5px; border-radius: 5px; padding: 1px 7px; background: var(--surface); border: 1px solid var(--border); color: var(--muted); margin: 2px 4px 2px 0; }
+  .src-tag.miss { opacity: .45; border-style: dashed; }
+  .chip-row { display: flex; gap: 6px; flex-wrap: wrap; padding: 12px 16px; border-top: 1px solid var(--border); }
+  .chip { font-size: 11.5px; border: 1px solid var(--border); border-radius: 999px; padding: 4px 12px; color: var(--muted); cursor: pointer; background: var(--surface); }
+  .chip:hover { border-color: var(--primary); color: var(--primary); }
+  .composer { display: flex; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--border); align-items: center; }
+  .composer input { flex: 1; border: 1px solid var(--border); border-radius: 10px; padding: 9px 14px; font-size: 13px; background: var(--surface); color: var(--text); }
+  .composer input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
+  .mode-pill { font-size: 10.5px; border: 1px solid var(--border); border-radius: 999px; padding: 2px 8px; color: var(--muted-2); cursor: pointer; }
+  .mode-pill.on { border-color: var(--primary); color: var(--primary); background: var(--primary-soft); }
+  .gen-report { border: 1px dashed color-mix(in srgb, var(--primary) 50%, transparent); background: color-mix(in srgb, var(--primary) 6%, transparent); border-radius: 10px; padding: 10px 12px; font-size: 12px; color: var(--primary); cursor: pointer; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar" id="sidebar">
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <div class="brand" style="padding:6px 8px 14px">
+        <div class="brand-logo">法</div>
+        <div><div class="brand-name">法务诉讼平台</div><div class="brand-sub">Legal Case Workspace</div></div>
+      </div>
+      <button class="icon-btn btn-sm" id="collapseBtn" style="margin-bottom:8px">«</button>
+    </div>
+    <nav>
+      <div class="nav-group">
+        <div class="nav-label">工作台</div>
+        <a class="nav-item" href="01-overview.html"><span class="nav-ico">▦</span>态势总览</a>
+        <a class="nav-item" href="02-search.html"><span class="nav-ico">⌕</span>案件检索<span class="nav-count">638</span></a>
+        <a class="nav-item active" href="09-ai.html"><span class="nav-ico">✦</span>AI 对话<span class="ph-badge">Beta</span></a>
+      </div>
+      <div class="nav-group">
+        <div class="nav-label">分析</div>
+        <a class="nav-item" href="04-parties.html"><span class="nav-ico">▣</span>对手方画像</a>
+        <a class="nav-item" href="05-analysis.html"><span class="nav-ico">◫</span>多维分析</a>
+        <a class="nav-item" href="06-songs.html"><span class="nav-ico">♪</span>歌曲维度</a>
+        <a class="nav-item" href="07-fees.html"><span class="nav-ico">¥</span>费用看板</a>
+        <a class="nav-item" href="08-metrics.html"><span class="nav-ico">◎</span>指标口径中心</a>
+      </div>
+      <div class="nav-group">
+        <div class="nav-label">系统</div>
+        <a class="nav-item" href="10-sync.html"><span class="nav-ico">↻</span>同步管理</a>
+        <a class="nav-item" href="11-dicts.html"><span class="nav-ico">☰</span>词典与清洗规则</a>
+      </div>
+    </nav>
+    <div class="side-foot">v0.1.0 Preview<br>数据截至 2026-08-13 03:00</div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="search-box"><input placeholder="全局检索：案号 / 案由 / 歌曲 / 对手方…"><span class="kbd">/</span><span class="s-ico">⌕</span></div>
+      <div class="top-right">
+        <span class="badge status-green"><i class="dot"></i>已同步 · 638 条</span>
+        <button class="icon-btn" id="themeBtn">🌙</button>
+      </div>
+    </div>
+
+    <div class="content" style="padding-bottom:0">
+      <div class="crumb-path">
+        <a href="00-index.html">原型导航</a><span class="sep">/</span>
+        <a href="09-ai.html">AI 对话</a><span class="sep">/</span>
+        <span class="cur">会话：#8 音集协批量案策略推演</span>
+      </div>
+
+      <div class="ai-layout">
+        <!-- 会话列表 -->
+        <div class="card card-pad" style="padding:10px;display:flex;flex-direction:column">
+          <div style="padding:6px 8px 10px;font-size:12px;font-weight:600">会话</div>
+          <div class="conv-list" style="flex:1">
+            <div class="conv-item on">音集协批量案策略推演<span class="conv-time">10:20</span></div>
+            <div class="conv-item">2026「可可西里」批量案 6 件应对<span class="conv-time">09:41</span></div>
+            <div class="conv-item">异地管辖胜率对比（湘/粤/京）<span class="conv-time">昨天</span></div>
+            <div class="conv-item">「故乡的云」判赔历史<span class="conv-time">昨天</span></div>
+            <div class="conv-item">费用归因与预算建议 Q3<span class="conv-time">07-28</span></div>
+            <div class="conv-item">系列案系数口径影响分析<span class="conv-time">07-22</span></div>
+            <div class="conv-item">新案导入：24580~24583 号分诊<span class="conv-time">07-18</span></div>
+          </div>
+          <div style="padding:10px 8px 4px">
+            <button class="btn btn-sm btn-ghost" style="width:100%" onclick="toast('新会话已创建（Mode B · 默认策略模式）')">＋ 新建会话</button>
+          </div>
+        </div>
+
+        <!-- 对话区 -->
+        <div class="card" style="display:flex;flex-direction:column;min-height:0">
+          <div class="chat-scroll" id="chatScroll">
+            <div class="msg ai">
+              <div class="msg-av">✦</div>
+              <div class="msg-body">
+                <div class="ai-msg">
+                  <b>策略推演 · Mode B（已绑定检索结果 24 条 + 对手方画像）</b>
+                  <div style="margin-top:8px">已为你汇总「音集协批量案」三组关键事实：</div>
+                  <div style="margin-top:6px"><b>① 胜诉空间</b>：312 案中 78.2% 以「权利链条瑕疵 / 授权范围限定」抗辩获胜；异地（湘/粤/川）支持率平均高 12pct。</div>
+                  <div style="margin-top:6px"><b>② 高价值判例</b>：（2025）湘0202民初1975号 判赔率 35% —— 已建议纳入类推库（相似度 0.91）。</div>
+                  <div style="margin-top:6px"><b>③ 风险提示</b>：2026 新一轮「可可西里」6 案立案，沿用 2025 案策略胜率预期 76%，若对方更新权利证据，回落至 54%。</div>
+                </div>
+                <div style="margin-top:10px">
+                  <span class="src-tag">📂 本地 312 案·口径 v1.0</span>
+                  <span class="src-tag">⚖️ 案例库 1,120 件（快照 2025-06）</span>
+                  <span class="src-tag">📜 著作法（2020修正）第 10/42 条</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="msg me">
+              <div class="msg-av">我</div>
+              <div class="msg-body">是否建议对 2026 年 6 件批量案统一选择外地管辖？请按胜率、成本、周期三个维度对比。</div>
+            </div>
+
+            <div class="msg ai">
+              <div class="msg-av">✦</div>
+              <div class="msg-body">
+                <div class="ai-msg">
+                  <div><b>三维度对比（Mode B · 推理链已记录）</b></div>
+                  <table class="tbl" style="width:100%;margin-top:8px;font-size:12px">
+                    <thead><tr><th>方案</th><th>预估胜诉率</th><th>单案成本</th><th>周期</th><th>风险</th></tr></thead>
+                    <tbody>
+                      <tr><td>北京海淀（现状）</td><td>76%</td><td>¥11,200</td><td>208 天</td><td>判赔低但稳定</td></tr>
+                      <tr><td>湖南株洲／长沙</td><td>88%</td><td>¥13,500</td><td>171 天</td><td><span class="badge status-amber" style="height:16px">异地质证沟通成本</span></td></tr>
+                      <tr><td>广东广州</td><td>85%</td><td>¥14,800</td><td>196 天</td><td>判赔较高（35%）</td></tr>
+                    </tbody>
+                  </table>
+                  <div style="margin-top:8px"><b>建议</b>：优先湖南方案 —— 本地判例密度高（湘例 1975 号）、周期短 37 天。若对方更换代理律师并补强授权证据，再评估回落策略。</div>
+                </div>
+                <div style="margin-top:10px">
+                  <span class="src-tag">📂 本地 2019–2026 判例切片</span>
+                  <span class="src-tag">⚖️ 案例库同主体 38 件</span>
+                  <span class="src-tag miss">📜 缺权威指引（引用裁判尺度）</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="msg me">
+              <div class="msg-av">我</div>
+              <div class="msg-body">把上面生成为《批量案应对建议》周报段落，含表格与脚注。</div>
+            </div>
+
+            <div class="msg ai">
+              <div class="msg-av">✦</div>
+              <div class="msg-body">
+                <div class="gen-report" onclick="toast('已生成周报段落：批量案应对建议（含 3 源脚注）待确认导出')">
+                  📄 已生成《批量案应对建议》周报段落（Markdown / 14 行）· 点击此处预览 → 确认后写入飞书文档
+                </div>
+                <div style="margin-top:10px;font-size:12px;color:var(--muted)">关联沉淀：类推判例 1 条（1975 号 → 相似度 0.91）· 策略模板 1 个（音集协批量案 v2）</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="chip-row">
+            <span class="mode-pill on" onclick="document.querySelectorAll('.mode-pill').forEach(p=>p.classList.remove('on'));this.classList.add('on');toast('已切换 Mode B（策略/推演模式）')">Mode B · 策略</span>
+            <span class="mode-pill" onclick="document.querySelectorAll('.mode-pill').forEach(p=>p.classList.remove('on'));this.classList.add('on');toast('已切换 Mode A（事实问答模式）')">Mode A · 事实</span>
+            <span class="chip" onclick="ask('对比音集协 vs 雷客的胜诉结构差异')">对比音集协 vs 雷客胜诉结构</span>
+            <span class="chip" onclick="ask('梳理 2025 年 VOD 线判赔 TOP10 案件')">2025 VOD 判赔 TOP10</span>
+            <span class="chip" onclick="ask('自动生成 Q3 诉讼态势周报')">生成 Q3 周报</span>
+          </div>
+
+          <div class="composer">
+            <input id="askInput" placeholder="向平台提问：支持检索 638 案、类推判例、法规与口径（Shift+Enter 换行）…">
+            <button class="btn btn-sm btn-primary" onclick="ask()">发送 ↵</button>
+          </div>
+        </div>
+      </div>
+
+      <footer class="footnote" style="margin-top:10px;text-align:right">AI 回答基于本地数据 + 案例库 + 法规三源检索，命中来源均标注 · Beta 版建议人工复核后落地</footer>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const themeBtn = document.getElementById('themeBtn');
+themeBtn.onclick=()=>{ const d=document.documentElement.dataset.theme==='dark'; document.documentElement.dataset.theme=d?'light':'dark'; themeBtn.textContent=d?'🌙':'☀'; };
+const sb=document.getElementById('sidebar'), cb=document.getElementById('collapseBtn');
+cb.onclick=()=>{ sb.classList.toggle('collapsed'); cb.textContent=sb.classList.contains('collapsed')?'»':'«'; };
+let tt;
+function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(tt); tt=setTimeout(()=>t.classList.remove('show'),2200); }
+
+function ask(pre){
+  const inp = document.getElementById('askInput');
+  const q = (pre || inp.value).trim();
+  if(!q){ toast('请输入问题'); return; }
+  inp.value = '';
+  const scroll = document.getElementById('chatScroll');
+  scroll.insertAdjacentHTML('beforeend',
+    `<div class="msg me"><div class="msg-av">我</div><div class="msg-body">${q.replace(/</g,'&lt;')}</div></div>
+     <div class="msg ai"><div class="msg-av">✦</div><div class="msg-body">
+       <div class="ai-msg"><b>模拟回答（原型演示）</b><div style="margin-top:6px;color:var(--muted)">原型阶段不接入真实模型：当前会话为静态示例。接入后此处展示基于检索增强的回答。</div></div>
+       <div style="margin-top:10px"><span class="src-tag miss">缺源 — 原型模拟内容</span></div>
+     </div></div>`);
+  scroll.scrollTop = scroll.scrollHeight;
+}
+document.getElementById('askInput').addEventListener('keydown', e=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); ask(); } });
+</script>
+</body>
+</html>

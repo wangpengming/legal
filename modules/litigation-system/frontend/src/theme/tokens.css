@@ -1,0 +1,72 @@
+/* =============================================================
+   设计系统 Tokens（google doc 02 §2 迁移源：docs/prototypes/assets/prototype.css
+   定稿值：docs/02 §2.1~2.4；亮/暗双主题同一套语义变量。
+   使用：Tailwind v4 @theme inline 引用（index.css），组件原子类直接
+   bg-primary / text-muted / border-border …；禁止散落 hex（G0-01）。
+   ============================================================= */
+
+:root {
+  /* 语义色板（亮色） */
+  --primary: #2563eb;
+  --primary-fg: #ffffff;
+  --primary-soft: #eff4ff;
+  --success: #16a34a;
+  --success-soft: #ecfdf3;
+  --danger: #dc2626;
+  --danger-soft: #fef2f2;
+  --warning: #d97706;
+  --warning-soft: #fffbeb;
+  --info: #64748b;
+  --info-soft: #f1f5f9;
+  /* 灰阶 */
+  --bg: #f8fafc;
+  --surface: #ffffff;
+  --surface-2: #f1f5f9;
+  --border: #e2e8f0;
+  --text: #0f172a;
+  --muted: #64748b;
+  --muted-2: #94a3b8;
+  /* 尺寸 */
+  --sidebar-w: 240px;
+  --topbar-h: 48px;
+  --radius-lg: 12px;
+  --radius: 8px;
+  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 1px rgba(15, 23, 42, 0.03);
+  --shadow-pop: 0 4px 6px -2px rgba(15, 23, 42, 0.06), 0 12px 32px -8px rgba(15, 23, 42, 0.18), 0 0 0 1px rgba(15, 23, 42, 0.05);
+  --font: -apple-system, "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
+  /* 业务线 9 色固定色序（ECharts 统一 palette，docs/02 §2.2） */
+  --palette: #2563eb, #16a34a, #d97706, #dc2626, #7c3aed, #0891b2, #db2777, #65a30d, #64748b;
+}
+
+[data-theme="dark"] {
+  --primary: #3b82f6;
+  --primary-fg: #0f172a;
+  --primary-soft: #172554;
+  --success: #22c55e;
+  --success-soft: #052e16;
+  --danger: #ef4444;
+  --danger-soft: #450a0a;
+  --warning: #f59e0b;
+  --warning-soft: #451a03;
+  --info: #94a3b8;
+  --info-soft: #1e293b;
+  --bg: #0f172a;
+  --surface: #1e293b;
+  --surface-2: #26334a;
+  --border: #334155;
+  --text: #f1f5f9;
+  --muted: #94a3b8;
+  --muted-2: #64748b;
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-pop: 0 4px 6px -2px rgba(0, 0, 0, 0.4), 0 12px 32px -8px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(51, 65, 85, 0.6);
+}
+
+/* prefers-reduced-motion：关闭滚数/过渡（docs/02 §9.2） */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

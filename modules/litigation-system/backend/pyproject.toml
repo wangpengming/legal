@@ -1,0 +1,10 @@
+[project]
+name = "litigation-backend"
+version = "0.1.0"
+description = "法务诉讼业务平台 · 后端（FastAPI + SQLAlchemy + SQLite WAL + FTS5）"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+addopts = "-q"
