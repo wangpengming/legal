@@ -4,6 +4,82 @@
 
 ---
 
+## 2026-08-17 扩展 case-intelligence 为案例分析输出生成器（v3.0 → v4.0 升级）
+
+**类型**: feature
+**模块**: case-intelligence（吸收方案，原 cross-module 决策已并入）
+**状态**: proposed
+**优先级**: P1（业务核心需求）
+**版本演进**: case-intelligence v3.0 → v4.0（起引入 LLM 生成能力，打破 v3.0"不做 AI"原则）
+
+### 描述
+基于原告方材料（起诉状 + 证据清单 + 证据），自动生成我方全套应对材料：答辩状、我方证据目录、我方证据资料、质证意见。**通过扩展 case-intelligence 模块实现**——复用其三对象模型（案件+文档+规则）、Paperless-ngx OCR、检查清单等现有 v3.0 基础设施，仅引入 LLM 生成层（限于答辩状 / 质证意见 / 证据目录）。
+
+### 决策依据（v3.0 → v4.0 升级理由）
+1. 三对象模型与本需求天然契合：原告材料 = "文档" 对象；检查清单可扩展为"答辩状必填项 / 质证意见三性原则清单"
+2. 复用基础设施：Paperless-ngx OCR  + NocoDB 存储 + 7 步审核工作流 → 新增生成后处理环节
+3. 技术债最小：不重建 OCR/检索/存储；只新增一个 LLM 生成模块
+4. 打破 v3.0"不做 AI"原则是受控、可解释的（仅限文档生成，不做案件判断）
+
+### 输入（用户提供）
+1. 原告起诉状（DOCX / PDF）
+2. 对方证据清单（DOCX / Excel / 图片）
+3. 对方证据材料（DOCX / PDF / 图片）
+4. （可选）案件基本信息（案号 / 法院 / 案由 / 我方身份 / 我方主张要点）
+
+### 输出（系统生成）
+1. **答辩状**（DOCX / PDF）— 含管辖权异议 / 事实与理由 / 证据目录引用
+2. **我方证据目录**（DOCX / Excel）— 规范格式、与对方目录可对照
+3. **我方证据资料**（DOCX / PDF）— 模板文件 + 待用户补充原始材料
+4. **质证意见**（DOCX / PDF）— 逐条对应对方证据（三性原则：真实性 / 合法性 / 关联性）
+
+### 子任务（F-041 ~ F-046）
+- [ ] **F-041** 需求基线 v4.0：用户画像 / MoSCoW / 用户故事 / 验收（`case-intelligence/docs/REQUIREMENTS.md`）
+- [ ] **F-042** 技术规格 v4.0：架构 / LLM 引擎选型 / 数据模型扩展 / 接口（`case-intelligence/spec/SPEC.md`）
+- [ ] **F-043** 输入处理：起诉状 / 证据清单 / 证据材料 → 复用 Paperless-ngx OCR + 文档 API
+- [ ] **F-044** 分析引擎：复用 `case-analysis-master` 六阶段框架 + LLM 集成（本地 / 云端）
+- [ ] **F-045** 输出生成：答辩状 / 证据目录 / 质证意见模板 + 渲染（DOCX/PDF）
+- [ ] **F-046** UI + 服务：Streamlit / NocoDB 表单 / 跨平台启动脚本
+
+### 验收标准
+- [ ] 输入 4 份原告材料，能输出 4 份我方材料
+- [ ] 答辩状结构完整（含管辖权异议 / 事实与理由 / 证据目录引用）
+- [ ] 质证意见逐条对应对方证据（三性原则）
+- [ ] 我方证据目录格式规范（与对方目录可对照）
+- [ ] PII 安全：所有数据本地存储，不上云
+- [ ] 与 court-doc-generator 输出对接（出庭时一站式生成）
+- [ ] case-intelligence v4.0 SPEC 同步更新
+
+### 待澄清
+- **AI 引擎**：本地 LLM（ollama + qwen2.5）vs 云端 API（飞书 AI / OpenAI / Claude）？
+- **输入交互**：一次性上传 4 份 vs 分步引导（先起诉状 → 提纲 → 补证据）？
+- **输出格式**：DOCX / PDF / 飞书云文档？
+- **复用范围**：是否复用 `case-analysis-master` skill 的全部方法论？
+- **案件类型**：是否限定案由（合同 / 知识产权 / 劳动争议）？还是通用？
+- **v3.0 → v4.0 升级策略**：保留 v3.0 全部能力 + 新增生成能力，还是重写？
+
+### 关联资源
+- 方法论：`case-analysis-master` skill（六阶段案件分析 + 抗辩方法论）
+- 范式：`office-workflow-litigation-doc` skill（答辩状结构）
+- 文档：`documents` / `pdf-extractor` / `image-ocr` skill（多格式输入）
+- 上游：现有 v3.0 三对象模型 + Paperless-ngx + 检查清单
+- 下游：court-doc-generator（出庭手续，出庭时一站式消费方）
+- 同级：litigation-system（638 条历史案件可作为"同类案参考"输入）
+
+### 模块影响（开工时同步更新）
+- `modules/case-intelligence/module.yaml`：version `3.0.0` → `4.0.0`；status 保持 `planning`；features 增加 4 项
+- `modules/index.yaml`：case-intelligence 描述补充"v4.0 起含 LLM 生成能力"
+- `modules/case-intelligence/spec/SPEC.md`：v3.0 → v4.0，新增"生成引擎"章节
+- `modules/case-intelligence/requirements/`：新增 `requirements/02-需求v4.md`
+
+### 后续行动（以后启动时）
+1. 在 case-intelligence 下新建 `docs/REQUIREMENTS-v4.md`，复用 v3 模板
+2. 明确 LLM 引擎选型（需评估本地 Ollama + qwen2.5 vs 云端 API 的中文法律场景能力）
+3. 评估 case-analysis-master 六阶段框架在答辩状生成场景的复用度
+4. 同步 litigation-system：评估"同类案参考"输入是否走 MCP 调用
+
+---
+
 ## 2026-08-17 出庭手续生成器支持多代理人材料动态绑定
 
 **类型**: feature
