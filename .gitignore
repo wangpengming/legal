@@ -1,0 +1,92 @@
+# =============================================
+# Legal System .gitignore
+# 原则：忽略所有临时文件，只提交源代码和配置
+# =============================================
+
+# ---- 临时文件（最广泛）----
+*.tmp
+*.temp
+*.log
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+*.bak
+*.backup
+*.old
+*.副本
+
+# ---- 构建产物 ----
+dist/
+build/
+out/
+*.pyc
+__pycache__/
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+*.whl
+node_modules/
+.vite/
+.cache/
+
+# ---- 环境变量（安全红线）----
+.env
+.env.local
+.env.*.local
+secrets.yaml
+secrets.json
+credentials.*
+
+# ---- 虚拟环境 ----
+.venv/
+venv/
+ENV/
+env/
+.conda/
+
+# ---- IDE/编辑器 ----
+.vscode/
+.idea/
+*.sublime-*
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.user
+
+# ---- 隐藏文件/目录（默认不提交）----
+.*
+!.gitignore
+!.gitattributes
+!.env.example
+
+# ---- 压缩包/安装包 ----
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.rar
+*.7z
+*.dmg
+*.pkg
+*.deb
+*.rpm
+
+# ---- 测试/覆盖率 ----
+.coverage
+htmlcov/
+.pytest_cache/
+coverage/
+.nyc_output/
+
+# ---- 临时上传/下载 ----
+uploads/
+downloads/
+tmp/
+temp/

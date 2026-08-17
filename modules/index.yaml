@@ -1,0 +1,20 @@
+# 模块注册表 / Module Registry
+# AI可解析格式，用于管理所有功能模块
+
+modules: []
+
+# 模板：
+#
+# - name: <module-name>
+#   path: modules/<module-name>
+#   status: active | planning | archived
+#   version: 0.0.1
+#   description: 模块一句话描述
+#   entry: src/main.py
+#   deps: []
+#   created: YYYY-MM-DD
+#
+# 状态说明：
+#   active    - 开发中/可用
+#   planning  - 规划中，未开始
+#   archived  - 已归档
