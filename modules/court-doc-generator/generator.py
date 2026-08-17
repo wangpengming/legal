@@ -2,9 +2,18 @@
 
 占位符策略：【】按出现顺序（从左到右、从上到下）依次替换。
 例：模板「【】年【】月【】日」+ values=['2026','9','15'] →「2026年9月15日」
+
+公共 API（v1.1.2）：
+- generate_court_matters(case, company, agent) → 写到 OUTPUTS_DIR（写入数据库由调用方负责）
+- generate_preview(case, company, agent) → 写到临时目录（不写数据库）
+
+设计原则（中天经验）：
+- 抽离 _generate_to_dir 内部函数，两种入口共享逻辑
+- 仅预览不污染 outputs 历史、不写数据库
 """
 import re
 import shutil
+import tempfile
 import zipfile
 from datetime import datetime
 from pathlib import Path
@@ -65,11 +74,16 @@ def replace_placeholders_by_position(paragraph, values: list) -> int:
 
 
 def replace_placeholders_in_doc(doc: Document, values: list) -> int:
-    """替换整个 docx 中的【】占位符（按文档顺序）。"""
+    """替换整个 docx 中的【】占位符（按文档顺序）。
+
+    ⚠️ 修复 v1.1.1：每段调用 replace_placeholders_by_position 时必须传 values[total:] 切片，
+    否则同一段落或后续段落会从 values[0] 重新使用，导致 description/案号 错位。
+    """
     total = 0
     # 段落
     for p in doc.paragraphs:
-        total += replace_placeholders_by_position(p, values)
+        used = replace_placeholders_by_position(p, values[total:])
+        total += used
         if total >= len(values):
             break  # 所有值都用完了
     # 表格（如果有）
@@ -90,28 +104,25 @@ def replace_placeholders_in_doc(doc: Document, values: list) -> int:
 # ============================================================
 
 def build_case_description(case: dict, our_label: str = "我单位") -> str:
-    """生成案由描述。
+    """生成案由描述主体（不含「我单位诉」/「诉我单位」/「与我单位」前缀，由模板拼装）。
 
-    原告：我单位诉{对方}{案由}
-    被告：{对方}诉我单位{案由}
-    第三人：{对方}与我单位{案由}
+    完整语义模板「我单位与【】一案」+ description「上海某某科技公司买卖合同纠纷」
+    →「我单位与上海某某科技公司买卖合同纠纷一案」✅ 正确。
+
+    ⚠️ 修复 v1.1.1：避免「我单位与我单位诉...」重复。
+    description 只返回主体「{对方}{案由}」，模板负责拼装「我单位」与「一案」字样。
     """
     opposing = (case.get("opposing_party") or "").strip()
     cause = (case.get("case_cause") or "").strip()
-    role = case.get("our_role", "").strip()
 
-    if role == "原告":
-        prefix = f"{our_label}诉{opposing}" if opposing else our_label
-    elif role == "被告":
-        prefix = f"{opposing}诉{our_label}" if opposing else our_label
-    elif role == "第三人":
-        prefix = f"{opposing}与{our_label}" if opposing else our_label
-    else:
-        prefix = f"{opposing}与{our_label}" if opposing else our_label
-
+    # 只拼接「对方 + 案由」，不带「我单位」也不带「诉/与」字样
+    if opposing and cause:
+        return f"{opposing}{cause}"
     if cause:
-        return f"{prefix}{cause}"
-    return prefix
+        return cause
+    if opposing:
+        return opposing
+    return ""
 
 
 def parse_hearing_date(hearing_date: str) -> dict:
@@ -189,36 +200,21 @@ def generate_dynamic_docx(template_key: str, values: list, output_path: Path) ->
     return count
 
 
-def generate_court_matters(case: dict, company: dict, agent: dict) -> Path:
-    """生成完整出庭手续，返回输出目录路径。
+def _generate_to_dir(case: dict, company: dict, agent: dict, output_dir: Path) -> Path:
+    """把案件材料生成到指定目录（不写数据库，纯文件系统操作）。
 
-    输出结构：
-      outputs/YYYY-MM-DD_<案号>/
-        ├── 00_合并出庭手续_<案号>.pdf       （7 份 PDF 合一份）
-        ├── 01_营业执照.pdf
-        ├── 02_法定代表人证明_<案号>.docx
-        ├── 02_法定代表人证明_<案号>.pdf
-        ├── 03_法人身份证.pdf
-        ├── 04_授权委托书_<案号>.docx
-        ├── 04_授权委托书_<案号>.pdf
-        ├── 05_推荐信_<案号>.docx
-        ├── 05_推荐信_<案号>.pdf
-        ├── 06_代理人劳动合同.pdf
-        ├── 07_代理人身份证.pdf
-        └── 出庭手续全套_<案号>.zip
+    这是所有生成入口的内部核心：动态 docx + 静态 PDF 拷贝 + 合并 + zip 打包。
 
-    鲁棒性（NFR-5.6）：
-    - 任一 DOCX→ PDF 转换失败只跳过该份 PDF，不阻塞其他文件
-    - 静态 PDF 缺失则跳过该份，不阻塞
-    - 最终的合并 PDF 也被加进 ZIP
+    参数：
+        case: 案件数据（来自表单或数据库）
+        company: 公司数据
+        agent: 代理人数据
+        output_dir: 输出目录（必须已创建）
+
+    返回：
+        output_dir
     """
-    case_number = case.get("case_number", "未命名案件")
-    hearing_date = case.get("hearing_date") or datetime.now().strftime("%Y-%m-%d")
-    folder_name = f"{hearing_date}_{sanitize_filename(case_number)}"
-    output_dir = OUTPUTS_DIR / folder_name
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    safe_case = sanitize_filename(case_number)
+    safe_case = sanitize_filename(case.get("case_number", "未命名案件"))
 
     # === 动态生成 3 份 docx + PDF ===
     dynamic_templates = [
@@ -229,11 +225,14 @@ def generate_court_matters(case: dict, company: dict, agent: dict) -> Path:
     for template_key, values, base_name in dynamic_templates:
         docx_path = output_dir / f"{base_name}_{safe_case}.docx"
         pdf_path = output_dir / f"{base_name}_{safe_case}.pdf"
-        generate_dynamic_docx(template_key, values, docx_path)
+        template_path = get_template_path(template_key)
+        doc = Document(str(template_path))
+        replace_placeholders_in_doc(doc, values)
+        doc.save(str(docx_path))
         # DOCX → PDF（鲁棒降级：失败仅警告，不阻塞）
         try:
             docx_to_pdf(docx_path, pdf_path)
-        except Exception as e:  # noqa: BLE001  # 转换异常仅警告
+        except Exception as e:  # noqa: BLE001
             import warnings
             warnings.warn(f"DOCX→PDF 转换失败（跳过）: {docx_path.name} → {e}", stacklevel=2)
 
@@ -274,6 +273,54 @@ def generate_court_matters(case: dict, company: dict, agent: dict) -> Path:
             zf.write(file, arcname=file.name)
 
     return output_dir
+
+
+def generate_court_matters(case: dict, company: dict, agent: dict) -> Path:
+    """生成完整出庭手续到 OUTPUTS_DIR，返回输出目录路径。
+
+    v1.1.2 重构：内部委托 _generate_to_dir（与 generate_preview 共享核心逻辑）。
+
+    输出结构：
+      outputs/YYYY-MM-DD_<案号>/
+        ├── 00_合并出庭手续_<案号>.pdf       （7 份 PDF 合一份）
+        ├── 01_营业执照.pdf
+        ├── 02_法定代表人证明_<案号>.docx
+        ├── 02_法定代表人证明_<案号>.pdf
+        ├── 03_法人身份证.pdf
+        ├── 04_授权委托书_<案号>.docx
+        ├── 04_授权委托书_<案号>.pdf
+        ├── 05_推荐信_<案号>.docx
+        ├── 05_推荐信_<案号>.pdf
+        ├── 06_代理人劳动合同.pdf
+        ├── 07_代理人身份证.pdf
+        └── 出庭手续全套_<案号>.zip
+
+    鲁棒性（NFR-5.6）：
+    - 任一 DOCX→ PDF 转换失败只跳过该份 PDF，不阻塞其他文件
+    - 静态 PDF 缺失则跳过该份，不阻塞
+    - 最终的合并 PDF 也被加进 ZIP
+    """
+    case_number = case.get("case_number", "未命名案件")
+    hearing_date = case.get("hearing_date") or datetime.now().strftime("%Y-%m-%d")
+    folder_name = f"{hearing_date}_{sanitize_filename(case_number)}"
+    output_dir = OUTPUTS_DIR / folder_name
+    output_dir.mkdir(parents=True, exist_ok=True)
+    return _generate_to_dir(case, company, agent, output_dir)
+
+
+def generate_preview(case: dict, company: dict, agent: dict) -> Path:
+    """仅预览：生成到临时目录，不写 outputs 不写数据库。
+
+    v1.1.2 新增（中天经验，task-018.jsonl line 143）：
+    - 用户点「仅预览」时实际生成 PDF，不污染 outputs 历史
+    - 复用 _generate_to_dir 完整生成逻辑
+    - 返回临时目录路径，调用方负责清理（用 shutil.rmtree）
+
+    返回：
+        临时目录路径（包含 00_合并出庭手续_*.pdf 等所有文件）
+    """
+    tmp_dir = Path(tempfile.mkdtemp(prefix="court_preview_"))
+    return _generate_to_dir(case, company, agent, tmp_dir)
 
 
 def sanitize_filename(name: str) -> str:

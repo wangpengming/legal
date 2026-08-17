@@ -3,7 +3,13 @@
 启动方式：
     streamlit run app.py
 或双击 `启动.command`
+
+v1.1.2 变更（中天经验 task-018.jsonl）：
+- 「仅预览」真预览：生成到临时目录 + PyMuPDF 缩略图（不写数据库）
+- 「生成」后顶部固定结果卡片：不需要滚动 + 立即可见
+- 预览结果保存在 st.session_state，rerun 后仍可见
 """
+import shutil
 from datetime import date, datetime
 from pathlib import Path
 
@@ -11,8 +17,18 @@ import streamlit as st
 
 import database as db
 from config import OUTPUTS_DIR, save_json_config
-from generator import generate_court_matters, open_in_finder, sanitize_filename
+from generator import (
+    generate_court_matters,
+    generate_preview,
+    open_in_finder,
+    sanitize_filename,
+)
 from feishu_api import get_feishu_status, is_feishu_enabled
+from pdf_thumb import (
+    page_count,
+    render_all_pages_base64,
+    render_first_page_base64,
+)
 from pdf_viewer_component import is_pdfjs_ready, render_pdf_viewer
 
 
@@ -26,6 +42,47 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
+
+
+# ============================================================
+# Auto-scroll：rerun 后自动滚动到顶部（避免用户卡在表单中段看不到结果卡片）
+# ============================================================
+
+_SCROLL_JS = """<script>
+(function () {
+  try {
+    // Streamlit 把页面内容包裹在 [data-testid="stMain"] 中
+    // 这个容器才是真实可滚动的元素（window/document 不可滚）
+    var main = document.querySelector('[data-testid="stMain"]')
+              || document.querySelector('section.main')
+              || document.scrollingElement;
+    if (main && typeof main.scrollTo === 'function') {
+      main.scrollTo({ top: 0, behavior: 'instant' in main ? 'instant' : 'auto' });
+    }
+    // 同时也清掉 window/document 的滚动（防御性）
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+  } catch (e) {
+    console.warn('auto-scroll failed:', e);
+  }
+})();
+</script>"""
+
+
+def _scroll_to_top_once(marker_key: str):
+    """rerun 后自动把 stMain 滚动到顶部，仅触发一次。
+
+    设计：使用一个 session_state 标记 _scroll_top_done_<marker_key>。
+    - 渲染卡片前调用 → 注入 JS → 标记置 True
+    - 标记已为 True → 不再注入（避免重复执行）
+    - 用户点击「清除结果」或「丢弃预览」时清掉标记
+    """
+    done_key = f"_scroll_top_done_{marker_key}"
+    if st.session_state.get(done_key):
+        return
+    st.components.v1.html(_SCROLL_JS, height=0)
+    st.session_state[done_key] = True
 
 
 # ============================================================
@@ -278,15 +335,277 @@ def render_main(current_company, current_agent):
         render_case_history(current_company, current_agent)
 
 
+def _render_result_card(
+    output_dir: Path,
+    case_data: dict,
+    title: str,
+    is_preview: bool = False,
+    current_company: dict | None = None,
+    current_agent: dict | None = None,
+):
+    """顶部固定结果卡片：缩略图网格 + 文件清单 + 下载按钮。
+
+    参数：
+        output_dir: 生成输出目录
+        case_data: 案件数据（含案号、案由等）
+        title: 卡片标题（「预览结果」或「已生成 · 出庭手续」）
+        is_preview: True 表示仅预览（临时目录，不写数据库）
+        current_company: 当前公司（确认生成时需要）
+        current_agent: 当前代理人（确认生成时需要）
+    """
+    case_number = case_data.get("case_number", "")
+    safe_case = sanitize_filename(case_number)
+    merged_pdf = output_dir / f"00_合并出庭手续_{safe_case}.pdf"
+
+    if not output_dir.exists():
+        st.error(f"❌ 输出目录不存在：{output_dir}")
+        return
+
+    files = sorted(
+        [f for f in output_dir.iterdir() if f.is_file() and f.suffix != ".zip"]
+    )
+    file_count = sum(1 for f in files if f.suffix in (".docx", ".pdf"))
+
+    # ========== 卡片顶部：案号 + 状态徽章 ==========
+    icon = "👁" if is_preview else "✅"
+    badge_color = "#f59e0b" if is_preview else "#10b981"
+    badge_text = "仅预览 · 未写入数据库" if is_preview else "已写入数据库"
+    pages = page_count(merged_pdf) if merged_pdf.exists() else 0
+
+    st.markdown(
+        f"""
+        <div style="
+            border: 1px solid #e5e5e5;
+            border-left: 4px solid {badge_color};
+            border-radius: 8px;
+            padding: 16px;
+            background: #ffffff;
+            margin-bottom: 16px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+        ">
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+                <span style="font-size: 24px;">{icon}</span>
+                <strong style="font-size: 18px;">{title}</strong>
+                <span style="
+                    background: {badge_color}15;
+                    color: {badge_color};
+                    padding: 2px 8px;
+                    border-radius: 4px;
+                    font-size: 12px;
+                ">{badge_text}</span>
+                <span style="margin-left: auto; color: #525252; font-size: 13px;">
+                    📦 {file_count} 份文件 · 📄 {pages} 页合并 PDF
+                </span>
+            </div>
+            <div style="color: #525252; font-size: 13px;">
+                <strong>案号：</strong>{case_number or "（待填）"} ·
+                <strong>案由：</strong>{case_data.get("case_cause", "—")} ·
+                <strong>法院：</strong>{case_data.get("court", "—")} ·
+                <strong>开庭：</strong>{case_data.get("hearing_date", "—")}
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # ========== PyMuPDF 缩略图网格 ==========
+    if merged_pdf.exists():
+        thumbs = render_all_pages_base64(merged_pdf, scale=0.25, max_pages=7)
+        if thumbs:
+            st.markdown("##### 🖼 缩略图（PyMuPDF 渲染 · 每页 1 张）")
+            # 7 列网格（每列一张缩略图）
+            cols = st.columns(min(len(thumbs), 7), gap="small")
+            for i, b64 in enumerate(thumbs):
+                with cols[i]:
+                    st.markdown(
+                        f'<div style="text-align: center;">'
+                        f'<img src="data:image/png;base64,{b64}" '
+                        f'style="width: 100%; border: 1px solid #e5e5e5; border-radius: 4px;" />'
+                        f'<div style="font-size: 11px; color: #525252; margin-top: 4px;">第 {i + 1} 页</div>'
+                        f"</div>",
+                        unsafe_allow_html=True,
+                    )
+
+    # ========== PDF.js 全屏预览（默认收起，不占用首屏）==========
+    if merged_pdf.exists() and is_pdfjs_ready():
+        with st.expander("📺 浏览器内预览 · 合并 PDF · 可缩放/翻页/打印全部", expanded=False):
+            render_pdf_viewer(
+                merged_pdf, height=720, key=f"viewer_{id(output_dir)}"
+            )
+    elif merged_pdf.exists() and not is_pdfjs_ready():
+        st.info(
+            "📺 PDF 浏览器内预览需要 PDF.js 库。请联系相关人员下载 "
+            "`pdf.min.js` + `pdf.worker.min.js` 到 `static/pdfjs/`。"
+        )
+
+    # ========== 文件清单 ==========
+    st.markdown("##### � 文件清单")
+    for f in files:
+        size_kb = f.stat().st_size / 1024
+        col_f1, col_f2 = st.columns([3, 1])
+        with col_f1:
+            st.text(f"📄 {f.name}  ({size_kb:.1f} KB)")
+        with col_f2:
+            with open(f, "rb") as fp:
+                st.download_button(
+                    label="⬇ 下载",
+                    data=fp.read(),
+                    file_name=f.name,
+                    mime="application/octet-stream",
+                    key=f"dl_{f.name}_{id(output_dir)}",
+                )
+
+    # ========== zip 包下载 + Finder 打开 ==========
+    st.divider()
+    col_zip, col_open = st.columns([2, 1])
+    with col_zip:
+        zip_files = list(output_dir.glob("*.zip"))
+        if zip_files:
+            with open(zip_files[0], "rb") as zf:
+                st.download_button(
+                    label="📦 下载完整 zip 包",
+                    data=zf.read(),
+                    file_name=zip_files[0].name,
+                    mime="application/zip",
+                    use_container_width=True,
+                    key=f"zip_{id(output_dir)}",
+                )
+    with col_open:
+        if st.button(
+            "📁 Finder 打开",
+            use_container_width=True,
+            key=f"finder_{id(output_dir)}",
+        ):
+            open_in_finder(output_dir)
+
+    # ========== 预览场景：询问是否确认生成 ==========
+    if is_preview:
+        st.divider()
+        st.warning(
+            "⚠️ 上面仅为**预览**，未写入数据库。确认无误后请点击下方「确认生成」按钮正式落盘。"
+        )
+        col_confirm, col_discard = st.columns(2)
+        with col_confirm:
+            if st.button(
+                "✅ 确认生成（写入数据库）",
+                type="primary",
+                use_container_width=True,
+                key=f"confirm_{id(output_dir)}",
+            ):
+                # v1.1.2 重构：直接在回调中执行生成（不依赖 session_state 跨 rerun）
+                # 1. 清理预览临时目录
+                try:
+                    shutil.rmtree(output_dir)
+                except OSError:
+                    pass
+                # 2. 构造完整案件数据（含公司/代理人）
+                full_case = {
+                    **case_data,
+                    "company_name": "",  # 占位
+                }
+                # 3. 写入数据库 + 生成
+                try:
+                    with st.spinner("⏳ 确认生成中（写入数据库）..."):
+                        case_id = db.create_case(case_data)
+                        full_case = db.get_case(case_id)
+                        final_dir = generate_court_matters(
+                            full_case, current_company, current_agent
+                        )
+                        file_count = sum(
+                            1 for _ in final_dir.iterdir()
+                            if _.suffix in (".docx", ".pdf")
+                        )
+                        db.add_history(case_id, case_number, str(final_dir), file_count)
+                    # 4. 切换到已生成卡片
+                    st.session_state.preview_dir = None
+                    st.session_state.preview_case_data = None
+                    st.session_state.last_output_dir = final_dir
+                    st.session_state.last_result_case_data = case_data
+                    st.session_state.form_case_number = ""
+                    st.session_state["_scroll_top_done_preview"] = False
+                    st.session_state["_scroll_top_done_last_result"] = False
+                    st.success(f"✅ 已生成 {file_count} 份文件！")
+                    st.rerun()
+                except Exception as e:  # noqa: BLE001
+                    st.error(f"❌ 生成失败：{e}")
+                    import traceback
+                    with st.expander("🔍 查看错误详情"):
+                        st.code(traceback.format_exc())
+        with col_discard:
+            if st.button(
+                "🗑 丢弃预览",
+                use_container_width=True,
+                key=f"discard_{id(output_dir)}",
+            ):
+                try:
+                    shutil.rmtree(output_dir)
+                except OSError:
+                    pass
+                st.session_state.preview_dir = None
+                st.session_state.preview_case_data = None
+                st.session_state["_scroll_top_done_preview"] = False
+                st.rerun()
+
+
 def render_new_case_form(current_company, current_agent):
-    """新建案件表单。"""
+    """新建案件表单（v1.1.2：顶部固定结果卡片 + 仅预览真预览）。"""
     st.subheader(f"当前：{current_company['name']} × {current_agent['name']}")
 
-    # 初始化 session state
-    if "form_case_number" not in st.session_state:
-        st.session_state.form_case_number = ""
-    if "last_output_dir" not in st.session_state:
-        st.session_state.last_output_dir = None
+    # ========== session state 初始化 ==========
+    defaults = {
+        "form_case_number": "",
+        "last_output_dir": None,
+        "last_result_case_data": None,
+        "preview_dir": None,
+        "preview_case_data": None,
+        "confirm_after_preview": False,
+        "preview_dir_to_discard": None,
+    }
+    for k, v in defaults.items():
+        if k not in st.session_state:
+            st.session_state[k] = v
+
+    # ========== 顶部固定结果卡片（已生成）==========
+    if st.session_state.last_output_dir and st.session_state.last_result_case_data:
+        last_dir = Path(st.session_state.last_output_dir)
+        if last_dir.exists():
+            # v1.1.2：rerun 后自动滚动到顶部，让缩略图/徽章立即可见
+            _scroll_to_top_once("last_result")
+            _render_result_card(
+                output_dir=last_dir,
+                case_data=st.session_state.last_result_case_data,
+                title="已生成 · 出庭手续",
+                is_preview=False,
+                current_company=current_company,
+                current_agent=current_agent,
+            )
+            if st.button("🔄 清除结果 / 新建下一个案件", key="clear_result"):
+                st.session_state.last_output_dir = None
+                st.session_state.last_result_case_data = None
+                st.session_state.form_case_number = ""
+                st.session_state["_scroll_top_done_last_result"] = False
+                st.rerun()
+            st.divider()
+
+    # ========== 顶部固定结果卡片（仅预览）==========
+    if (
+        st.session_state.preview_dir
+        and st.session_state.preview_case_data
+        and not st.session_state.confirm_after_preview
+    ):
+        preview_dir = Path(st.session_state.preview_dir)
+        if preview_dir.exists():
+            # v1.1.2：rerun 后自动滚动到顶部，让缩略图/徽章立即可见
+            _scroll_to_top_once("preview")
+            _render_result_card(
+                output_dir=preview_dir,
+                case_data=st.session_state.preview_case_data,
+                title="预览结果 · 仅预览模式",
+                is_preview=True,
+                current_company=current_company,
+                current_agent=current_agent,
+            )
+            st.divider()
 
     col1, col2 = st.columns(2)
 
@@ -364,7 +683,7 @@ def render_new_case_form(current_company, current_agent):
         preview_btn = st.button("👁 仅预览", use_container_width=True)
 
     # ========== 生成逻辑 ==========
-    if generate_btn or preview_btn:
+    if generate_btn or preview_btn or st.session_state.confirm_after_preview:
         # 校验
         if not (case_number and case_cause and court):
             st.error("❌ 请填写：案号、案由、审理法院（标 * 为必填）")
@@ -384,9 +703,45 @@ def render_new_case_form(current_company, current_agent):
             "notes": notes.strip(),
         }
 
+        # ========== 仅预览：生成到临时目录 + 顶部固定卡片 ==========
         if preview_btn:
-            st.info(f"📝 预览模式：上述信息将生成 7 份出庭手续文件（点击「生成」执行）")
-            return
+            # 清理旧预览临时目录
+            if st.session_state.preview_dir:
+                old = Path(st.session_state.preview_dir)
+                if old.exists():
+                    try:
+                        shutil.rmtree(old)
+                    except OSError:
+                        pass
+            with st.spinner("⏳ 预览生成中（不写数据库）..."):
+                preview_dir = generate_preview(
+                    case_data, current_company, current_agent
+                )
+            st.session_state.preview_dir = str(preview_dir)
+            st.session_state.preview_case_data = case_data
+            st.session_state.confirm_after_preview = False
+            # v1.1.2：下一次 render 重新触发 auto-scroll（重置 done 标记）
+            st.session_state["_scroll_top_done_preview"] = False
+            st.success(f"✅ 预览完成（临时目录：{preview_dir.name}）")
+            st.rerun()
+
+        # ========== 正式生成（直接点 / 从预览确认）==========
+        # 先清理预览临时目录（生成成功后不再需要）
+        if st.session_state.preview_dir_to_discard:
+            discard = Path(st.session_state.preview_dir_to_discard)
+            if discard.exists():
+                try:
+                    shutil.rmtree(discard)
+                except OSError:
+                    pass
+        # 清理旧预览目录（以防用户预览后未确认直接点生成）
+        if st.session_state.preview_dir:
+            old_prev = Path(st.session_state.preview_dir)
+            if old_prev.exists():
+                try:
+                    shutil.rmtree(old_prev)
+                except OSError:
+                    pass
 
         # 写入数据库
         case_id = db.create_case(case_data)
@@ -396,69 +751,35 @@ def render_new_case_form(current_company, current_agent):
 
         # 生成
         try:
-            with st.spinner("⏳ 正在生成出庭手续..."):
+            with st.spinner("� 正在生成出庭手续..."):
                 output_dir = generate_court_matters(
                     full_case, current_company, current_agent
                 )
             # 记录历史
-            file_count = sum(1 for _ in output_dir.iterdir() if _.suffix in (".docx", ".pdf"))
+            file_count = sum(
+                1 for _ in output_dir.iterdir() if _.suffix in (".docx", ".pdf")
+            )
             db.add_history(case_id, case_number, str(output_dir), file_count)
 
+            # 保存到 session_state → 顶部固定结果卡片
             st.session_state.last_output_dir = output_dir
-            st.session_state.form_case_number = ""  # 清空案号便于下一个案件
+            st.session_state.last_result_case_data = case_data
+            st.session_state.form_case_number = ""
+            st.session_state.preview_dir = None
+            st.session_state.preview_case_data = None
+            st.session_state.confirm_after_preview = False
+            st.session_state.preview_dir_to_discard = None
+            # v1.1.2：下一次 render 重新触发 auto-scroll（重置 done 标记）
+            st.session_state["_scroll_top_done_last_result"] = False
+            st.session_state["_scroll_top_done_preview"] = False
 
             st.success(f"✅ 已生成 {file_count} 份文件！")
-
-            # ===== PDF 浏览器内预览（PDF.js 全内联）=====
-            merged_pdf = output_dir / f"00_合并出庭手续_{sanitize_filename(case_number)}.pdf"
-            if merged_pdf.exists() and is_pdfjs_ready():
-                with st.expander("📺 浏览器内预览 · 合并 PDF（推荐）", expanded=True):
-                    st.caption("使用 PDF.js 全内联渲染·可缩放/翻页/打印全部")
-                    render_pdf_viewer(merged_pdf, height=720, key=f"preview_{case_id}")
-            elif merged_pdf.exists() and not is_pdfjs_ready():
-                with st.info("📺 PDF 浏览器内预览需要 PDF.js 库。请联系相关人员下载 `pdf.min.js` + `pdf.worker.min.js` 到 `static/pdfjs/`。"):
-
-                    pass  # 占位
-
-            # 列出生成的文件
-            st.markdown("##### 📂 生成文件清单")
-            files = sorted(output_dir.iterdir(), key=lambda x: x.name)
-            for f in files:
-                size_kb = f.stat().st_size / 1024
-                col_f1, col_f2 = st.columns([3, 1])
-                with col_f1:
-                    st.text(f"📄 {f.name}  ({size_kb:.1f} KB)")
-                with col_f2:
-                    with open(f, "rb") as fp:
-                        st.download_button(
-                            label="下载",
-                            data=fp.read(),
-                            file_name=f.name,
-                            mime="application/octet-stream",
-                            key=f"dl_{f.name}_{case_id}",
-                        )
-
-            st.divider()
-            col_open1, col_open2 = st.columns(2)
-            with col_open1:
-                if st.button("📁 在 Finder 中打开", use_container_width=True):
-                    open_in_finder(output_dir)
-            with col_open2:
-                zip_files = list(output_dir.glob("*.zip"))
-                if zip_files:
-                    with open(zip_files[0], "rb") as zf:
-                        st.download_button(
-                            label="📦 下载完整 zip 包",
-                            data=zf.read(),
-                            file_name=zip_files[0].name,
-                            mime="application/zip",
-                            use_container_width=True,
-                        )
+            st.rerun()
 
         except Exception as e:
             st.error(f"❌ 生成失败：{e}")
             import traceback
-            with st.expander("🔍 查看错误详情"):
+            with st.expander("� 查看错误详情"):
                 st.code(traceback.format_exc())
 
 
