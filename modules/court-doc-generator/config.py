@@ -2,8 +2,10 @@
 import json
 from pathlib import Path
 
-# 项目根目录
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+# 项目根目录（本模块所在目录：court-doc-generator/）
+# v1.1.3 修复：config.py 位于 court-doc-generator/ 下，parent.parent 会解析到 modules/，
+# 导致 TEMPLATES_DIR/STATIC_DIR 指向空目录（模板文件已按 a61a41c 整理到本模块内）
+PROJECT_ROOT = Path(__file__).resolve().parent
 TEMPLATES_DIR = PROJECT_ROOT / "templates"
 STATIC_DIR = PROJECT_ROOT / "static"
 CONFIG_DIR = PROJECT_ROOT / "config"

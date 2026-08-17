@@ -172,7 +172,9 @@ def main() -> None:
         else:
             print(f"⚠️ 健康检查未通过（Streamlit 可能仍在初始化）")
         # 5. 开浏览器
-        time.sleep(OPEN_BROWSER_DELAY - 8)
+        # v1.1.3 修复：原 `sleep(OPEN_BROWSER_DELAY - 8)` 在 OPEN_BROWSER_DELAY=6 时
+        # 为负值，触发 ValueError 崩溃导致浏览器永不打开。
+        # wait_for_port 已等端口就绪 + 上方 sleep(2)，这里直接开浏览器即可。
         open_browser(port)
     else:
         print(f"⚠️ 端口 {port} 启动超时。请查看日志：{LOG_FILE}", file=sys.stderr)

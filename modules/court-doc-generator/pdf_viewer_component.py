@@ -234,7 +234,7 @@ def _build_pdf_html(
       wrap.id = 'page-' + num;
       wrap.appendChild(canvas);
       container.innerHTML = '';
-      container.append.append(wrap);
+      container.appendChild(wrap);
       page.render({{ canvasContext: ctx, viewport: viewport }});
       pageInfo.textContent = num + ' / ' + pdfDoc.numPages;
     }});
@@ -265,7 +265,10 @@ def _build_pdf_html(
   }}
 
   // 启动
-  window.pdfjsLib.getDocument({{ data: atob('{pdf_b64}') }}).promise
+  // v1.1.3：PDF 二进制转 Uint8Array（与 worker Blob 一致），避免部分版本字符串载入异常
+  // 注意：{{ }} 是 f-string 转义，避免被误当作格式规范（见 v1.1.3 修复 NameError: data）
+  const pdfBytes = Uint8Array.from(atob('{pdf_b64}'), c => c.charCodeAt(0));
+  window.pdfjsLib.getDocument({{ data: pdfBytes }}).promise
     .then(pdf => {{
       pdfDoc = pdf;
       currentPage = 1;

@@ -6,8 +6,12 @@
 
 v1.1.2 变更（中天经验 task-018.jsonl）：
 - 「仅预览」真预览：生成到临时目录 + PyMuPDF 缩略图（不写数据库）
-- 「生成」后顶部固定结果卡片：不需要滚动 + 立即可见
 - 预览结果保存在 st.session_state，rerun 后仍可见
+
+v1.1.3 变更（用户反馈）：
+- 结果卡片从页面顶部移回表单下方（标准布局）
+- 生成/预览后自动滚动到底部（替代 v1.1.2 的「滚顶」机制）
+- 修复 3 处替换字符乱码
 """
 import shutil
 from datetime import date, datetime
@@ -45,24 +49,33 @@ st.set_page_config(
 
 
 # ============================================================
-# Auto-scroll：rerun 后自动滚动到顶部（避免用户卡在表单中段看不到结果卡片）
+# Auto-scroll：rerun 后自动滚动到底部（结果卡片在表单下方，生成后滚过去）
 # ============================================================
 
 _SCROLL_JS = """<script>
 (function () {
   try {
-    // Streamlit 把页面内容包裹在 [data-testid="stMain"] 中
-    // 这个容器才是真实可滚动的元素（window/document 不可滚）
-    var main = document.querySelector('[data-testid="stMain"]')
-              || document.querySelector('section.main')
-              || document.scrollingElement;
+    // v1.1.3 修复：此代码通过 st.components.html 注入到 srcdoc iframe，
+    // iframe 内的 document 没有 [data-testid="stMain"]（它是外层页面容器），
+    // 原实现 main=null 抛 TypeError（console: auto-scroll failed）。
+    // 方案：访问 window.parent 的 DOM（iframe 带 allow-same-origin，可跨窗访问）。
+    var win = window.parent || window;
+    var doc = (win !== window && win.document) ? win.document : document;
+    var main = doc.querySelector('[data-testid="stMain"]')
+              || doc.querySelector('section.main')
+              || doc.scrollingElement
+              || doc.documentElement;
     if (main && typeof main.scrollTo === 'function') {
-      main.scrollTo({ top: 0, behavior: 'instant' in main ? 'instant' : 'auto' });
+      main.scrollTo({ top: main.scrollHeight, behavior: 'smooth' });
     }
-    // 同时也清掉 window/document 的滚动（防御性）
-    window.scrollTo(0, 0);
-    document.documentElement.scrollTop = 0;
-    document.body.scrollTop = 0;
+    // 同时也滚 window/document（防御性，全部判空）
+    if (doc.body) {
+      win.scrollTo(0, doc.body.scrollHeight);
+      doc.body.scrollTop = doc.body.scrollHeight;
+    }
+    if (doc.documentElement) {
+      doc.documentElement.scrollTop = doc.documentElement.scrollHeight;
+    }
   } catch (e) {
     console.warn('auto-scroll failed:', e);
   }
@@ -70,15 +83,15 @@ _SCROLL_JS = """<script>
 </script>"""
 
 
-def _scroll_to_top_once(marker_key: str):
-    """rerun 后自动把 stMain 滚动到顶部，仅触发一次。
+def _scroll_to_bottom_once(marker_key: str):
+    """rerun 后自动把 stMain 滚动到底部（结果卡片位置），仅触发一次。
 
-    设计：使用一个 session_state 标记 _scroll_top_done_<marker_key>。
+    设计：使用一个 session_state 标记 _scroll_bottom_done_<marker_key>。
     - 渲染卡片前调用 → 注入 JS → 标记置 True
     - 标记已为 True → 不再注入（避免重复执行）
     - 用户点击「清除结果」或「丢弃预览」时清掉标记
     """
-    done_key = f"_scroll_top_done_{marker_key}"
+    done_key = f"_scroll_bottom_done_{marker_key}"
     if st.session_state.get(done_key):
         return
     st.components.v1.html(_SCROLL_JS, height=0)
@@ -439,7 +452,7 @@ def _render_result_card(
         )
 
     # ========== 文件清单 ==========
-    st.markdown("##### � 文件清单")
+    st.markdown("##### 📄 文件清单")
     for f in files:
         size_kb = f.stat().st_size / 1024
         col_f1, col_f2 = st.columns([3, 1])
@@ -522,8 +535,8 @@ def _render_result_card(
                     st.session_state.last_output_dir = final_dir
                     st.session_state.last_result_case_data = case_data
                     st.session_state.form_case_number = ""
-                    st.session_state["_scroll_top_done_preview"] = False
-                    st.session_state["_scroll_top_done_last_result"] = False
+                    st.session_state["_scroll_bottom_done_preview"] = False
+                    st.session_state["_scroll_bottom_done_last_result"] = False
                     st.success(f"✅ 已生成 {file_count} 份文件！")
                     st.rerun()
                 except Exception as e:  # noqa: BLE001
@@ -543,12 +556,12 @@ def _render_result_card(
                     pass
                 st.session_state.preview_dir = None
                 st.session_state.preview_case_data = None
-                st.session_state["_scroll_top_done_preview"] = False
+                st.session_state["_scroll_bottom_done_preview"] = False
                 st.rerun()
 
 
 def render_new_case_form(current_company, current_agent):
-    """新建案件表单（v1.1.2：顶部固定结果卡片 + 仅预览真预览）。"""
+    """新建案件表单（v1.1.3：结果卡片在表单下方 + 仅预览真预览）。"""
     st.subheader(f"当前：{current_company['name']} × {current_agent['name']}")
 
     # ========== session state 初始化 ==========
@@ -564,48 +577,6 @@ def render_new_case_form(current_company, current_agent):
     for k, v in defaults.items():
         if k not in st.session_state:
             st.session_state[k] = v
-
-    # ========== 顶部固定结果卡片（已生成）==========
-    if st.session_state.last_output_dir and st.session_state.last_result_case_data:
-        last_dir = Path(st.session_state.last_output_dir)
-        if last_dir.exists():
-            # v1.1.2：rerun 后自动滚动到顶部，让缩略图/徽章立即可见
-            _scroll_to_top_once("last_result")
-            _render_result_card(
-                output_dir=last_dir,
-                case_data=st.session_state.last_result_case_data,
-                title="已生成 · 出庭手续",
-                is_preview=False,
-                current_company=current_company,
-                current_agent=current_agent,
-            )
-            if st.button("🔄 清除结果 / 新建下一个案件", key="clear_result"):
-                st.session_state.last_output_dir = None
-                st.session_state.last_result_case_data = None
-                st.session_state.form_case_number = ""
-                st.session_state["_scroll_top_done_last_result"] = False
-                st.rerun()
-            st.divider()
-
-    # ========== 顶部固定结果卡片（仅预览）==========
-    if (
-        st.session_state.preview_dir
-        and st.session_state.preview_case_data
-        and not st.session_state.confirm_after_preview
-    ):
-        preview_dir = Path(st.session_state.preview_dir)
-        if preview_dir.exists():
-            # v1.1.2：rerun 后自动滚动到顶部，让缩略图/徽章立即可见
-            _scroll_to_top_once("preview")
-            _render_result_card(
-                output_dir=preview_dir,
-                case_data=st.session_state.preview_case_data,
-                title="预览结果 · 仅预览模式",
-                is_preview=True,
-                current_company=current_company,
-                current_agent=current_agent,
-            )
-            st.divider()
 
     col1, col2 = st.columns(2)
 
@@ -703,7 +674,7 @@ def render_new_case_form(current_company, current_agent):
             "notes": notes.strip(),
         }
 
-        # ========== 仅预览：生成到临时目录 + 顶部固定卡片 ==========
+        # ========== 仅预览：生成到临时目录（结果卡片在表单下方渲染）==========
         if preview_btn:
             # 清理旧预览临时目录
             if st.session_state.preview_dir:
@@ -720,8 +691,8 @@ def render_new_case_form(current_company, current_agent):
             st.session_state.preview_dir = str(preview_dir)
             st.session_state.preview_case_data = case_data
             st.session_state.confirm_after_preview = False
-            # v1.1.2：下一次 render 重新触发 auto-scroll（重置 done 标记）
-            st.session_state["_scroll_top_done_preview"] = False
+            # v1.1.3：下一次 render 重新触发 auto-scroll（重置 done 标记）
+            st.session_state["_scroll_bottom_done_preview"] = False
             st.success(f"✅ 预览完成（临时目录：{preview_dir.name}）")
             st.rerun()
 
@@ -751,7 +722,7 @@ def render_new_case_form(current_company, current_agent):
 
         # 生成
         try:
-            with st.spinner("� 正在生成出庭手续..."):
+            with st.spinner("⏳ 正在生成出庭手续..."):
                 output_dir = generate_court_matters(
                     full_case, current_company, current_agent
                 )
@@ -761,7 +732,7 @@ def render_new_case_form(current_company, current_agent):
             )
             db.add_history(case_id, case_number, str(output_dir), file_count)
 
-            # 保存到 session_state → 顶部固定结果卡片
+            # 保存到 session_state → 表单下方结果卡片（v1.1.3）
             st.session_state.last_output_dir = output_dir
             st.session_state.last_result_case_data = case_data
             st.session_state.form_case_number = ""
@@ -769,9 +740,9 @@ def render_new_case_form(current_company, current_agent):
             st.session_state.preview_case_data = None
             st.session_state.confirm_after_preview = False
             st.session_state.preview_dir_to_discard = None
-            # v1.1.2：下一次 render 重新触发 auto-scroll（重置 done 标记）
-            st.session_state["_scroll_top_done_last_result"] = False
-            st.session_state["_scroll_top_done_preview"] = False
+            # v1.1.3：下一次 render 重新触发 auto-scroll（重置 done 标记）
+            st.session_state["_scroll_bottom_done_last_result"] = False
+            st.session_state["_scroll_bottom_done_preview"] = False
 
             st.success(f"✅ 已生成 {file_count} 份文件！")
             st.rerun()
@@ -779,8 +750,48 @@ def render_new_case_form(current_company, current_agent):
         except Exception as e:
             st.error(f"❌ 生成失败：{e}")
             import traceback
-            with st.expander("� 查看错误详情"):
+            with st.expander("🔍 查看错误详情"):
                 st.code(traceback.format_exc())
+
+    # ========== 页面下方：结果卡片（已生成）==========
+    # v1.1.3：结果卡片从页面顶部移到表单下方（用户反馈的标准布局）
+    if st.session_state.last_output_dir and st.session_state.last_result_case_data:
+        last_dir = Path(st.session_state.last_output_dir)
+        if last_dir.exists():
+            # v1.1.3：rerun 后自动滚动到底部，让缩略图/徽章立即可见
+            _scroll_to_bottom_once("last_result")
+            _render_result_card(
+                output_dir=last_dir,
+                case_data=st.session_state.last_result_case_data,
+                title="已生成 · 出庭手续",
+                is_preview=False,
+                current_company=current_company,
+                current_agent=current_agent,
+            )
+            if st.button("🔄 清除结果 / 新建下一个案件", key="clear_result"):
+                st.session_state.last_output_dir = None
+                st.session_state.last_result_case_data = None
+                st.session_state.form_case_number = ""
+                st.session_state["_scroll_bottom_done_last_result"] = False
+                st.rerun()
+
+    # ========== 页面下方：结果卡片（仅预览）==========
+    if (
+        st.session_state.preview_dir
+        and st.session_state.preview_case_data
+        and not st.session_state.confirm_after_preview
+    ):
+        preview_dir = Path(st.session_state.preview_dir)
+        if preview_dir.exists():
+            _scroll_to_bottom_once("preview")
+            _render_result_card(
+                output_dir=preview_dir,
+                case_data=st.session_state.preview_case_data,
+                title="预览结果 · 仅预览模式",
+                is_preview=True,
+                current_company=current_company,
+                current_agent=current_agent,
+            )
 
 
 def render_case_history(current_company, current_agent):

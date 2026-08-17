@@ -90,3 +90,8 @@ uploads/
 downloads/
 tmp/
 temp/
+
+# ---- 运行时数据 / 生成产物（提交源代码，不提交数据）----
+data/
+outputs/
+*.db
