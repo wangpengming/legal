@@ -125,7 +125,9 @@ def main() -> None:
     existing_pid = is_already_running()
     if existing_pid:
         print(f"⚠️ 服务已在运行（PID {existing_pid}），无需重复启动")
-        print(f"   访问 http://localhost:{DEFAULT_PORT}")
+        # v1.1.4 修复：服务已存在时也应弹出浏览器，
+        # 否则双击 启动.command 时服务已在跑 → 只能看到终端提示，页面不会打开
+        open_browser(DEFAULT_PORT)
         return
 
     # 2. 端口选择（避让）
