@@ -543,6 +543,7 @@ def _render_result_card(
             open_in_finder(output_dir)
     with col_print:
         # F-037 在线打印：合并 PDF → 系统默认打印机（无弹窗）
+        # F-038 调整：弹确认对话框防误触
         if merged_pdf.exists():
             if st.button(
                 "🖨 在线打印",
@@ -550,11 +551,8 @@ def _render_result_card(
                 key=f"online_print_{id(output_dir)}",
                 help="直接把合并 PDF 送到系统默认打印机（macOS lp / Linux lp / Windows ShellExecute），不会弹任何对话框",
             ):
-                success, msg = print_pdf_to_default_printer(merged_pdf)
-                if success:
-                    st.success(f"✅ 已发送到打印机: {msg}")
-                else:
-                    st.error(f"❌ 打印失败: {msg}")
+                st.session_state.pending_print_path = str(merged_pdf)
+                st.rerun()
 
     # ========== 预览场景：询问是否确认生成 ==========
     if is_preview:
@@ -919,6 +917,50 @@ def render_case_history(current_company, current_agent):
 
 
 # ============================================================
+# F-038 在线打印确认对话框（防误触：弹模态对话框）
+# ============================================================
+
+@st.dialog("🖨 确认打印")
+def _confirm_print_dialog():
+    """F-038 调整：弹模态确认对话框，让用户显式确认后再执行打印。"""
+    pdf_path_str = st.session_state.get("pending_print_path")
+    if not pdf_path_str:
+        st.info("无待打印文件")
+        return
+
+    pdf_path = Path(pdf_path_str)
+    if not pdf_path.exists():
+        st.error(f"PDF 不存在：{pdf_path}")
+        st.session_state.pending_print_path = None
+        return
+
+    # 显示 PDF 信息
+    size_kb = pdf_path.stat().st_size / 1024
+    st.code(pdf_path.name, language="text")
+    st.caption(f"路径：`{pdf_path}`  |  大小：{size_kb:.1f} KB")
+
+    st.warning("⚠️ 此操作直接调用系统打印机，**不可撤销**。")
+
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("✅ 确认打印", type="primary", use_container_width=True, key="confirm_print_btn"):
+            with st.spinner("正在发送打印任务..."):
+                success, msg = print_pdf_to_default_printer(pdf_path)
+            st.session_state.pending_print_path = None
+            if success:
+                st.success(f"✅ {msg}")
+            else:
+                st.error(f"❌ {msg}")
+            import time
+            time.sleep(2.5)
+            st.rerun()
+    with col2:
+        if st.button("❌ 取消", use_container_width=True, key="cancel_print_btn"):
+            st.session_state.pending_print_path = None
+            st.rerun()
+
+
+# ============================================================
 # 入口
 # ============================================================
 
@@ -930,6 +972,11 @@ def main():
     - 测试场景下 import app 不会创建默认记录
     """
     ensure_default_company_and_agent()
+
+    # F-038：检查是否有待打印文件，弹确认对话框
+    if st.session_state.get("pending_print_path"):
+        _confirm_print_dialog()
+
     current_company, current_agent = render_sidebar()
     render_main(current_company, current_agent)
 
