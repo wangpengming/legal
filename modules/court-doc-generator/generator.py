@@ -335,11 +335,11 @@ def _generate_to_dir(case: dict, company: dict, agent: dict, output_dir: Path) -
             target_name = f"{target_idx}_{target_suffix}.pdf"
             shutil.copy2(src_path, output_dir / target_name)
 
-    # F-036 法定代表人证明：固定静态文件（从 static/2.法定代表人证明.doc 复制为 .doc）
-    # 输出保留 .doc 扩展名（python-docx 不支持 .doc 格式，但 Word 可打开；如需 .docx 由用户提供转换版）
-    legal_rep_src = STATIC_DIR / "2.法定代表人证明.doc"
+    # F-036 法定代表人证明：固定静态 PDF 文件（从 static/2.法定代表人证明.pdf 复制）
+    # 输出为 .pdf（与 04/05 一样进入 00_合并出庭手续.pdf）
+    legal_rep_src = STATIC_DIR / "2.法定代表人证明.pdf"
     if legal_rep_src.exists():
-        shutil.copy2(legal_rep_src, output_dir / f"02_法定代表人证明_{safe_case}.doc")
+        shutil.copy2(legal_rep_src, output_dir / f"02_法定代表人证明_{safe_case}.pdf")
 
     # 代理人级（F-033：按当前 agent 路径取，fallback 到默认文件）
     for target_name, fallback_filename in AGENT_STATIC_FALLBACK.items():

@@ -235,13 +235,17 @@ def test_save_agent_pdf_unique_filename_per_call():
 # ============================================================
 
 def test_legal_rep_cert_static_file_exists():
-    """F-036: static/2.法定代表人证明.doc 应作为固定静态源文件存在。"""
+    """F-036: static/2.法定代表人证明.pdf 应作为固定静态源文件存在。"""
     from pathlib import Path
     from config import STATIC_DIR
 
-    src = STATIC_DIR / "2.法定代表人证明.doc"
+    src = STATIC_DIR / "2.法定代表人证明.pdf"
     assert src.exists(), f"固定模板文件必须存在：{src}"
     assert src.stat().st_size > 0, "固定模板文件不能为空"
+    # 验证是有效 PDF（≥1 页）
+    import pypdf
+    r = pypdf.PdfReader(str(src))
+    assert len(r.pages) >= 1, "PDF 应至少 1 页"
 
 
 def test_legal_rep_cert_not_in_dynamic_templates():
