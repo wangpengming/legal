@@ -654,9 +654,9 @@ def render_new_case_form(current_company, current_agent):
             help="如：（2026）京0101民初1234号",
         )
         case_cause = st.text_input(
-            "案由 *",
-            placeholder="合同纠纷 / 著作权侵权 / 劳动争议...",
-            help="如：合同纠纷、服务合同纠纷、知识产权纠纷",
+            "案由描述（不含'纠纷'）*",
+            placeholder="合同 / 著作权侵权 / 劳动争议 / 买卖合同 ...",
+            help="填案由的【描述部分】即可（如填'合同'，模板自动加'纠纷'二字 = '合同纠纷'）。如填'合同纠纷'会出现'合同纠纷纠纷'重复。",
         )
         court = st.text_input(
             "审理法院 *",
@@ -699,7 +699,9 @@ def render_new_case_form(current_company, current_agent):
             preview_parts.append(f"{opposing_party or '对方'}诉我方")
         else:
             preview_parts.append(f"{opposing_party or '对方'}与我方")
-        preview_parts.append(case_cause)
+        # 自动补"纠纷"后缀（与模板一致）
+        preview_cause = case_cause if case_cause.endswith("纠纷") else f"{case_cause}纠纷"
+        preview_parts.append(preview_cause)
         st.code(f"📌 {' '.join(preview_parts)}（案号：{case_number or '（待填）'}）", language="text")
 
     st.divider()
