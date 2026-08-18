@@ -22,11 +22,56 @@ from docx import Document
 
 from config import (  # noqa: F401  # 顶层平铺
     OUTPUTS_DIR,
+    PROJECT_ROOT,
     STATIC_DIR,
+    AGENT_STATIC_FALLBACK,
     get_template_path,
 )
 from docx_to_pdf import docx_to_pdf
 from pdf_merger import merge_pdfs
+
+
+# ============================================================
+# F-033 辅助函数：解析代理人级 PDF 路径
+# ============================================================
+
+# 输出文件名 → 数据库字段映射
+_AGENT_PATH_KEYS = {
+    "06_代理人劳动合同.pdf": "contract_pdf_path",
+    "07_代理人身份证.pdf": "id_card_pdf_path",
+}
+
+
+def _resolve_agent_pdf(agent: dict, target_name: str, fallback_filename: str):
+    """F-033 解析代理人级 PDF 源路径。
+
+    优先级：
+        1. agent[path_key]（按 target_name 选 contract_pdf_path / id_card_pdf_path）
+           - 相对路径相对 PROJECT_ROOT 解析
+           - 文件不存在则跳过
+        2. STATIC_DIR / fallback_filename（默认 fallback）
+        3. 都找不到返回 None
+
+    返回：
+        Path 对象；None 表示该文件应跳过（不影响其他文件生成）
+
+    设计：
+    - 纯函数，易测试（不依赖 docx 模板 / 数据库）
+    - 与 _generate_to_dir 解耦
+    """
+    path_key = _AGENT_PATH_KEYS.get(target_name)
+    if path_key:
+        custom = agent.get(path_key)
+        if custom:
+            candidate = Path(custom)
+            if not candidate.is_absolute():
+                candidate = PROJECT_ROOT / candidate
+            if candidate.exists():
+                return candidate
+    fallback = STATIC_DIR / fallback_filename
+    if fallback.exists():
+        return fallback
+    return None
 
 
 # ============================================================
@@ -149,20 +194,29 @@ def values_for_legal_rep_cert(case: dict, company: dict) -> list:
 
 
 def values_for_power_of_attorney(case: dict, company: dict, agent: dict) -> list:
-    """授权委托书模板（5 个【】，按位置）：
+    """授权委托书模板（7 个【】，按位置）：
       1. 【】纠纷  → 案由描述
-      2. （案号：【】）  → 案号
-      3. 日期：【】年【】月【】日  → 年、月、日
+      2. 【】（被授权人姓名）
+      3. 【】（身份证号）
+      4. （案号：【】）  → 案号
+      5. 日期：【】年【】月【】日  → 年、月、日
+
+    F-035 多代理人材料动态绑定：补充 agent 姓名 + 身份证号到 values。
+    注：模板结构调整见 F-034（templates/4.授权委托书.docx 新增 2 个【】占位符）。
     """
     description = build_case_description(case)
+    agent_name = (agent.get("name") or "").strip()
+    agent_id = (agent.get("id_card") or "").strip()
     case_number = case.get("case_number", "")
     parts = parse_hearing_date(case.get("hearing_date"))
     return [
         description,        # 1. 【】纠纷
-        case_number,        # 2. （案号：【】）
-        parts["年"],        # 3. 日期：【】年
-        parts["月"],        # 4. 【】月
-        parts["日"],        # 5. 【】日
+        agent_name,         # 2. 【】（被授权人姓名）
+        agent_id,           # 3. 【】（身份证号）
+        case_number,        # 4. （案号：【】）
+        parts["年"],        # 5. 日期：【】年
+        parts["月"],        # 6. 【】月
+        parts["日"],        # 7. 【】日
     ]
 
 
@@ -236,15 +290,22 @@ def _generate_to_dir(case: dict, company: dict, agent: dict, output_dir: Path) -
             import warnings
             warnings.warn(f"DOCX→PDF 转换失败（跳过）: {docx_path.name} → {e}", stacklevel=2)
 
-    # === 复制静态 PDF（按出庭顺序，缺失则跳过）===
-    static_files = [
-        ("01_营业执照.pdf", STATIC_DIR / "1.营业执照复印件.pdf"),
-        ("03_法人身份证.pdf", STATIC_DIR / "法人身份证.pdf"),
-        ("06_代理人劳动合同.pdf", STATIC_DIR / "代理人劳动合同.pdf"),
-        ("07_代理人身份证.pdf", STATIC_DIR / "代理人身份证.pdf"),
-    ]
-    for target_name, src_path in static_files:
+    # === 复制静态 PDF ===
+    # 公司级（与代理人无关，固定）
+    from config import COMPANY_STATIC
+    for src_name in COMPANY_STATIC:
+        src_path = STATIC_DIR / src_name
         if src_path.exists():
+            # 输出文件名映射：1.营业执照复印件.pdf → 01_营业执照.pdf
+            target_idx = "01" if "营业执照" in src_name else "03"
+            target_suffix = "营业执照" if "营业执照" in src_name else "法人身份证"
+            target_name = f"{target_idx}_{target_suffix}.pdf"
+            shutil.copy2(src_path, output_dir / target_name)
+
+    # 代理人级（F-033：按当前 agent 路径取，fallback 到默认文件）
+    for target_name, fallback_filename in AGENT_STATIC_FALLBACK.items():
+        src_path = _resolve_agent_pdf(agent, target_name, fallback_filename)
+        if src_path:
             shutil.copy2(src_path, output_dir / target_name)
 
     # === 合并 7 份 PDF 为 1 份 ===

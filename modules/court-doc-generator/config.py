@@ -26,13 +26,21 @@ TEMPLATE_FILES = {
     "recommendation": "5.推荐信.docx",
 }
 
-# 静态 PDF 文件清单（按出庭提交顺序）
-STATIC_FILES = [
+# F-033 多代理人材料动态绑定：静态文件拆分为公司级与代理人级
+# 公司级静态（与具体代理人无关，所有案件共用）
+COMPANY_STATIC = [
     "1.营业执照复印件.pdf",
     "法人身份证.pdf",
-    "代理人劳动合同.pdf",
-    "代理人身份证.pdf",
 ]
+# 代理人级静态 fallback（未上传个人材料时使用默认文件）
+# key: 输出文件名，value: 默认 fallback 文件名（位于 STATIC_DIR/）
+AGENT_STATIC_FALLBACK = {
+    "06_代理人劳动合同.pdf": "代理人劳动合同.pdf",
+    "07_代理人身份证.pdf": "代理人身份证.pdf",
+}
+
+# 静态 PDF 文件清单（按出庭提交顺序）— 向后兼容保留
+STATIC_FILES = COMPANY_STATIC + list(AGENT_STATIC_FALLBACK.values())
 
 
 def get_template_path(key: str) -> Path:
