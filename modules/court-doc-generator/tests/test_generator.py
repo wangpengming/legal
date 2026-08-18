@@ -32,9 +32,8 @@ def test_only_unsafe():
 # ============================================================
 
 def test_values_for_power_of_attorney_includes_agent():
-    """F-035: values_for_power_of_attorney 返回 7 个元素，包含 agent 姓名 + 身份证号。
-
-    占位符 1=案由描述, 2=被授权人姓名, 3=身份证号, 4=案号, 5/6/7=年/月/日
+    """F-034 + F-035: values_for_power_of_attorney 返回 7 个值，按文档【】出现顺序：
+    1=被授权人姓名, 2=身份证号, 3=案由描述, 4=案号, 5/6/7=年/月/日
     """
     from generator import values_for_power_of_attorney
 
@@ -53,10 +52,10 @@ def test_values_for_power_of_attorney_includes_agent():
         "gender": "男",
     }
     values = values_for_power_of_attorney(case, company, agent)
-    assert len(values) == 7, "应返回 7 个值（5→7 增加 2 个 agent 字段）"
-    assert values[0] == "对方公司合同纠纷", "案由描述"
-    assert values[1] == "张三", "被授权人姓名"
-    assert values[2] == "110101199001011234", "代理人身份证号"
+    assert len(values) == 7, "应返回 7 个值"
+    assert values[0] == "张三", "被授权人姓名"
+    assert values[1] == "110101199001011234", "代理人身份证号"
+    assert values[2] == "对方公司合同纠纷", "案由描述"
     assert values[3] == "（2026）京01民初123号", "案号"
     assert values[4] == "2026", "年"
     assert values[5] == "9", "月"
@@ -71,9 +70,21 @@ def test_values_for_power_of_attorney_handles_missing_agent_fields():
     company = {}
     agent = {}  # 完全没有字段
     values = values_for_power_of_attorney(case, company, agent)
-    assert values[1] == "", "缺失姓名 → 空字符串"
-    assert values[2] == "", "缺失身份证号 → 空字符串"
+    assert values[0] == "", "缺失姓名 → 空字符串"
+    assert values[1] == "", "缺失身份证号 → 空字符串"
+    assert values[2] == "", "缺失案由描述 → 空字符串"
     assert values[3] == "（2026）京01民初123号"
+
+
+def test_power_of_attorney_template_has_seven_placeholders():
+    """F-034: templates/4.授权委托书.docx 含 7 个【】占位符。"""
+    from docx import Document
+    from pathlib import Path
+
+    template_path = Path(__file__).resolve().parent.parent / "templates" / "4.授权委托书.docx"
+    doc = Document(str(template_path))
+    total = sum(p.text.count("【】") for p in doc.paragraphs)
+    assert total == 7, f"模板应有 7 个【】占位符，实际 {total} 个"
 
 
 # ============================================================
@@ -153,3 +164,67 @@ def test_resolve_agent_pdf_returns_none_when_path_missing(tmp_path):
         agent, "06_代理人劳动合同.pdf", "non_existent_fallback.pdf"
     )
     assert result is None, "路径失效且 fallback 缺失 → 返回 None（调用方应跳过）"
+
+
+# ============================================================
+# F-032 多代理人材料动态绑定：save_agent_pdf 上传保存
+# ============================================================
+
+def test_save_agent_pdf_creates_file_and_returns_relative_path(tmp_path):
+    """F-032: save_agent_pdf 创建文件 + 返回相对 PROJECT_ROOT 的路径。
+
+    验证：①文件落地 ②目录自动创建 ③返回路径相对 PROJECT_ROOT
+    """
+    from generator import save_agent_pdf
+    from config import PROJECT_ROOT
+
+    # 用临时 PROJECT_ROOT（monkeypatch 改 PROJECT_ROOT）
+    # 简化做法：直接观察返回值是否相对 PROJECT_ROOT
+    fake_pdf = b"%PDF-1.4 fake content"
+
+    rel_path = save_agent_pdf(999, fake_pdf, "contract")
+    # 路径应在 PROJECT_ROOT 下
+    abs_path = PROJECT_ROOT / rel_path
+    assert abs_path.exists(), f"文件应存在于 {abs_path}"
+    assert abs_path.read_bytes() == fake_pdf, "文件内容应一致"
+    assert rel_path.startswith("static/agents/999/"), "路径应在 agents/999/ 子目录"
+    assert rel_path.endswith(".pdf"), "扩展名应为 pdf"
+
+    # 清理
+    abs_path.unlink()
+    try:
+        abs_path.parent.rmdir()  # agents/999/
+    except OSError:
+        pass
+    try:
+        (PROJECT_ROOT / "static" / "agents").rmdir()  # agents/
+    except OSError:
+        pass
+
+
+def test_save_agent_pdf_invalid_file_type_raises():
+    """F-032: file_type 非法 → ValueError。"""
+    from generator import save_agent_pdf
+    import pytest
+
+    with pytest.raises(ValueError, match="file_type 必须是"):
+        save_agent_pdf(1, b"data", "invalid_type")
+
+
+def test_save_agent_pdf_unique_filename_per_call():
+    """F-032: 每次调用生成 UUID 唯一文件名（不冲突）。"""
+    from generator import save_agent_pdf
+    from config import PROJECT_ROOT
+
+    paths = set()
+    for _ in range(3):
+        p = save_agent_pdf(1, b"data", "contract")
+        paths.add(p)
+
+    assert len(paths) == 3, "3 次调用应生成 3 个不同路径"
+
+    # 清理
+    for p in list(paths):
+        abs_p = PROJECT_ROOT / p
+        if abs_p.exists():
+            abs_p.unlink()

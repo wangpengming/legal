@@ -14,6 +14,7 @@
 import re
 import shutil
 import tempfile
+import uuid
 import zipfile
 from datetime import datetime
 from pathlib import Path
@@ -72,6 +73,40 @@ def _resolve_agent_pdf(agent: dict, target_name: str, fallback_filename: str):
     if fallback.exists():
         return fallback
     return None
+
+
+def save_agent_pdf(agent_id: int, file_bytes: bytes, file_type: str) -> str:
+    """F-032 保存代理人上传的 PDF 到 static/agents/<id>/。
+
+    参数：
+        agent_id: 代理人 ID（用于创建子目录）
+        file_bytes: PDF 二进制内容（来自 st.file_uploader.read()）
+        file_type: "contract"（劳动合同）或 "id_card"（身份证）
+
+    返回：
+        相对 PROJECT_ROOT 的路径字符串（存入数据库）
+
+    特性：
+        - UUID 8 位哈希命名（避免冲突 + 不含敏感信息）
+        - 自动创建目录
+        - 异常时清理已创建文件
+    """
+    if file_type not in ("contract", "id_card"):
+        raise ValueError(f"file_type 必须是 'contract' 或 'id_card'，实际 {file_type}")
+
+    agent_dir = STATIC_DIR / "agents" / str(agent_id)
+    agent_dir.mkdir(parents=True, exist_ok=True)
+
+    file_name = f"{file_type}_{uuid.uuid4().hex[:8]}.pdf"
+    file_path = agent_dir / file_name
+    try:
+        file_path.write_bytes(file_bytes)
+    except OSError:
+        if file_path.exists():
+            file_path.unlink()
+        raise
+
+    return str(file_path.relative_to(PROJECT_ROOT))
 
 
 # ============================================================
@@ -194,27 +229,28 @@ def values_for_legal_rep_cert(case: dict, company: dict) -> list:
 
 
 def values_for_power_of_attorney(case: dict, company: dict, agent: dict) -> list:
-    """授权委托书模板（7 个【】，按位置）：
-      1. 【】纠纷  → 案由描述
-      2. 【】（被授权人姓名）
-      3. 【】（身份证号）
+    """授权委托书模板（7 个【】，按文档出现顺序）：
+      1. 【】受委托人  → 代理人姓名
+      2. 身份证号：【】→ 代理人身份证号
+      3. 【】纠纷  → 案由描述（build_case_description 已拼装 {对方}{案由}）
       4. （案号：【】）  → 案号
-      5. 日期：【】年【】月【】日  → 年、月、日
+      5-7. 【】年【】月【】日  → 年、月、日
 
-    F-035 多代理人材料动态绑定：补充 agent 姓名 + 身份证号到 values。
-    注：模板结构调整见 F-034（templates/4.授权委托书.docx 新增 2 个【】占位符）。
+    F-034 调整：占位符顺序与 templates/4.授权委托书.docx 实际段落顺序对齐：
+    原模板第 9 段：现委托上列受委托人【】（身份证号：【】）在我单位与【】纠纷（案号：【】）...
+    原模板第 14 段：【】年【】月【】日
     """
-    description = build_case_description(case)
     agent_name = (agent.get("name") or "").strip()
     agent_id = (agent.get("id_card") or "").strip()
+    description = build_case_description(case)
     case_number = case.get("case_number", "")
     parts = parse_hearing_date(case.get("hearing_date"))
     return [
-        description,        # 1. 【】纠纷
-        agent_name,         # 2. 【】（被授权人姓名）
-        agent_id,           # 3. 【】（身份证号）
+        agent_name,         # 1. 【】受委托人
+        agent_id,           # 2. 身份证号：【】
+        description,        # 3. 【】纠纷
         case_number,        # 4. （案号：【】）
-        parts["年"],        # 5. 日期：【】年
+        parts["年"],        # 5. 【】年
         parts["月"],        # 6. 【】月
         parts["日"],        # 7. 【】日
     ]

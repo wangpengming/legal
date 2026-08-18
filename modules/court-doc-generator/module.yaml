@@ -1,7 +1,7 @@
 name: court-doc-generator
-version: 1.1.4
+version: 1.2.0
 status: active
-description: 出庭手续文档生成器（7份材料一键生成 + PDF合并预览 + 拍照扫描功能规划中）
+description: 出庭手续文档生成器（7份材料 + 多代理人材料动态绑定 + PDF合并预览 + 拍照扫描功能规划中）
 entry: app.py
 port:
   app: 18501          # Streamlit 主端口（避开默认 8501）
@@ -21,5 +21,6 @@ features:
   - PDF合并
   - 浏览器内PDF预览（PDF.js base64方案）
   - ZIP打包
+  - 多代理人材料动态绑定（v1.2.0）：06/07 PDF 跟随 agent + 04 授权委托书被授权人姓名/身份证号动态填充
   - 拍照扫描功能（规划中，待澄清需求）
 readme: docs/README.md

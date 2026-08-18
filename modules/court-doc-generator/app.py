@@ -26,6 +26,7 @@ from generator import (
     generate_preview,
     open_in_finder,
     sanitize_filename,
+    save_agent_pdf,
 )
 from feishu_api import get_feishu_status, is_feishu_enabled
 from pdf_thumb import (
@@ -286,6 +287,17 @@ def render_sidebar():
             current_agent = None
 
         with st.expander("➕ 添加/编辑代理人"):
+            # F-032 已绑定材料展示
+            if current_agent:
+                if current_agent.get("contract_pdf_path"):
+                    st.caption(f"✅ 劳动合同：{current_agent['contract_pdf_path']}")
+                else:
+                    st.caption("⚠️ 劳动合同未上传（生成时用 fallback 默认文件）")
+                if current_agent.get("id_card_pdf_path"):
+                    st.caption(f"✅ 身份证：{current_agent['id_card_pdf_path']}")
+                else:
+                    st.caption("⚠️ 身份证未上传（生成时用 fallback 默认文件）")
+
             with st.form("add_agent"):
                 a_name = st.text_input("代理人姓名*", value=current_agent["name"] if current_agent else "")
                 a_gender = st.selectbox("性别", ["男", "女"], index=1 if (current_agent and current_agent.get("gender") == "女") else 0)
@@ -297,15 +309,53 @@ def render_sidebar():
                                 )
                 a_position = st.text_input("职务", value=current_agent.get("position", "") if current_agent else "")
                 a_phone = st.text_input("电话", value=current_agent.get("phone", "") if current_agent else "")
+
+                # F-032 PDF 上传控件（必须在 form 内）
+                st.markdown("---")
+                st.caption("📎 代理人材料（保存时上传替换）")
+                contract_file = st.file_uploader(
+                    "劳动合同 PDF",
+                    type="pdf",
+                    key=f"contract_upload_{current_agent['id'] if current_agent else 'new'}",
+                )
+                id_card_file = st.file_uploader(
+                    "身份证 PDF",
+                    type="pdf",
+                    key=f"id_card_upload_{current_agent['id'] if current_agent else 'new'}",
+                )
+
                 submitted_a = st.form_submit_button("保存")
                 if submitted_a and a_name:
+                    company_id = current_company["id"] if current_company else None
+
+                    # F-032 处理上传文件（需 agent_id，所以先 upsert 拿到 id）
+                    extra = {}
+                    if contract_file is not None or id_card_file is not None:
+                        agent_id = db.upsert_agent({
+                            "name": a_name,
+                            "gender": a_gender,
+                            "id_card": a_idcard,
+                            "position": a_position,
+                            "phone": a_phone,
+                            "company_id": company_id,
+                        })
+                        if contract_file is not None:
+                            extra["contract_pdf_path"] = save_agent_pdf(
+                                agent_id, contract_file.read(), "contract"
+                            )
+                        if id_card_file is not None:
+                            extra["id_card_pdf_path"] = save_agent_pdf(
+                                agent_id, id_card_file.read(), "id_card"
+                            )
+
                     db.upsert_agent({
                         "name": a_name,
                         "gender": a_gender,
                         "id_card": a_idcard,
                         "position": a_position,
                         "phone": a_phone,
-                        "company_id": current_company["id"] if current_company else None,
+                        "company_id": company_id,
+                        **extra,
                     })
                     st.success(f"✅ 已保存代理人：{a_name}")
                     st.rerun()
