@@ -17,6 +17,7 @@
 | court-doc-generator | [modules/court-doc-generator/docs/](../modules/court-doc-generator/docs/) | active |
 | litigation-system | [modules/litigation-system/docs/](../modules/litigation-system/docs/) | active |
 | case-intelligence | [modules/case-intelligence/docs/](../modules/case-intelligence/docs/) | planning |
+| portal | [modules/portal/docs/](../modules/portal/docs/) | planning |
 
 ## 更新日志
 

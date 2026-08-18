@@ -47,6 +47,7 @@
 | `court-doc-generator` | active | 1.1.4 | 出庭手续文档生成器（7 份材料 + PDF 合并预览） | `modules/court-doc-generator/app.py` | 原生开发 |
 | `litigation-system` | active | 0.2.0 | 法务诉讼业务平台（飞书历年案件天级同步 + 检索/统计/AI） | `modules/litigation-system/backend/app/main.py` | 2026-08-17 并入 |
 | `case-intelligence` | planning | 3.0.0 | 同质化案件文档检索与规则系统 | `none` | 2026-08-17 并入（方案设计） |
+| `portal` | planning | 0.1.0 | Legal 统一门户（注册表驱动子系统集成框架 + 系统健康监控总览） | `modules/portal/prototype.html` | 2026-08-17 原生开发 |
 
 > 模块注册表：`modules/index.yaml`。任何模块变更须先改此处再改代码。
 

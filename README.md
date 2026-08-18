@@ -21,6 +21,7 @@ legal/
 │   ├── court-doc-generator/    # 出庭手续文档生成器（Streamlit）
 │   ├── litigation-system/      # 法务诉讼业务平台（FastAPI + React）
 │   ├── case-intelligence/      # 同质化案件文档检索与规则系统（NocoDB + Paperless，规划中）
+│   ├── portal/                 # 统一门户（注册表驱动集成框架 + 健康监控总览，原型已交付）
 │   └── [module-name]/          # 通用模块目录
 │       ├── src/                # 源代码
 │       ├── tests/              # 测试
@@ -45,6 +46,7 @@ legal/
 | court-doc-generator | active | 1.1.4 | 出庭手续文档生成器（7份材料一键生成 + PDF合并预览） |
 | litigation-system | active | 0.2.0 | 法务诉讼业务平台（飞书历年案件天级同步 + 检索/统计/AI 双模式） |
 | case-intelligence | planning | 3.0.0 | 同质化案件文档检索与规则系统（NocoDB + Paperless-ngx，不做 AI） |
+| portal | planning | 0.1.0 | 法务统一门户（注册表驱动集成框架 + 健康监控总览，单文件原型已交付） |
 
 ## 模块间关系
 
@@ -60,6 +62,8 @@ legal/
 ```
 
 三角布局：**文书生成 · 诉讼数据平台 · 卷宗检索规则**，三者独立演进、按需集成。
+
+**portal 统一门户**（第 4 模块，规划中）：通过同源反代（nginx）+ apps.yaml 注册表汇聚三个子系统为单一入口 `https://legal.internal/`，并提供系统健康监控总览；原型见 `modules/portal/prototype.html`。
 
 ## 快速开始
 

@@ -27,3 +27,12 @@ modules:
     entry: none
     created: 2026-08-10
     integrated: 2026-08-17
+
+  - name: portal
+    path: modules/portal
+    status: planning
+    version: 0.1.0
+    description: Legal 统一门户（注册表驱动子系统集成框架 + 系统健康监控总览，单文件原型已交付，正式版规划中）
+    entry: prototype.html
+    created: 2026-08-17
+    integrated: 2026-08-17

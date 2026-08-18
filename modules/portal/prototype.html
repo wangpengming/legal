@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="data:,">
+<title>Legal Portal · 法务部门统一门户（原型）</title>
+<style>
+  :root{
+    --navy:#1F3A93; --blue:#2B5BCE; --light-blue:#6C8CD5; --pale-blue:#8FA8E0;
+    --gold:#B7984D; --gold-line:rgba(183,152,77,.45);
+    --alert:#C0392B; --ok:#2E8B57; --warn:#C79A2F;
+    --bg:#F5F7FA; --card:#FFFFFF; --line:#E3E9F2;
+    --ink:#1F2A44; --ink-2:#5A6A8C; --ink-3:#8A98B8;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --shadow:0 1px 3px rgba(31,42,68,.06),0 4px 14px rgba(31,42,68,.05);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Source Han Sans SC","Microsoft YaHei",sans-serif;color:var(--ink);background:var(--bg);-webkit-font-smoothing:antialiased}
+
+  /* ---------- 通用控件 ---------- */
+  button{font-family:inherit;cursor:pointer;border:none;background:none}
+  .btn{border-radius:8px;padding:9px 18px;font-size:14px;font-weight:600;transition:all .2s}
+  .btn-primary{background:var(--blue);color:#fff}
+  .btn-primary:hover{background:#204bb8;box-shadow:0 4px 12px rgba(43,91,206,.35)}
+  .btn-ghost{border:1px solid var(--line);color:var(--ink-2);background:var(--card)}
+  .btn-ghost:hover{border-color:var(--blue);color:var(--blue);background:#f2f6ff}
+  .chip{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:999px;font-size:12px;font-family:var(--mono)}
+  .chip-gold{color:var(--gold);border:1px solid var(--gold-line);background:#FBF7EE}
+  .dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+  .dot.on{background:var(--ok);box-shadow:0 0 0 0 rgba(46,139,87,.5);animation:breathe 2s infinite}
+  .dot.deg{background:var(--warn);animation:breathe 1.4s infinite}
+  .dot.off{background:var(--alert)}
+  @keyframes breathe{0%{box-shadow:0 0 0 0 rgba(46,139,87,.45)}70%{box-shadow:0 0 0 6px rgba(46,139,87,0)}100%{box-shadow:0 0 0 0 rgba(46,139,87,0)}}
+  @keyframes pulse{0%{transform:scale(1)}50%{transform:scale(1.06)}100%{transform:scale(1)}}
+  .pulse{animation:pulse .3s}
+
+  /* ---------- 欢迎页 ---------- */
+  #welcome{position:fixed;inset:0;z-index:10;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    background:radial-gradient(1200px 700px at 18% -10%,#2B5BCE 0%,transparent 55%),radial-gradient(900px 600px at 110% 110%,#6C8CD5 0%,transparent 50%),linear-gradient(150deg,#0E1D55 0%,#1F3A93 52%,#28499F 100%);
+    overflow:hidden}
+  #welcome::before{content:"";position:absolute;inset:0;background:repeating-linear-gradient(0deg,transparent 0 2px,rgba(255,255,255,.018) 2px 3px)}
+  #welcome::after{content:"";position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--gold) 30%,var(--gold) 70%,transparent)}
+  .w-inner{position:relative;z-index:1;width:min(920px,92vw);text-align:center}
+  .w-logo{width:76px;height:76px;margin:0 auto 22px;filter:drop-shadow(0 6px 18px rgba(0,0,0,.35))}
+  .w-title{font-size:34px;font-weight:700;color:#fff;letter-spacing:6px}
+  .w-title i{font-style:normal;color:var(--gold);font-weight:500;margin:0 10px}
+  .w-sub{margin-top:14px;font-size:15px;color:rgba(255,255,255,.72);letter-spacing:1px}
+  .w-line{width:220px;height:1px;margin:26px auto;background:linear-gradient(90deg,transparent,var(--gold),transparent)}
+  .w-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin:34px auto 0}
+  .w-card{position:relative;padding:26px 22px 24px;border-radius:12px;text-align:left;cursor:pointer;color:#fff;
+    background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.16);backdrop-filter:blur(10px);
+    transition:all .25s}
+  .w-card:hover{transform:translateY(-5px);background:rgba(255,255,255,.13);border-color:rgba(255,255,255,.3);box-shadow:0 18px 40px rgba(4,12,40,.45)}
+  .w-card .tag{font-family:var(--mono);font-size:11px;color:rgba(255,255,255,.66);background:rgba(0,0,0,.22);display:inline-block;padding:2px 8px;border-radius:4px}
+  .w-card h3{margin:14px 0 8px;font-size:19px;font-weight:600;letter-spacing:1px}
+  .w-card p{font-size:13px;line-height:1.7;color:rgba(255,255,255,.68);min-height:42px}
+  .w-card .go{margin-top:14px;font-size:13px;font-weight:600;color:var(--gold);opacity:0;transform:translateX(-6px);transition:all .25s}
+  .w-card:hover .go{opacity:1;transform:none}
+  .w-card .st{position:absolute;top:16px;right:16px;display:flex;align-items:center;gap:6px;font-size:11px;color:rgba(255,255,255,.75);font-family:var(--mono)}
+  .w-enter{margin-top:40px}
+  .w-enter .btn-primary{padding:12px 40px;font-size:15px;letter-spacing:3px}
+  .w-foot{position:absolute;bottom:26px;font-size:12px;color:rgba(255,255,255,.4);letter-spacing:1px;font-family:var(--mono)}
+
+  /* ---------- 主框架 ---------- */
+  #portal{display:none;height:100vh;flex-direction:column}
+  .topbar{height:58px;flex:none;background:var(--card);border-bottom:1px solid var(--gold-line);display:flex;align-items:center;padding:0 22px;gap:14px;z-index:5}
+  .tb-logo{width:30px;height:30px}
+  .tb-title{font-size:16px;font-weight:700;letter-spacing:2px;color:var(--navy)}
+  .tb-title small{font-weight:500;color:var(--ink-3);margin-left:10px;letter-spacing:1px;font-size:12px}
+  .tb-crumb{font-size:13px;color:var(--ink-2);flex:1}
+  .tb-right{display:flex;align-items:center;gap:14px}
+  .tb-clock{font-family:var(--mono);font-size:13px;color:var(--ink-2);background:#F1F4FB;padding:5px 12px;border-radius:6px}
+  .tb-back{font-size:13px;color:var(--blue);font-weight:600}
+  .tb-back:hover{text-decoration:underline}
+
+  .body{flex:1;display:flex;min-height:0}
+  .sidebar{width:210px;flex:none;background:var(--card);border-right:1px solid var(--line);padding:16px 10px;overflow-y:auto}
+  .nav-item{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:8px;font-size:14px;color:var(--ink-2);margin-bottom:4px;transition:all .18s;position:relative}
+  .nav-item:hover{background:#F1F5FD;color:var(--navy)}
+  .nav-item.active{background:var(--navy);color:#fff;font-weight:600;box-shadow:0 6px 14px rgba(31,58,147,.28)}
+  .nav-item.active::before{content:"";position:absolute;left:-10px;top:8px;bottom:8px;width:3px;border-radius:2px;background:var(--gold)}
+  .nav-item .ico{width:16px;height:16px;flex:none;opacity:.8}
+  .nav-sep{height:1px;background:var(--line);margin:14px 12px}
+  .nav-caption{font-size:11px;color:var(--ink-3);letter-spacing:2px;padding:0 14px 8px}
+  .nav-point{margin-left:auto;font-size:11px}
+
+  .content{flex:1;overflow-y:auto;padding:26px 30px 40px}
+  .page-title{font-size:21px;font-weight:700;color:var(--navy);letter-spacing:1px}
+  .page-sub{font-size:13px;color:var(--ink-2);margin-top:6px}
+
+  /* 统计条 */
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin:22px 0}
+  .stat{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px 18px;box-shadow:var(--shadow)}
+  .stat .k{font-size:12px;color:var(--ink-3);letter-spacing:1px}
+  .stat .v{font-size:26px;font-weight:700;font-family:var(--mono);margin-top:6px;color:var(--navy)}
+  .stat .v small{font-size:13px;color:var(--ink-2);font-weight:500;margin-left:4px}
+  .stat .v.on{color:var(--ok)} .stat .v.off{color:var(--alert)}
+
+  /* 健康监控卡片 */
+  .grid-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+  .hc{background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);overflow:hidden;display:flex;flex-direction:column}
+  .hc-head{padding:18px 20px 0;display:flex;align-items:center;gap:12px}
+  .hc-ico{width:38px;height:38px;border-radius:9px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:17px;font-weight:700;font-family:var(--mono)}
+  .hc-name{font-size:16px;font-weight:700}
+  .hc-desc{font-size:12px;color:var(--ink-3);margin-top:2px}
+  .hc-status{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:12px;font-family:var(--mono);padding:4px 10px;border-radius:999px;cursor:pointer;transition:all .2s;border:1px solid var(--line);color:var(--ink-2)}
+  .hc-status:hover{border-color:var(--blue);color:var(--blue)}
+  .hc-metrics{padding:16px 20px;display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .hc-metrics .m{background:#F8FAFD;border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+  .hc-metrics .m .k{font-size:11px;color:var(--ink-3)}
+  .hc-metrics .m .v{font-family:var(--mono);font-size:15px;font-weight:600;margin-top:4px;color:var(--navy)}
+  .hc-trend{height:46px;margin:0 20px;position:relative}
+  .hc-trend svg{width:100%;height:100%}
+  .hc-foot{border-top:1px solid var(--line);padding:12px 20px;display:flex;align-items:center;gap:10px;background:#FBFCFE}
+  .hc-foot .last{font-family:var(--mono);font-size:11px;color:var(--ink-3);flex:1}
+  .hc-foot .btn{padding:7px 14px;font-size:13px}
+  .hc-foot .btn-sm{padding:7px 12px;font-size:12px;border:1px solid var(--line);border-radius:7px;color:var(--ink-2);background:#fff;transition:all .2s;font-family:inherit}
+  .hc-foot .btn-sm:hover{border-color:var(--blue);color:var(--blue)}
+  .hc.logging .hc-head,.hc.logging .hc-metrics,.hc.logging .hc-trend{opacity:.45;pointer-events:none;filter:grayscale(1)}
+
+  /* 子系统嵌入视图 */
+  #appView{display:none}
+  .frame-meta{display:flex;align-items:center;gap:10px;margin:18px 0 14px;flex-wrap:wrap}
+  .frame-tag{font-family:var(--mono);font-size:12px;background:#fff;border:1px solid var(--line);border-radius:6px;padding:4px 10px;color:var(--ink-2)}
+  .frame-window{border:1px solid var(--line);border-radius:12px;background:var(--card);box-shadow:var(--shadow);overflow:hidden}
+  .frame-chrome{display:flex;align-items:center;gap:8px;padding:10px 14px;background:#F1F4FB;border-bottom:1px solid var(--line)}
+  .frame-chrome .c{width:11px;height:11px;border-radius:50%}
+  .frame-chrome .addr{flex:1;margin-left:8px;background:#fff;border:1px solid var(--line);border-radius:6px;font-family:var(--mono);font-size:12px;color:var(--ink-2);padding:5px 12px}
+  .frame-chrome .badge{font-size:11px;color:#fff;padding:3px 10px;border-radius:999px;font-family:var(--mono)}
+  .frame-body iframe{width:100%;height:560px;border:none;display:block;background:#fff}
+  .frame-note{margin-top:12px;font-size:12px;color:var(--ink-3);line-height:1.8;background:#FBFCFE;border:1px dashed var(--line);border-radius:8px;padding:10px 14px}
+  .frame-note code{background:#EEF2FB;color:var(--navy);font-family:var(--mono);padding:1px 6px;border-radius:4px;font-size:11px}
+
+  /* 日志面板 */
+  .log-panel{background:#0D1B36;border-radius:12px;padding:18px 20px;margin-top:20px;box-shadow:var(--shadow)}
+  .log-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+  .log-head span{color:rgba(255,255,255,.85);font-size:13px;letter-spacing:1px;font-weight:600}
+  .log-head .ctl{font-size:12px;font-family:var(--mono);color:#7fb3ff;cursor:pointer}
+  .log-body{font-family:var(--mono);font-size:12px;line-height:2;height:300px;overflow-y:auto;color:#C9D6F0}
+  .log-body .t{color:#54688F;margin-right:10px}
+  .log-body .ok{color:#4CD48C} .log-body .wn{color:#E5C15A} .log-body .er{color:#FF7A70}
+  .log-body .sys{color:#8FA8E0}
+  .about-box{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:22px 24px;margin-top:20px;box-shadow:var(--shadow);max-width:760px}
+  .about-box h4{color:var(--navy);margin:14px 0 6px;font-size:15px}
+  .about-box p,.about-box li{font-size:13px;color:var(--ink-2);line-height:1.9}
+  .about-box ul{padding-left:18px}
+  .about-box code{background:#EEF2FB;color:var(--navy);font-family:var(--mono);padding:1px 6px;border-radius:4px;font-size:12px}
+</style>
+</head>
+<body>
+
+<!-- ======================= 欢迎页 ======================= -->
+<div id="welcome">
+  <div class="w-inner">
+    <svg class="w-logo" viewBox="0 0 64 64" fill="none" aria-label="Legal 徽标">
+      <g stroke="#B7984D" stroke-width="2.4" stroke-linecap="round">
+        <line x1="10" y1="14" x2="54" y2="14"/>
+        <line x1="32" y1="14" x2="32" y2="20"/>
+        <line x1="32" y1="20" x2="20" y2="34"/>
+        <line x1="32" y1="20" x2="44" y2="34"/>
+      </g>
+      <path d="M14 34h12M38 34h12M14 34l6 12a6 6 0 0 0 12 0l6-12M38 34l6 12a6 6 0 0 0 12 0l6-12" stroke="#8FA8E0" stroke-width="2" stroke-linejoin="round"/>
+      <path d="M26 34v8a6 6 0 1 0 12 0v-8" stroke="#B7984D" stroke-width="2"/>
+    </svg>
+    <div class="w-title">LEGAL<i>·</i>PORTAL</div>
+    <div class="w-sub">法务部门统一门户 · 子系统集成框架 v0.1 原型</div>
+    <div class="w-line"></div>
+    <div class="w-cards" id="welcomeCards"></div>
+    <div class="w-enter"><button class="btn btn-primary" onclick="enterPortal('dashboard')">进入工作台 →</button></div>
+  </div>
+  <div class="w-foot">INTERNAL ONLY · 2026-08-17 · 原型演示环境</div>
+</div>
+
+<!-- ======================= 主框架 ======================= -->
+<div id="portal">
+  <div class="topbar">
+    <svg class="tb-logo" viewBox="0 0 64 64" fill="none" aria-hidden="true">
+      <g stroke="#1F3A93" stroke-width="5" stroke-linecap="round"><line x1="8" y1="12" x2="56" y2="12"/><line x1="32" y1="12" x2="32" y2="18"/><line x1="32" y1="18" x2="18" y2="34"/><line x1="32" y1="18" x2="46" y2="34"/></g>
+      <path d="M14 34h10M40 34h10M14 34l6 12a6 6 0 0 0 12 0l6-12M40 34l6 12a6 6 0 0 0 12 0l6-12" stroke="#B7984D" stroke-width="3.4" stroke-linejoin="round"/>
+    </svg>
+    <div class="tb-title">Legal Portal<small>法务部门统一门户</small></div>
+    <div class="tb-crumb" id="crumb">工作台 · 系统总览</div>
+    <div class="tb-right">
+      <div class="tb-clock" id="clock">--:--:--</div>
+      <button class="tb-back" onclick="showWelcome()">⌂ 返回门面</button>
+    </div>
+  </div>
+  <div class="body">
+    <div class="sidebar" id="sidebar">
+      <div class="nav-caption">导航 NAVIGATION</div>
+      <div class="nav-item active" data-view="dashboard" onclick="goView('dashboard')"><span class="ico">◈</span>系统总览<span class="nav-point" id="navAll"></span></div>
+      <div class="nav-sep"></div>
+      <div class="nav-caption">子系统 MODULES</div>
+      <div id="navApps"></div>
+      <div class="nav-sep"></div>
+      <div class="nav-caption">运维 OPERATIONS</div>
+      <div class="nav-item" data-view="logs" onclick="goView('logs')"><span class="ico">▤</span>运行日志</div>
+      <div class="nav-item" data-view="about" onclick="goView('about')"><span class="ico">◉</span>关于框架</div>
+    </div>
+    <div class="content">
+
+      <!-- 总览 -->
+      <div id="view-dashboard">
+        <div class="page-title">系统总览</div>
+        <div class="page-sub">三个子系统的实时运行状态 · 注册表驱动 · 同源反代集成</div>
+        <div class="stats">
+          <div class="stat"><div class="k">子系统</div><div class="v" id="stTotal">0</div></div>
+          <div class="stat"><div class="k">在线</div><div class="v on" id="stOnline">0</div></div>
+          <div class="stat"><div class="k">降级</div><div class="v" id="stDeg">0</div></div>
+          <div class="stat"><div class="k">平均心跳</div><div class="v" id="stLat">0<small>ms</small></div></div>
+        </div>
+        <div class="grid-cards" id="hcCards"></div>
+        <div class="frame-note" style="margin-top:18px">💡 <b>状态灯可点击</b>（在线 ⇄ 降级 ⇄ 离线，演示心跳状态机）；心跳每 3~6 秒自动刷新一次；正式版将由 Portal 后端每 10~30s 轮询各系统真实健康端点。</div>
+      </div>
+
+      <!-- 子系统嵌入视图 -->
+      <div id="view-app" style="display:none">
+        <div class="page-title" id="appTitle">子系统</div>
+        <div class="page-sub" id="appDesc"></div>
+        <div class="frame-meta">
+          <span class="frame-tag" id="fPath"></span>
+          <span class="frame-tag" id="fEntry"></span>
+          <span class="frame-tag" id="fHealth"></span>
+          <span class="frame-tag" id="fVer"></span>
+        </div>
+        <div class="frame-window">
+          <div class="frame-chrome">
+            <span class="c" style="background:#FF5F57"></span><span class="c" style="background:#FEBC2E"></span><span class="c" style="background:#28C840"></span>
+            <span class="addr" id="fAddr">https://legal.internal/…</span>
+            <span class="badge" id="fBadge" style="background:#1F3A93">同源反代</span>
+          </div>
+          <div class="frame-body"><iframe id="fFrame" title="子系统嵌入窗口"></iframe></div>
+        </div>
+        <div class="frame-note">原型阶段：iframe 内为占位页，演示"同源反代 + 嵌入"机制。正式版中 nginx 将 <code>/court</code>、<code>/litigation</code>、<code>/case</code> 反代至各子系统，此处即为真实系统窗口，iframe 无跨域、心跳无 CORS。</div>
+      </div>
+
+      <!-- 日志 -->
+      <div id="view-logs" style="display:none">
+        <div class="page-title">运行日志</div>
+        <div class="page-sub">各子系统心跳与系统事件（模拟 tail -f）</div>
+        <div class="log-panel">
+          <div class="log-head"><span>PORTAL · LOG TAIL</span><span class="ctl" onclick="clearLog()">清空 ↩</span></div>
+          <div class="log-body" id="logBody"></div>
+        </div>
+      </div>
+
+      <!-- 关于 -->
+      <div id="view-about" style="display:none">
+        <div class="page-title">关于框架</div>
+        <div class="page-sub">Legal Portal 兼容子系统的机制说明</div>
+        <div class="about-box">
+          <h4>🎯 定位</h4>
+          <p>法务部门统一门户（门面 + 健康监控）与子系统集成框架。四个数字：统一入口、品牌门面、注册表驱动、健康监控。</p>
+          <h4>📦 注册表驱动（apps.yaml）</h4>
+          <ul>
+            <li>导航、欢迎页卡片、健康卡片、子系统视图<b>全部由注册表动态渲染</b></li>
+            <li>新增模块 = 注册表加一行 + nginx 加一段反代 → 即插即用</li>
+            <li>左侧菜单与<code>modules/index.yaml</code>同源同思想</li>
+          </ul>
+          <h4>🔌 异构兼容策略</h4>
+          <ul>
+            <li>Streamlit / NocoDB / Paperless 等黑盒 Web 应用 → <code>nginx 同源反代 + iframe</code></li>
+            <li>React 同栈子系统（litigation-system）→ 后续可演进为微前端原生嵌入</li>
+          </ul>
+          <h4>⚖️ 设计语言</h4>
+          <p>商务蓝 <code>#1F3A93</code> / <code>#2B5BCE</code> · 金色点缀 <code>#B7984D</code> · 印章红告警 <code>#C0392B</code> · 浅色留白 · 庄重耐看。</p>
+          <h4>📐 演进路线</h4>
+          <p>v0.1 原型（本页）→ v0.2 React 正式版 + nginx 反代 → v0.3 飞书免登 / 心跳趋势 / 一键启停 → v0.4 可选态势驾驶舱。认证、微前端明确不在 v1 边界。</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+/* ================= 注册表（apps.yaml 的 JS 映射） ================= */
+const APPS = [
+  { name:"court-doc-generator", title:"出庭手续生成器", desc:"7 份出庭材料一键生成，PDF 预览与合并打包", color:"#2B5BCE", icon:"出",
+    path:"/court", health:"/court/_stcore/health", port:"18501", ver:"1.1.4", entry:"app.py",
+    status:"on", lastBeat:0, latency:38, uptime:0, fails:0 },
+  { name:"litigation-system", title:"诉讼业务平台", desc:"案件台账 · 飞书同步 · 文书与流程管理", color:"#1F3A93", icon:"诉",
+    path:"/litigation", health:"/litigation/api/health", port:"8000", ver:"0.2.0", entry:"FastAPI + React",
+    status:"on", lastBeat:0, latency:52, uptime:0, fails:0 },
+  { name:"case-intelligence", title:"卷宗检索与规则", desc:"同质化案件检索 · 文档规则化 · 卷宗归档", color:"#B7984D", icon:"卷",
+    path:"/case", health:"/case/api/healthz", ports:"8090/8091", ver:"3.0.0", entry:"docker compose",
+    status:"on", lastBeat:0, latency:44, uptime:0, fails:0 },
+];
+const ST = { "on":"在线","deg":"降级","off":"离线" };
+const STN = { "on":1,"deg":2,"off":3 };
+
+/* ---------- 工具 ---------- */
+const $ = s => document.querySelector(s);
+const pad = n => String(n).padStart(2,"0");
+const nowStr = () => { const d=new Date(); return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())+" "+pad(d.getHours())+":"+pad(d.getMinutes())+":"+pad(d.getSeconds()); };
+const tstr = () => { const d=new Date(); return pad(d.getHours())+":"+pad(d.getMinutes())+":"+pad(d.getSeconds()); };
+
+/* ---------- 状态存储 ---------- */
+let curView = "dashboard", curApp = null, logs = [];
+
+/* ---------- 渲染：欢迎页 ---------- */
+function renderWelcome(){
+  $("#welcomeCards").innerHTML = APPS.map(a=>`
+    <div class="w-card" onclick="enterPortal('app','${a.name}')">
+      <div class="st"><span class="dot ${a.status}"></span>${ST[a.status]}</div>
+      <span class="tag">${a.path}</span>
+      <h3>${a.title}</h3>
+      <p>${a.desc}</p>
+      <div class="go">进入子系统 →</div>
+    </div>`).join("");
+}
+/* ---------- 渲染：侧栏 ---------- */
+function renderSidebar(){
+  $("#navApps").innerHTML = APPS.map(a=>`
+    <div class="nav-item" data-view="app" data-app="${a.name}" onclick="goView('app','${a.name}')">
+      <span class="ico" style="color:${a.color}">◆</span>${a.title}
+      <span class="nav-point"><span class="dot ${a.status}"></span></span>
+    </div>`).join("");
+}
+
+/* ---------- 渲染：健康卡片 ---------- */
+function trendSVG(a){
+  const pts = [];
+  for(let i=0;i<20;i++) pts.push(i*5.5 + (Math.random()*7-3.5));
+  const p = pts.map((y,i)=>`${i*5.5},${44-y}`).join(" ");
+  const flat = 44 - pts[19];
+  return `<svg viewBox="0 0 110 46" preserveAspectRatio="none">
+    <polyline points="${p}" fill="none" stroke="${a.color}" stroke-width="1.6" opacity="0.85"/>
+    <circle cx="104.5" cy="${flat}" r="2.6" fill="${a.color}"/>
+  </svg>`;
+}
+function renderCards(){
+  $("#hcCards").innerHTML = APPS.map(a=>{
+    const lat = a.status==="off" ? "—" : a.latency+"ms";
+    const up  = a.status==="off" ? "<span style='color:var(--alert)'>已中断</span>" : fmtUptime(a.uptime);
+    return `<div class="hc ${a.status==="off"?"logging":""}" id="hc-${a.name}">
+      <div class="hc-head">
+        <div class="hc-ico" style="background:linear-gradient(135deg,${a.color},#1F3A93)">${a.icon}</div>
+        <div><div class="hc-name">${a.title}</div><div class="hc-desc">${a.path} · ${a.entry}</div></div>
+        <div class="hc-status" title="点击切换状态（演示）" onclick="cycleStatus('${a.name}')"><span class="dot ${a.status}" id="d-${a.name}"></span>${ST[a.status]}</div>
+      </div>
+      <div class="hc-metrics">
+        <div class="m"><div class="k">版本</div><div class="v">${a.ver}</div></div>
+        <div class="m"><div class="k">端口</div><div class="v">${a.ports||a.port}</div></div>
+        <div class="m"><div class="k">心跳延迟</div><div class="v m-lat">${lat}</div></div>
+      </div>
+      <div class="hc-trend">${trendSVG(a)}</div>
+      <div class="hc-foot">
+        <div class="last"><span id="hc-heart-${a.name}">⏱ 心跳 ${fmtTime(a.lastBeat)}</span> · <span id="hc-up-${a.name}">在线 ${up}</span></div>
+        <button class="btn-sm" onclick="beat('${a.name}')">↻ 刷新</button>
+        <button class="btn btn-primary" onclick="goView('app','${a.name}')">进入 →</button>
+      </div>
+    </div>`;
+  }).join("");
+}
+const fmtTime = ts => { const m = Date.now()-ts; return m<0 ? "…" : (m<1000 ? m+"ms" : Math.floor(m/1000)+"s"); };
+const fmtUptime = s => { const h=Math.floor(s/3600), m=Math.floor(s%3600/60); return h>0 ? `${h}h ${m}m` : `${m}m ${s%60}s`; };
+
+/* ---------- 状态模拟 ---------- */
+function beat(name, manual){
+  const a = APPS.find(x=>x.name===name); if(!a) return;
+  a.lastBeat = Date.now();
+  a.latency = 18 + Math.floor(Math.random()*60);
+  if(!manual && Math.random()<0.06){ // 模拟抖动：随机降级
+    a.status = "deg"; a.fails = 1;
+    pushLog(name, "心跳延迟升高，状态降级 (degraded)", "wn");
+  } else if(a.status==="deg" && Math.random()<0.5){
+    a.status="on"; a.fails=0; pushLog(name, "心跳恢复，状态在线 (online)", "ok");
+  }
+  const el = $("#d-"+name); if(el){ el.classList.remove("pulse"); void el.offsetWidth; el.classList.add("pulse"); }
+  updateCard(name);
+}
+function cycleStatus(name){
+  const a = APPS.find(x=>x.name===name);
+  const keys=["on","deg","off"]; a.status = keys[(keys.indexOf(a.status)+1)%3];
+  const msgs={"on":["心跳恢复，状态在线 (online)","ok"],"deg":["心跳延迟升高，状态降级 (degraded)","wn"],"off":["连接失败，连续 3 次心跳超时，已离线 (offline)","er"]};
+  pushLog(name, msgs[a.status][0], msgs[a.status][1]);
+  if(a.status==="off") a.uptime=0;
+  updateCard(name);
+}
+/* 局部刷新单张卡片：避免全量重渲染导致 DOM 抖动与交互失效 */
+function updateCard(name){
+  const a = APPS.find(x=>x.name===name); const card = $("#hc-"+name); if(!a||!card) return;
+  const dot = $("#d-"+name); if(dot) dot.className = "dot "+a.status;
+  const st = card.querySelector(".hc-status"); if(st) st.innerHTML = `<span class="dot ${a.status}"></span>${ST[a.status]}`;
+  const lat = card.querySelector(".m-lat"); if(lat) lat.textContent = a.status==="off" ? "—" : a.latency+"ms";
+  card.classList.toggle("logging", a.status==="off");
+  const heart = $("#hc-heart-"+name); if(heart) heart.textContent = a.status==="off" ? "⏱ 心跳 已中断" : "⏱ 心跳 "+fmtTime(a.lastBeat);
+  const trend = card.querySelector(".hc-trend"); if(trend) trend.innerHTML = trendSVG(a);
+  updateUptime(a);
+  renderSidebar(); renderStats();
+}
+function updateUptime(a){
+  const el = $("#hc-up-"+a.name); if(el) el.textContent = a.status==="off" ? "在线 已中断" : "在线 "+fmtUptime(a.uptime);
+}
+function renderStats(){
+  const on = APPS.filter(a=>a.status==="on").length, deg = APPS.filter(a=>a.status==="deg").length;
+  const lat = APPS.filter(a=>a.status!=="off").reduce((s,a)=>s+a.latency,0)/Math.max(1,APPS.filter(a=>a.status!=="off").length);
+  $("#stTotal").textContent = APPS.length;
+  $("#stOnline").textContent = on;
+  $("#stDeg").textContent = deg;
+  $("#stLat").textContent = Math.round(lat);
+  $("#navAll").innerHTML = `<span class="dot ${on? "on":"off"}"></span>`;
+}
+/* 自动心跳：每 3~6s 随机挑一个系统 */
+setInterval(()=>{ beat(APPS[Math.floor(Math.random()*APPS.length)].name); }, 3000 + Math.random()*3000);
+setInterval(()=>{ APPS.forEach(a=>{ if(a.status!=="off"){ a.uptime++; updateUptime(a); } }); }, 1000);
+
+/* ---------- 日志 ---------- */
+function pushLog(sys, msg, level){
+  logs.push({sys,msg,level,t:tstr()});
+  if(logs.length>80) logs.shift();
+  const b = $("#logBody"); if(!b) return;
+  if(curView!=="logs") return;
+  const row = document.createElement("div");
+  row.innerHTML = `<span class="t">${tstr()}</span><span class="sys">[${sys}]</span> <span class="${level||""}">${msg}</span>`;
+  b.appendChild(row); b.scrollTop = b.scrollHeight;
+}
+function clearLog(){ logs=[]; $("#logBody").innerHTML=""; }
+function seedLogs(){
+  pushLog("portal", "Portal v0.1 原型已启动，欢迎页渲染完成", "sys");
+  pushLog("court-doc-generator", "心跳 200 OK · /court/_stcore/health", "ok");
+  pushLog("litigation-system", "心跳 200 OK · /litigation/api/health", "ok");
+  pushLog("case-intelligence", "心跳 200 OK · NocoDB 8090 · Paperless 8091", "ok");
+  pushLog("portal", "nginx 同源反代规则已加载：/court /litigation /case", "sys");
+}
+
+/* ---------- 视图切换 ---------- */
+function enterPortal(view, app){ $("#welcome").style.display="none"; $("#portal").style.display="flex"; goView(view, app); }
+function showWelcome(){ renderWelcome(); $("#portal").style.display="none"; $("#welcome").style.display="flex"; }
+function goView(view, app){
+  curView = view;
+  document.querySelectorAll(".content > div").forEach(d=>d.style.display="none");
+  document.querySelectorAll(".nav-item").forEach(n=>n.classList.toggle("active", n.dataset.view===view && (n.dataset.app||"")===(app||"")));
+  if(view==="dashboard"){
+    renderCards(); renderStats();
+    $("#view-dashboard").style.display="block";
+    $("#crumb").textContent = "工作台 · 系统总览";
+  } else if(view==="app"){
+    const a = APPS.find(x=>x.name===app) || APPS[0]; curApp = a;
+    $("#appTitle").textContent = a.title;
+    $("#appDesc").textContent = a.desc;
+    $("#fPath").textContent = "路径 " + a.path;
+    $("#fEntry").textContent = "入口 " + a.entry;
+    $("#fHealth").textContent = "健康 " + a.health;
+    $("#fVer").textContent = "v" + a.ver;
+    $("#fAddr").textContent = "https://legal.internal" + a.path;
+    $("#fBadge").style.background = a.color;
+    $("#fBadge").textContent = "同源反代";
+    $("#fFrame").srcdoc = frameDoc(a);
+    $("#view-app").style.display="block";
+    $("#crumb").textContent = "子系统 · " + a.title;
+  } else if(view==="logs"){
+    $("#view-logs").style.display="block";
+    $("#crumb").textContent = "运维 · 运行日志";
+    const b=$("#logBody"); b.innerHTML="";
+    logs.forEach(l=>{ const r=document.createElement("div"); r.innerHTML=`<span class="t">${l.t}</span><span class="sys">[${l.sys}]</span> <span class="${l.level||""}">${l.msg}</span>`; b.appendChild(r); });
+    b.scrollTop=b.scrollHeight;
+  } else if(view==="about"){
+    $("#view-about").style.display="block";
+    $("#crumb").textContent = "运维 · 关于框架";
+  }
+}
+/* 嵌入占位页（正式版为真实子系统） */
+function frameDoc(a){
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+    body{margin:0;font-family:-apple-system,"PingFang SC",sans-serif;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;background:linear-gradient(150deg,#FFFFFF,${a.color}14);color:#1F2A44}
+    .ring{width:88px;height:88px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:34px;color:#fff;background:linear-gradient(135deg,${a.color},#1F3A93);box-shadow:0 14px 34px ${a.color}40}
+    h2{margin:22px 0 6px;letter-spacing:2px} p{color:#5A6A8C;font-size:13px} .pin{margin-top:16px;font-family:ui-monospace,monospace;font-size:12px;background:#FFF;border:1px solid #E3E9F2;padding:6px 12px;border-radius:6px;color:#1F3A93}
+  </style></head><body><div class="ring">${a.icon}</div><h2>${a.title}</h2><p>子系统嵌入窗口占位 · 正式版由 nginx 同源反代接入真实系统</p><div class="pin">${a.health}</div></body></html>`;
+}
+
+/* ---------- 时钟 ---------- */
+setInterval(()=>{ $("#clock").textContent = nowStr(); }, 1000);
+
+/* ---------- 启动 ---------- */
+APPS.forEach(a=>a.lastBeat=Date.now());
+renderWelcome(); renderSidebar(); renderCards(); renderStats(); seedLogs();
+</script>
+</body>
+</html>

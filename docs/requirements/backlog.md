@@ -4,6 +4,36 @@
 
 ---
 
+## 2026-08-17 Legal Portal 统一门户（v0.1 原型）
+
+**类型**: feature
+**模块**: portal
+**状态**: in-progress
+**优先级**: P1
+
+### 描述
+
+法务部统一门户：注册表驱动的子系统集成框架 + 系统健康监控总览。四项设计决策已定：形态从简（无认证、登录页可有可无，重在框架/效果/功能/集成）、商务蓝浅色庄重视觉、暂不做统一认证、首版聚焦系统健康监控。
+
+已交付：
+1. `modules/portal/docs/SPEC.md` — v0.1 规格（设计语言 / 同源反代架构 / apps.yaml 注册表 schema / 健康监控协议 / 页面结构 / 验收标准 / 演进路线）
+2. `modules/portal/prototype.html` — 单文件交互原型（欢迎页 + 主框架 + Dashboard 健康总览 + 子系统嵌入演示 + 日志），APPS 注册表驱动，浏览器自测通过（控制台零报错、状态机 on→degraded→offline 切换、返回门面状态同步）
+
+正式版待办（未开始）：
+- [ ] nginx 同源反代配置落地（/court→18501、/litigation→8000、/case→8090+8091，仅内网 10.10.11.37）
+- [ ] apps.yaml 注册表转正并接入真实健康端点
+- [ ] litigation-system / case-intelligence 补齐健康端点（/api/health、/api/healthz）
+- [ ] 健康趋势图历史落库、一键启停、WebSocket 实时日志（P1）
+- [ ] 正式版形态确认（静态多页 or Vite/React）与部署
+
+### 验收标准（原型阶段）
+- [x] SPEC 覆盖设计语言/架构/注册表 schema/健康协议/验收标准
+- [x] 原型集成为一个 HTML 文件，APPS 数组驱动四视图
+- [x] 本地起服务 + 浏览器自测渲染与交互无误（控制台零报错）
+- [ ] 正式版开发（proposed）
+
+---
+
 ## 2026-08-17 扩展 case-intelligence 为案例分析输出生成器（v3.0 → v4.0 升级）
 
 **类型**: feature
