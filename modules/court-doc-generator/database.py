@@ -2,6 +2,8 @@
 import sqlite3
 from datetime import datetime
 from contextlib import contextmanager
+from typing import Tuple
+
 from config import DB_PATH
 
 
@@ -280,6 +282,48 @@ def set_default_agent(agent_id: int):
     with get_conn() as conn:
         conn.execute("UPDATE agents SET is_default = 0")
         conn.execute("UPDATE agents SET is_default = 1 WHERE id = ?", (agent_id,))
+
+
+def delete_agent(agent_id: int) -> Tuple[bool, str, list]:
+    """F-039 删除代理人（DB 记录 + 返回待清理文件路径列表）。
+
+    参数：
+        agent_id: 代理人 ID
+
+    返回：
+        (success: bool, message: str, file_paths_to_delete: list[str])
+        - success=True, message="已删除", file_paths_to_delete=["static/agents/3/contract_xxx.pdf", ...]
+        - success=False, message="该代理人关联 N 个案件...", file_paths_to_delete=[]
+        - success=False, message="代理人 N 不存在", file_paths_to_delete=[]
+
+    设计：
+        - 数据库函数只管 DB（职责单一）
+        - 文件删除由调用方（app.py）负责，避免 DB 函数依赖 path 路径
+        - 检查 cases.agent_id 关联：有关联不删（保留历史案件可追溯性）
+    """
+    with get_conn() as conn:
+        # 1. 检查关联案件数
+        related_count = conn.execute(
+            "SELECT COUNT(*) AS cnt FROM cases WHERE agent_id = ?", (agent_id,)
+        ).fetchone()["cnt"]
+
+        if related_count > 0:
+            return False, f"该代理人关联 {related_count} 个案件，请先解除关联", []
+
+        # 2. 读取旧路径（用于返回给调用方删文件）
+        row = conn.execute(
+            "SELECT contract_pdf_path, id_card_pdf_path FROM agents WHERE id = ?",
+            (agent_id,),
+        ).fetchone()
+        if not row:
+            return False, f"代理人 {agent_id} 不存在", []
+
+        paths = [p for p in (row["contract_pdf_path"], row["id_card_pdf_path"]) if p]
+
+        # 3. 删记录
+        conn.execute("DELETE FROM agents WHERE id = ?", (agent_id,))
+
+    return True, "已删除", paths
 
 
 # ============================================================

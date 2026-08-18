@@ -79,6 +79,40 @@ def _resolve_agent_pdf(agent: dict, target_name: str, fallback_filename: str):
     return None
 
 
+def validate_agent_paths(agents: list) -> dict:
+    """F-041 校验代理人的 PDF 路径。
+
+    返回：
+        dict[int, dict]，键是 agent_id，值含 "valid"（存在的字段名列表）和 "invalid"（失效字段名列表）
+        只返回有失效字段的 agent；空字典表示所有路径都 OK。
+
+    用途：UI 启动/侧边栏加载时校验，失效的 agent 在 UI 上标红 + 提示"请重新上传"。
+
+    注意：空字段（未上传）不算失效；相对路径相对 PROJECT_ROOT 解析。
+    """
+    result = {}
+    for agent in agents:
+        agent_id = agent["id"]
+        valid = []
+        invalid = []
+        for key in ("contract_pdf_path", "id_card_pdf_path"):
+            rel_path = agent.get(key)
+            if not rel_path:
+                continue
+            full = PROJECT_ROOT / rel_path
+            if full.exists():
+                valid.append(key)
+            else:
+                invalid.append(key)
+        if invalid:
+            result[agent_id] = {
+                "agent_name": agent.get("name", ""),
+                "valid": valid,
+                "invalid": invalid,
+            }
+    return result
+
+
 def save_agent_pdf(agent_id: int, file_bytes: bytes, file_type: str) -> str:
     """F-032 保存代理人上传的 PDF 到 static/agents/<id>/。
 

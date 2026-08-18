@@ -287,6 +287,101 @@ def test_save_agent_pdf_unique_filename_per_call():
 
 
 # ============================================================
+# F-041 validate_agent_paths 路径校验
+# ============================================================
+
+def test_validate_agent_paths_all_valid(tmp_path):
+    """F-041: 所有路径都存在 → 返回空字典。"""
+    from generator import validate_agent_paths
+
+    # 创建两个有效文件
+    valid_file = tmp_path / "test.pdf"
+    valid_file.write_bytes(b"%PDF fake")
+
+    # 但 validate_agent_paths 用 PROJECT_ROOT 作根，不是 tmp_path
+    # 所以用真实路径结构
+    from config import PROJECT_ROOT
+    agent_dir = PROJECT_ROOT / "static" / "agents" / "_test_vap"
+    agent_dir.mkdir(parents=True, exist_ok=True)
+    pdf1 = agent_dir / "valid.pdf"
+    pdf1.write_bytes(b"%PDF fake")
+
+    agents = [{
+        "id": 99,
+        "name": "测试",
+        "contract_pdf_path": "static/agents/_test_vap/valid.pdf",
+        "id_card_pdf_path": None,
+    }]
+    result = validate_agent_paths(agents)
+    assert result == {}, f"全部有效应返回空字典，实际：{result}"
+
+    # 清理
+    pdf1.unlink()
+    agent_dir.rmdir()
+
+
+def test_validate_agent_paths_detects_missing(tmp_path):
+    """F-041: 路径不存在 → 在结果中标记 invalid。"""
+    from generator import validate_agent_paths
+
+    agents = [{
+        "id": 100,
+        "name": "测试",
+        "contract_pdf_path": "static/agents/100/contract_missing.pdf",
+        "id_card_pdf_path": "static/agents/100/id_card_also_missing.pdf",
+    }]
+    result = validate_agent_paths(agents)
+
+    assert 100 in result
+    assert result[100]["agent_name"] == "测试"
+    assert "contract_pdf_path" in result[100]["invalid"]
+    assert "id_card_pdf_path" in result[100]["invalid"]
+    assert result[100]["valid"] == []
+
+
+def test_validate_agent_paths_mixed(tmp_path):
+    """F-041: 一有效一失效 → 只记录失效字段。"""
+    from generator import validate_agent_paths
+    from config import PROJECT_ROOT
+
+    # 创建 1 个有效文件
+    agent_dir = PROJECT_ROOT / "static" / "agents" / "_test_vap_mix"
+    agent_dir.mkdir(parents=True, exist_ok=True)
+    valid_pdf = agent_dir / "valid.pdf"
+    valid_pdf.write_bytes(b"%PDF fake")
+
+    agents = [{
+        "id": 101,
+        "name": "混合",
+        "contract_pdf_path": "static/agents/_test_vap_mix/valid.pdf",  # 存在
+        "id_card_pdf_path": "static/agents/_test_vap_mix/missing.pdf",   # 不存在
+    }]
+    result = validate_agent_paths(agents)
+
+    assert 101 in result
+    assert "contract_pdf_path" in result[101]["valid"]
+    assert "id_card_pdf_path" in result[101]["invalid"]
+
+    # 清理
+    valid_pdf.unlink()
+    agent_dir.rmdir()
+
+
+def test_validate_agent_paths_empty_field_ok():
+    """F-041: 空字段（未上传）不算失效。"""
+    from generator import validate_agent_paths
+
+    agents = [{
+        "id": 102,
+        "name": "新代理人",
+        "contract_pdf_path": None,
+        "id_card_pdf_path": "",
+    }]
+    result = validate_agent_paths(agents)
+    assert result == {}, "空字段不算失效"
+
+
+# ============================================================
 # F-036 法定代表人证明改为固定静态文件
 # ============================================================
 

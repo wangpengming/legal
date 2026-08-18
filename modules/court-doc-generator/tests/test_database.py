@@ -179,3 +179,77 @@ def test_old_record_compatible_after_migration(fresh_db):
     assert agent["id_card"] == "123456"
     assert agent["contract_pdf_path"] is None  # 默认 None
     assert agent["id_card_pdf_path"] is None   # 默认 None
+
+
+# ============================================================
+# F-039 delete_agent 级联清理
+# ============================================================
+
+def test_delete_agent_no_relation_succeeds(fresh_db):
+    """F-039: 无关联案件的代理人 → 删除成功 + 返回待清理文件路径。"""
+    import database as db
+
+    cid = db.upsert_company({"name": "公司", "legal_rep_name": "法人"})
+    aid = db.upsert_agent({"name": "张三", "company_id": cid})
+
+    success, msg, paths = db.delete_agent(aid)
+    assert success is True
+    assert "已删除" in msg
+    assert paths == []  # 没上传 PDF，无文件路径
+
+
+def test_delete_agent_with_relation_blocks(fresh_db):
+    """F-039: 有关联案件的代理人 → 拒绝删除（保护历史）。"""
+    import database as db
+
+    cid = db.upsert_company({"name": "公司", "legal_rep_name": "法人"})
+    aid = db.upsert_agent({"name": "李四", "company_id": cid})
+
+    # 创建一个案件关联李四
+    case_id = db.create_case({
+        "case_number": "（2026）京01民初123号",
+        "case_cause": "合同纠纷",
+        "court": "北京一中院",
+        "hearing_date": "2026-09-01",
+        "our_role": "原告",
+        "authority_type": "特别授权",
+        "company_id": cid,
+        "agent_id": aid,
+    })
+    assert case_id > 0
+
+    # 删除应失败
+    success, msg, paths = db.delete_agent(aid)
+    assert success is False
+    assert "关联" in msg
+    assert "1 个案件" in msg
+    assert paths == []  # 不返回路径（不删文件）
+
+
+def test_delete_agent_returns_file_paths(fresh_db):
+    """F-039: 返回正确的待清理文件路径列表。"""
+    import database as db
+
+    cid = db.upsert_company({"name": "公司", "legal_rep_name": "法人"})
+    aid = db.upsert_agent({
+        "name": "王五",
+        "company_id": cid,
+        "contract_pdf_path": "static/agents/9/contract_abc.pdf",
+        "id_card_pdf_path": "static/agents/9/id_card_xyz.pdf",
+    })
+
+    success, msg, paths = db.delete_agent(aid)
+    assert success is True
+    assert len(paths) == 2
+    assert "contract_abc.pdf" in paths[0]
+    assert "id_card_xyz.pdf" in paths[1]
+
+
+def test_delete_agent_not_exists(fresh_db):
+    """F-039: 删除不存在的代理人 → 失败。"""
+    import database as db
+
+    success, msg, paths = db.delete_agent(999)
+    assert success is False
+    assert "不存在" in msg
+    assert paths == []

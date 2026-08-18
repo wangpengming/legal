@@ -20,7 +20,7 @@ from pathlib import Path
 import streamlit as st
 
 import database as db
-from config import OUTPUTS_DIR, save_json_config
+from config import OUTPUTS_DIR, PROJECT_ROOT, save_json_config
 from generator import (
     generate_court_matters,
     generate_preview,
@@ -28,6 +28,7 @@ from generator import (
     print_pdf_to_default_printer,
     sanitize_filename,
     save_agent_pdf,
+    validate_agent_paths,
 )
 from feishu_api import get_feishu_status, is_feishu_enabled
 from pdf_thumb import (
@@ -276,6 +277,16 @@ def render_sidebar():
         # ========== 代理人管理 ==========
         st.subheader("👤 代理人（法务/律师）")
         agents = db.list_agents()
+
+        # F-041 启动时校验路径（代理人的 PDF 是否还存在）
+        invalid_paths = validate_agent_paths(agents)
+        if invalid_paths:
+            for aid, info in invalid_paths.items():
+                keys_str = "、".join(info["invalid"])
+                st.error(
+                    f"⚠️ 代理人 **{info['agent_name']}** 的 {keys_str} PDF 文件已丢失/被改动！请重新上传。"
+                )
+
         agent_options = {f"{a['name']} - {a.get('position', '')}" + (" [默认]" if a['is_default'] else ""): a for a in agents}
         if agent_options:
             selected_agent_label = st.selectbox(
@@ -286,6 +297,47 @@ def render_sidebar():
             current_agent = agent_options[selected_agent_label]
         else:
             current_agent = None
+
+        # F-039 删除代理人按钮（只在有代理人时显示，放在编辑表单后面）
+        if current_agent:
+            delete_key = f"confirm_delete_agent_{current_agent['id']}"
+            if st.session_state.get(delete_key):
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.button("✅ 确认删除", key=f"do_delete_agent_{current_agent['id']}", type="primary"):
+                        success, msg, paths_to_delete = db.delete_agent(current_agent["id"])
+                        st.session_state[delete_key] = False
+                        if success:
+                            # 清理文件
+                            deleted_count = 0
+                            for rel_path in paths_to_delete:
+                                full = PROJECT_ROOT / rel_path if not Path(rel_path).is_absolute() else Path(rel_path)
+                                try:
+                                    if full.exists():
+                                        full.unlink()
+                                        deleted_count += 1
+                                except OSError:
+                                    pass
+                            # 清理空目录
+                            if paths_to_delete:
+                                agent_dir = (PROJECT_ROOT / paths_to_delete[0]).parent
+                                try:
+                                    if agent_dir.exists() and not any(agent_dir.iterdir()):
+                                        agent_dir.rmdir()
+                                except OSError:
+                                    pass
+                            st.success(f"✅ 已删除 {current_agent['name']} + {deleted_count} 个文件")
+                            st.rerun()
+                        else:
+                            st.error(f"❌ {msg}")
+                with col2:
+                    if st.button("取消", key=f"cancel_delete_agent_{current_agent['id']}"):
+                        st.session_state[delete_key] = False
+                        st.rerun()
+            else:
+                if st.button("🗑 删除此代理人", key=f"ask_delete_agent_{current_agent['id']}", help="删除 DB 记录 + 已上传 PDF 文件（关联案件时拒绝）"):
+                    st.session_state[delete_key] = True
+                    st.rerun()
 
         with st.expander("➕ 添加/编辑代理人"):
             # F-032 已绑定材料展示
@@ -341,10 +393,30 @@ def render_sidebar():
                             "company_id": company_id,
                         })
                         if contract_file is not None:
+                            # F-040 重传清理：删旧文件
+                            if current_agent and current_agent.get("contract_pdf_path"):
+                                old = Path(current_agent["contract_pdf_path"])
+                                if not old.is_absolute():
+                                    old = PROJECT_ROOT / old
+                                try:
+                                    if old.exists():
+                                        old.unlink()
+                                except OSError:
+                                    pass  # 静默失败，不阻塞新上传
                             extra["contract_pdf_path"] = save_agent_pdf(
                                 agent_id, contract_file.read(), "contract"
                             )
                         if id_card_file is not None:
+                            # F-040 重传清理：删旧文件
+                            if current_agent and current_agent.get("id_card_pdf_path"):
+                                old = Path(current_agent["id_card_pdf_path"])
+                                if not old.is_absolute():
+                                    old = PROJECT_ROOT / old
+                                try:
+                                    if old.exists():
+                                        old.unlink()
+                                except OSError:
+                                    pass
                             extra["id_card_pdf_path"] = save_agent_pdf(
                                 agent_id, id_card_file.read(), "id_card"
                             )

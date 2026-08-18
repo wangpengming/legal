@@ -4,6 +4,37 @@
 
 ---
 
+## 2026-08-18 court-doc-generator 多代理人材料绑定边界场景处理（F-039~F-041）
+
+**类型**: improvement
+**模块**: court-doc-generator
+**状态**: in-progress
+**优先级**: P2（完善功能，非阻塞）
+
+### 描述
+F-031~F-035 已完成多代理人材料动态绑定主体功能，但 3 个边界场景未处理：
+1. **F-039 删除代理人级联清理**：删除 agent 时是否清理由 static/agents/<id>/ 下的文件？
+2. **F-040 重传替换清旧文件**：同一代理人重新上传 PDF 时，旧文件是否清理？
+3. **F-041 启动时校验路径**：agent.contract_pdf_path / id_card_pdf_path 文件丢失/被外部改动时怎么办？
+
+### 子任务
+- [ ] **F-039** `database.delete_agent(agent_id)` 实现：先查关联案件 → 有关联不删文件 → 无关联级联删 static/agents/<id>/
+- [ ] **F-040** `app.py` 代理人表单提交逻辑：检测已有路径 → 先删旧 PDF → 再保存新 PDF
+- [ ] **F-041** `generator.validate_agent_paths()` + `app.py` UI 提示：启动时/侧边栏加载时校验所有 agent 路径 → 失效的标红 + 提示"重新上传"
+- [ ] 测试覆盖：3 个 helper 各加 2-3 个用例
+
+### 验收标准
+- [ ] F-039：删无关联代理人 → 文件全清；有关联 → 弹确认"保留文件"
+- [ ] F-040：同代理人重传 → 旧文件消失，新文件就位（DB 路径已更新）
+- [ ] F-041：路径失效 → UI 警告 + 一键重传入口
+
+### 待澄清
+- F-039：关联案件判定用 cases.agent_id 还是 generation_history.case_id（间接）？
+- F-040：旧文件删除失败怎么办？（OSError → 静默？报警？）
+- F-041：UI 警告是阻塞式（强制重传）还是提示式（继续用 fallback）？
+
+---
+
 ## 2026-08-18 court-doc-generator 增加在线打印功能（直送系统打印机）
 
 **类型**: feature
