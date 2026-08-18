@@ -39,6 +39,9 @@ AGENT_STATIC_FALLBACK = {
     "07_代理人身份证.pdf": "代理人身份证.pdf",
 }
 
+# F-036：templates/2.法定代表人证明.docx 已废除（v1.2.0 改为固定静态文件）
+# 当前从 static/2.法定代表人证明.doc 复制为输出文件
+
 # 静态 PDF 文件清单（按出庭提交顺序）— 向后兼容保留
 STATIC_FILES = COMPANY_STATIC + list(AGENT_STATIC_FALLBACK.values())
 

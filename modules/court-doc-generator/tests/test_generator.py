@@ -228,3 +228,24 @@ def test_save_agent_pdf_unique_filename_per_call():
         abs_p = PROJECT_ROOT / p
         if abs_p.exists():
             abs_p.unlink()
+
+
+# ============================================================
+# F-036 法定代表人证明改为固定静态文件
+# ============================================================
+
+def test_legal_rep_cert_static_file_exists():
+    """F-036: static/2.法定代表人证明.doc 应作为固定静态源文件存在。"""
+    from pathlib import Path
+    from config import STATIC_DIR
+
+    src = STATIC_DIR / "2.法定代表人证明.doc"
+    assert src.exists(), f"固定模板文件必须存在：{src}"
+    assert src.stat().st_size > 0, "固定模板文件不能为空"
+
+
+def test_legal_rep_cert_not_in_dynamic_templates():
+    """F-036: values_for_legal_rep_cert 函数应已被移除（02 改为静态复制）。"""
+    import generator as g
+    assert not hasattr(g, "values_for_legal_rep_cert"), \
+        "values_for_legal_rep_cert 应已被移除（02 改为静态复制）"

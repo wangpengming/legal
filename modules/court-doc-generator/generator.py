@@ -221,11 +221,9 @@ def parse_hearing_date(hearing_date: str) -> dict:
 # ============================================================
 # 模板专用 values 构造（按【】位置顺序）
 # ============================================================
-
-def values_for_legal_rep_cert(case: dict, company: dict) -> list:
-    """法定代表人证明模板：【】年【】月【】日"""
-    parts = parse_hearing_date(case.get("hearing_date"))
-    return [parts["年"], parts["月"], parts["日"]]
+# F-036 注：法定代表人证明改为固定静态文件（不再 dynamic 生成）。
+# 模板 templates/2.法定代表人证明.docx 废除；改从 static/2.法定代表人证明.doc 复制。
+# 理由：法定代表人证明是公司级静态材料（与具体案件/日期无关），保留"马杰"版即可。
 
 
 def values_for_power_of_attorney(case: dict, company: dict, agent: dict) -> list:
@@ -306,9 +304,8 @@ def _generate_to_dir(case: dict, company: dict, agent: dict, output_dir: Path) -
     """
     safe_case = sanitize_filename(case.get("case_number", "未命名案件"))
 
-    # === 动态生成 3 份 docx + PDF ===
+    # === 动态生成 2 份 docx + PDF（F-036 调整：02 法定代表人证明改为静态复制）===
     dynamic_templates = [
-        ("legal_rep_cert", values_for_legal_rep_cert(case, company), "02_法定代表人证明"),
         ("power_of_attorney", values_for_power_of_attorney(case, company, agent), "04_授权委托书"),
         ("recommendation", values_for_recommendation(case, company, agent), "05_推荐信"),
     ]
@@ -337,6 +334,12 @@ def _generate_to_dir(case: dict, company: dict, agent: dict, output_dir: Path) -
             target_suffix = "营业执照" if "营业执照" in src_name else "法人身份证"
             target_name = f"{target_idx}_{target_suffix}.pdf"
             shutil.copy2(src_path, output_dir / target_name)
+
+    # F-036 法定代表人证明：固定静态文件（从 static/2.法定代表人证明.doc 复制为 .doc）
+    # 输出保留 .doc 扩展名（python-docx 不支持 .doc 格式，但 Word 可打开；如需 .docx 由用户提供转换版）
+    legal_rep_src = STATIC_DIR / "2.法定代表人证明.doc"
+    if legal_rep_src.exists():
+        shutil.copy2(legal_rep_src, output_dir / f"02_法定代表人证明_{safe_case}.doc")
 
     # 代理人级（F-033：按当前 agent 路径取，fallback 到默认文件）
     for target_name, fallback_filename in AGENT_STATIC_FALLBACK.items():
