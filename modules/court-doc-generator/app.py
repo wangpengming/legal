@@ -25,6 +25,7 @@ from generator import (
     generate_court_matters,
     generate_preview,
     open_in_finder,
+    print_pdf_to_default_printer,
     sanitize_filename,
     save_agent_pdf,
 )
@@ -518,9 +519,9 @@ def _render_result_card(
                     key=f"dl_{f.name}_{id(output_dir)}",
                 )
 
-    # ========== zip 包下载 + Finder 打开 ==========
+    # ========== zip 包下载 + Finder 打开 + 在线打印 ==========
     st.divider()
-    col_zip, col_open = st.columns([2, 1])
+    col_zip, col_open, col_print = st.columns([2, 1, 1])
     with col_zip:
         zip_files = list(output_dir.glob("*.zip"))
         if zip_files:
@@ -540,6 +541,20 @@ def _render_result_card(
             key=f"finder_{id(output_dir)}",
         ):
             open_in_finder(output_dir)
+    with col_print:
+        # F-037 在线打印：合并 PDF → 系统默认打印机（无弹窗）
+        if merged_pdf.exists():
+            if st.button(
+                "🖨 在线打印",
+                use_container_width=True,
+                key=f"online_print_{id(output_dir)}",
+                help="直接把合并 PDF 送到系统默认打印机（macOS lp / Linux lp / Windows ShellExecute），不会弹任何对话框",
+            ):
+                success, msg = print_pdf_to_default_printer(merged_pdf)
+                if success:
+                    st.success(f"✅ 已发送到打印机: {msg}")
+                else:
+                    st.error(f"❌ 打印失败: {msg}")
 
     # ========== 预览场景：询问是否确认生成 ==========
     if is_preview:

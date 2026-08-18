@@ -253,3 +253,95 @@ def test_legal_rep_cert_not_in_dynamic_templates():
     import generator as g
     assert not hasattr(g, "values_for_legal_rep_cert"), \
         "values_for_legal_rep_cert 应已被移除（02 改为静态复制）"
+
+
+# ============================================================
+# F-037 在线打印：print_pdf_to_default_printer
+# ============================================================
+
+def test_print_pdf_to_default_printer_file_not_exists(tmp_path):
+    """F-037: PDF 不存在时返回 (False, 错误消息)。"""
+    from generator import print_pdf_to_default_printer
+
+    fake_pdf = tmp_path / "non_existent.pdf"
+    success, msg = print_pdf_to_default_printer(fake_pdf)
+    assert success is False
+    assert "不存在" in msg
+
+
+def test_print_pdf_to_default_printer_success_mac(monkeypatch, tmp_path):
+    """F-037: macOS/Linux 调 lp 命令成功 → 返回 (True, stdout)。"""
+    import platform
+    if platform.system() not in ("Darwin", "Linux"):
+        import pytest
+        pytest.skip("本测试仅在 macOS / Linux 运行")
+
+    from generator import print_pdf_to_default_printer
+    import subprocess
+
+    fake_pdf = tmp_path / "test.pdf"
+    fake_pdf.write_bytes(b"%PDF-1.4 fake")
+
+    class FakeResult:
+        returncode = 0
+        stdout = "request id is HP-LaserJet-1 (1 file(s))"
+        stderr = ""
+
+    monkeypatch.setattr(subprocess, "run", lambda *a, **kw: FakeResult())
+
+    success, msg = print_pdf_to_default_printer(fake_pdf)
+    assert success is True
+    assert "HP-LaserJet-1" in msg
+
+
+def test_print_pdf_to_default_printer_lp_failure(monkeypatch, tmp_path):
+    """F-037: lp 命令失败 → 返回 (False, stderr)。"""
+    from generator import print_pdf_to_default_printer
+    import subprocess
+
+    fake_pdf = tmp_path / "test.pdf"
+    fake_pdf.write_bytes(b"%PDF-1.4 fake")
+
+    class FakeResult:
+        returncode = 1
+        stdout = ""
+        stderr = "lp: The printer or class does not exist."
+
+    monkeypatch.setattr(subprocess, "run", lambda *a, **kw: FakeResult())
+
+    success, msg = print_pdf_to_default_printer(fake_pdf)
+    assert success is False
+    assert "lp 失败" in msg
+
+
+def test_print_pdf_to_default_printer_timeout(monkeypatch, tmp_path):
+    """F-037: subprocess 超时 → 返回 (False, 超时提示)。"""
+    from generator import print_pdf_to_default_printer
+    import subprocess
+
+    fake_pdf = tmp_path / "test.pdf"
+    fake_pdf.write_bytes(b"%PDF-1.4 fake")
+
+    def fake_run(*args, **kwargs):
+        raise subprocess.TimeoutExpired(cmd="lp", timeout=30)
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    success, msg = print_pdf_to_default_printer(fake_pdf)
+    assert success is False
+    assert "超时" in msg
+
+
+def test_print_pdf_to_default_printer_unsupported_os(monkeypatch, tmp_path):
+    """F-037: 不支持的系统（如 FreeBSD）→ 返回 (False, 错误消息)。"""
+    from generator import print_pdf_to_default_printer
+    import platform
+
+    fake_pdf = tmp_path / "test.pdf"
+    fake_pdf.write_bytes(b"%PDF-1.4 fake")
+
+    monkeypatch.setattr(platform, "system", lambda: "FreeBSD")
+
+    success, msg = print_pdf_to_default_printer(fake_pdf)
+    assert success is False
+    assert "不支持的系统" in msg

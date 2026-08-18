@@ -13,11 +13,15 @@
 """
 import re
 import shutil
+import subprocess
 import tempfile
 import uuid
 import zipfile
 from datetime import datetime
 from pathlib import Path
+from typing import Tuple
+
+import platform
 
 from docx import Document
 
@@ -435,3 +439,64 @@ def open_in_finder(path: Path):
     """在 macOS Finder 中打开文件/目录。"""
     import subprocess
     subprocess.Popen(["open", str(path)])
+
+
+def print_pdf_to_default_printer(pdf_path: Path) -> Tuple[bool, str]:
+    """F-037 在线打印：直接把 PDF 送到系统默认打印机（绕过浏览器对话框）。
+
+    实现思路：调系统命令行工具（macOS `lp` / Linux `lp` / Windows PowerShell），
+    区别于 `window.print()`（浏览器 API，总会弹打印对话框）。
+
+    返回：
+        (success: bool, message: str)
+        - success=True → message 是 lp 的 stdout（含 request id）
+        - success=False → message 是错误描述（用于 UI 显示）
+
+    跨平台：
+        - macOS： `lp <file>`  → CUPS 默认打印机
+        - Linux： `lp <file>`  → CUPS 默认打印机
+        - Windows： `Start-Process -FilePath <file> -Verb Print` → ShellExecute 静默打印
+    """
+    if not pdf_path.exists():
+        return False, f"PDF 不存在: {pdf_path}"
+
+    system = platform.system()
+
+    try:
+        if system in ("Darwin", "Linux"):
+            # CUPS lp 命令（macOS / Linux）
+            result = subprocess.run(
+                ["lp", str(pdf_path)],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            if result.returncode == 0:
+                # lp 输出例: "request id is HP-LaserJet-1 (1 file(s))"
+                return True, result.stdout.strip() or "打印任务已提交"
+            return False, f"lp 失败 (code={result.returncode}): {result.stderr.strip()}"
+
+        elif system == "Windows":
+            # PowerShell 调 ShellExecute 静默打印（不弹 Adobe Reader 对话框）
+            ps_cmd = (
+                f'Start-Process -FilePath "{pdf_path}" -Verb Print'
+            )
+            result = subprocess.run(
+                ["powershell", "-Command", ps_cmd],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            if result.returncode == 0:
+                return True, "打印任务已提交（Windows ShellExecute）"
+            return False, f"PowerShell 失败: {result.stderr.strip()}"
+
+        else:
+            return False, f"不支持的系统: {system}（仅 macOS / Linux / Windows）"
+
+    except subprocess.TimeoutExpired:
+        return False, "打印命令超时（30s）— 请检查打印机状态"
+    except FileNotFoundError as e:
+        return False, f"系统打印命令未找到: {e}"
+    except Exception as e:
+        return False, f"打印异常: {e}"
