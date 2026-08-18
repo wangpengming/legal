@@ -33,14 +33,14 @@ def test_init_db_creates_tables(fresh_db):
     assert "companies" in tables
     assert "agents" in tables
     assert "cases" in tables
-    assert "case_history" in tables
+    assert "generation_history" in tables
 
 
 def test_upsert_company(fresh_db):
     """upsert_company：第一次插入应返回 id，第二次（同 name）应更新。"""
     import database as db
-    cid1 = db.upsert_company({"name": "测试公司A"})
-    cid2 = db.upsert_company({"name": "测试公司A", "phone": "010-12345678"})
+    cid1 = db.upsert_company({"name": "测试公司A", "legal_rep_name": "测试法人"})
+    cid2 = db.upsert_company({"name": "测试公司A", "phone": "010-12345678", "legal_rep_name": "测试法人"})
     assert cid1 == cid2, "同名公司应更新而非新增"
     co = db.get_company(cid1)
     assert co["phone"] == "010-12345678"
@@ -49,7 +49,7 @@ def test_upsert_company(fresh_db):
 def test_upsert_agent_unique_by_name_and_company(fresh_db):
     """agents 唯一性修复：以 (name, company_id) 判重。"""
     import database as db
-    cid = db.upsert_company({"name": "公司X"})
+    cid = db.upsert_company({"name": "公司X", "legal_rep_name": "测试法人"})
 
     # 同公司下同名 + 空 id_card 应是同一人
     aid1 = db.upsert_agent({"name": "张三", "company_id": cid, "id_card": ""})
@@ -57,7 +57,7 @@ def test_upsert_agent_unique_by_name_and_company(fresh_db):
     assert aid1 == aid2, "同公司下同名同空 id_card 应是同一人"
 
     # 同名但不同公司应是两人
-    cid_y = db.upsert_company({"name": "公司Y"})
+    cid_y = db.upsert_company({"name": "公司Y", "legal_rep_name": "测试法人"})
     aid3 = db.upsert_agent({"name": "张三", "company_id": cid_y, "id_card": ""})
     assert aid3 != aid1, "不同公司下同名应不同人"
 
@@ -69,7 +69,7 @@ def test_upsert_agent_unique_by_name_and_company(fresh_db):
 def test_list_agents_excludes_empty(fresh_db):
     """list_agents 默认排除空名字记录。"""
     import database as db
-    db.upsert_company({"name": "公司"})
+    db.upsert_company({"name": "公司", "legal_rep_name": "测试法人"})
     db.upsert_agent({"name": "张三", "company_id": 1})
     agents = db.list_agents()
     names = [a["name"] for a in agents]
@@ -79,7 +79,7 @@ def test_list_agents_excludes_empty(fresh_db):
 def test_create_and_search_cases(fresh_db):
     """create_case + search_cases。"""
     import database as db
-    cid = db.upsert_company({"name": "公司"})
+    cid = db.upsert_company({"name": "公司", "legal_rep_name": "测试法人"})
     aid = db.upsert_agent({"name": "代理人", "company_id": cid})
 
     case_id = db.create_case({
@@ -98,3 +98,84 @@ def test_create_and_search_cases(fresh_db):
     found = db.search_cases("合同")
     assert len(found) >= 1
     assert found[0]["case_number"] == "（2026）京01民初123号"
+
+
+# ============================================================
+# F-031 多代理人材料动态绑定：数据库迁移 + 新字段 CRUD
+# ============================================================
+
+def test_migrate_add_agent_pdf_paths(fresh_db):
+    """F-031: 迁移函数能给旧库新增 contract_pdf_path / id_card_pdf_path 字段。
+
+    旧库（无新字段）→ 执行迁移 → 新字段存在 → 重复执行幂等无报错。
+    """
+    import database as db
+    import sqlite3
+
+    with db.get_conn() as conn:
+        # 验证迁移后字段存在
+        cols = [row[1] for row in conn.execute("PRAGMA table_info(agents)").fetchall()]
+        assert "contract_pdf_path" in cols, "迁移后应包含 contract_pdf_path"
+        assert "id_card_pdf_path" in cols, "迁移后应包含 id_card_pdf_path"
+
+        # 验证幂等性：再次执行不报错
+        db.migrate_add_agent_pdf_paths(conn)
+        cols2 = [row[1] for row in conn.execute("PRAGMA table_info(agents)").fetchall()]
+        assert cols == cols2, "重复执行迁移不应改变列定义"
+
+
+def test_upsert_agent_with_pdf_paths(fresh_db):
+    """F-031: upsert_agent 能写入和读取 contract_pdf_path / id_card_pdf_path。
+
+    覆盖：插入时写入 / 更新时更新 / list_agents 返回新字段。
+    """
+    import database as db
+
+    cid = db.upsert_company({"name": "公司X", "legal_rep_name": "测试法人"})
+
+    # 插入时写入 2 个路径
+    aid1 = db.upsert_agent({
+        "name": "张三",
+        "company_id": cid,
+        "contract_pdf_path": "static/agents/1/contract_a1b2.pdf",
+        "id_card_pdf_path": "static/agents/1/id_card_c3d4.pdf",
+    })
+
+    # 读取验证
+    agent = db.get_default_agent()
+    assert agent["contract_pdf_path"] == "static/agents/1/contract_a1b2.pdf"
+    assert agent["id_card_pdf_path"] == "static/agents/1/id_card_c3d4.pdf"
+
+    # list_agents 也应返回新字段
+    agents = db.list_agents()
+    assert agents[0]["contract_pdf_path"] == "static/agents/1/contract_a1b2.pdf"
+
+    # 更新时修改路径
+    db.upsert_agent({
+        "name": "张三",
+        "company_id": cid,
+        "contract_pdf_path": "static/agents/1/contract_new.pdf",
+        "id_card_pdf_path": None,  # 显式置空
+    })
+    agent2 = db.get_default_agent()
+    assert agent2["contract_pdf_path"] == "static/agents/1/contract_new.pdf"
+    assert agent2["id_card_pdf_path"] is None
+
+
+def test_old_record_compatible_after_migration(fresh_db):
+    """F-031: 旧记录（迁移前插入的）在迁移后仍可读，路径字段为 None。
+
+    兼容性验证：新增字段对老数据透明，不破坏现有 CRUD。
+    """
+    import database as db
+
+    cid = db.upsert_company({"name": "公司X", "legal_rep_name": "测试法人"})
+
+    # 在新表结构下插入老格式记录（不写新字段）
+    aid = db.upsert_agent({"name": "李四", "company_id": cid, "id_card": "123456"})
+
+    agent = db.get_default_agent()
+    assert agent["name"] == "李四"
+    assert agent["id_card"] == "123456"
+    assert agent["contract_pdf_path"] is None  # 默认 None
+    assert agent["id_card_pdf_path"] is None   # 默认 None

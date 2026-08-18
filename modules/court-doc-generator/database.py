@@ -33,6 +33,8 @@ CREATE TABLE IF NOT EXISTS agents (
     phone TEXT,                                -- 电话
     company_id INTEGER,                        -- 所属公司
     is_default INTEGER DEFAULT 0,              -- 是否默认
+    contract_pdf_path TEXT,                    -- 🆕 F-031 劳动合同 PDF 路径（相对 PROJECT_ROOT）
+    id_card_pdf_path TEXT,                     -- 🆕 F-031 身份证 PDF 路径（相对 PROJECT_ROOT）
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (company_id) REFERENCES companies(id),
@@ -87,10 +89,24 @@ def get_conn():
         conn.close()
 
 
+def migrate_add_agent_pdf_paths(conn):
+    """F-031 幂等迁移：给 agents 表新增 contract_pdf_path / id_card_pdf_path 字段。
+
+    旧数据库升级时执行（已有数据保留，仅新增字段）。
+    重复执行安全（sqlite3.OperationalError 捕获）。
+    """
+    for col in ("contract_pdf_path", "id_card_pdf_path"):
+        try:
+            conn.execute(f"ALTER TABLE agents ADD COLUMN {col} TEXT")
+        except sqlite3.OperationalError:
+            pass  # 列已存在，幂等
+
+
 def init_db():
-    """初始化数据库（建表）。"""
+    """初始化数据库（建表 + F-031 迁移）。"""
     with get_conn() as conn:
         conn.executescript(SCHEMA_SQL)
+        migrate_add_agent_pdf_paths(conn)
 
 
 # ============================================================
@@ -111,6 +127,15 @@ def get_default_company() -> dict | None:
     with get_conn() as conn:
         row = conn.execute(
             "SELECT * FROM companies WHERE is_default = 1 LIMIT 1"
+        ).fetchone()
+        return dict(row) if row else None
+
+
+def get_company(company_id: int) -> dict | None:
+    """按 id 获取公司（v1.1.0 测试需要，补全）。"""
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT * FROM companies WHERE id = ?", (company_id,)
         ).fetchone()
         return dict(row) if row else None
 
@@ -211,13 +236,17 @@ def upsert_agent(data: dict) -> int:
         if existing:
             conn.execute(
                 """UPDATE agents
-                SET gender=?, id_card=?, position=?, phone=?, updated_at=?
+                SET gender=?, id_card=?, position=?, phone=?,
+                    contract_pdf_path=?, id_card_pdf_path=?,
+                    updated_at=?
                 WHERE id=?""",
                 (
                     data.get("gender"),
                     data.get("id_card"),
                     data.get("position"),
                     data.get("phone"),
+                    data.get("contract_pdf_path"),
+                    data.get("id_card_pdf_path"),
                     now,
                     existing["id"],
                 ),
@@ -227,8 +256,9 @@ def upsert_agent(data: dict) -> int:
             cur = conn.execute(
                 """INSERT INTO agents
                 (name, gender, id_card, position, phone, company_id,
-                 is_default, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)""",
+                 is_default, contract_pdf_path, id_card_pdf_path,
+                 created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)""",
                 (
                     data["name"],
                     data.get("gender"),
@@ -236,6 +266,8 @@ def upsert_agent(data: dict) -> int:
                     data.get("position"),
                     data.get("phone"),
                     data.get("company_id"),
+                    data.get("contract_pdf_path"),
+                    data.get("id_card_pdf_path"),
                     now,
                     now,
                 ),
