@@ -364,7 +364,15 @@ def _generate_to_dir(case: dict, company: dict, agent: dict, output_dir: Path) -
 
     返回：
         output_dir
+
+    F-043 物理隔离：若 output_dir 已存在（同案号重新生成场景），先清空整个
+    目录再重建，避免新旧文件混合导致二次污染。临时目录（tmp）每次 mkdtemp
+    都不存在，无需清空。
     """
+    if output_dir.exists():
+        shutil.rmtree(output_dir)
+    output_dir.mkdir(parents=True)
+
     safe_case = sanitize_filename(case.get("case_number", "未命名案件"))
 
     # === 动态生成 2 份 docx + PDF（F-036 调整：02 法定代表人证明改为静态复制）===
