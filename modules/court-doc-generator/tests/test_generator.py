@@ -32,8 +32,9 @@ def test_only_unsafe():
 # ============================================================
 
 def test_values_for_power_of_attorney_includes_agent():
-    """F-034 + F-035: values_for_power_of_attorney 返回 7 个值，按文档【】出现顺序：
-    1=被授权人姓名, 2=身份证号, 3=案由描述, 4=案号, 5/6/7=年/月/日
+    """F-038: values_for_power_of_attorney 返回 9 个值，按真实模板【】出现顺序：
+
+    1=受委托人姓名, 2=职务, 3=电话, 4=对方当事人, 5=案由, 6=案号, 7/8/9=年/月/日
     """
     from generator import values_for_power_of_attorney
 
@@ -48,22 +49,26 @@ def test_values_for_power_of_attorney_includes_agent():
     company = {"name": "测试公司"}
     agent = {
         "name": "张三",
-        "id_card": "110101199001011234",
         "gender": "男",
+        "id_card": "110101199001011234",
+        "position": "法务经理",
+        "phone": "13800138000",
     }
     values = values_for_power_of_attorney(case, company, agent)
-    assert len(values) == 7, "应返回 7 个值"
-    assert values[0] == "张三", "被授权人姓名"
-    assert values[1] == "110101199001011234", "代理人身份证号"
-    assert values[2] == "对方公司合同纠纷", "案由描述"
-    assert values[3] == "（2026）京01民初123号", "案号"
-    assert values[4] == "2026", "年"
-    assert values[5] == "9", "月"
-    assert values[6] == "15", "日"
+    assert len(values) == 9, "应返回 9 个值"
+    assert values[0] == "张三", "受委托人姓名"
+    assert values[1] == "法务经理", "职务"
+    assert values[2] == "13800138000", "电话"
+    assert values[3] == "对方公司", "对方当事人"
+    assert values[4] == "合同纠纷", "案由"
+    assert values[5] == "（2026）京01民初123号", "案号"
+    assert values[6] == "2026", "年"
+    assert values[7] == "9", "月"
+    assert values[8] == "15", "日"
 
 
 def test_values_for_power_of_attorney_handles_missing_agent_fields():
-    """F-035: agent 字段缺失时不能崩，应用空字符串代替。"""
+    """F-038: agent 字段缺失时不能崩，应用空字符串代替。"""
     from generator import values_for_power_of_attorney
 
     case = {"case_number": "（2026）京01民初123号", "hearing_date": "2026-09-15"}
@@ -71,20 +76,71 @@ def test_values_for_power_of_attorney_handles_missing_agent_fields():
     agent = {}  # 完全没有字段
     values = values_for_power_of_attorney(case, company, agent)
     assert values[0] == "", "缺失姓名 → 空字符串"
-    assert values[1] == "", "缺失身份证号 → 空字符串"
-    assert values[2] == "", "缺失案由描述 → 空字符串"
-    assert values[3] == "（2026）京01民初123号"
+    assert values[1] == "", "缺失职务 → 空字符串"
+    assert values[2] == "", "缺失电话 → 空字符串"
+    assert values[3] == "", "缺失对方 → 空字符串"
+    assert values[4] == "", "缺失案由 → 空字符串"
+    assert values[5] == "（2026）京01民初123号"
 
 
-def test_power_of_attorney_template_has_seven_placeholders():
-    """F-034: templates/4.授权委托书.docx 含 7 个【】占位符。"""
+def test_values_for_recommendation_includes_agent_and_case():
+    """F-038: values_for_recommendation 返回 11 个值，按真实模板【】出现顺序：
+
+    1=法院, 2=员工姓名, 3=性别, 4=身份证号, 5=职务, 6=对方, 7=案由, 8=案号, 9/10/11=年/月/日
+    """
+    from generator import values_for_recommendation
+
+    case = {
+        "case_number": "（2026）京01民初123号",
+        "case_cause": "合同纠纷",
+        "court": "北京一中院",
+        "hearing_date": "2026-09-15",
+        "opposing_party": "对方公司",
+        "our_role": "原告",
+    }
+    company = {"name": "测试公司"}
+    agent = {
+        "name": "李四",
+        "gender": "女",
+        "id_card": "110101199203054321",
+        "position": "法务专员",
+        "phone": "13900139000",
+    }
+    values = values_for_recommendation(case, company, agent)
+    assert len(values) == 11, "应返回 11 个值"
+    assert values[0] == "北京一中院", "法院"
+    assert values[1] == "李四", "员工姓名"
+    assert values[2] == "女", "性别"
+    assert values[3] == "110101199203054321", "身份证号"
+    assert values[4] == "法务专员", "职务"
+    assert values[5] == "对方公司", "对方当事人"
+    assert values[6] == "合同纠纷", "案由"
+    assert values[7] == "（2026）京01民初123号", "案号"
+    assert values[8] == "2026", "年"
+    assert values[9] == "9", "月"
+    assert values[10] == "15", "日"
+
+
+def test_power_of_attorney_template_has_nine_placeholders():
+    """F-038: templates/4.授权委托书.docx 含 9 个【】占位符。"""
     from docx import Document
     from pathlib import Path
 
     template_path = Path(__file__).resolve().parent.parent / "templates" / "4.授权委托书.docx"
     doc = Document(str(template_path))
     total = sum(p.text.count("【】") for p in doc.paragraphs)
-    assert total == 7, f"模板应有 7 个【】占位符，实际 {total} 个"
+    assert total == 9, f"模板应有 9 个【】占位符，实际 {total} 个"
+
+
+def test_recommendation_template_has_eleven_placeholders():
+    """F-038: templates/5.推荐信.docx 含 11 个【】占位符。"""
+    from docx import Document
+    from pathlib import Path
+
+    template_path = Path(__file__).resolve().parent.parent / "templates" / "5.推荐信.docx"
+    doc = Document(str(template_path))
+    total = sum(p.text.count("【】") for p in doc.paragraphs)
+    assert total == 11, f"模板应有 11 个【】占位符，实际 {total} 个"
 
 
 # ============================================================

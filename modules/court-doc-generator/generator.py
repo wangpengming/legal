@@ -231,51 +231,76 @@ def parse_hearing_date(hearing_date: str) -> dict:
 
 
 def values_for_power_of_attorney(case: dict, company: dict, agent: dict) -> list:
-    """授权委托书模板（7 个【】，按文档出现顺序）：
-      1. 【】受委托人  → 代理人姓名
-      2. 身份证号：【】→ 代理人身份证号
-      3. 【】纠纷  → 案由描述（build_case_description 已拼装 {对方}{案由}）
-      4. （案号：【】）  → 案号
-      5-7. 【】年【】月【】日  → 年、月、日
+    """授权委托书模板（9 个【】，按文档出现顺序，F-038 调整）：
 
-    F-034 调整：占位符顺序与 templates/4.授权委托书.docx 实际段落顺序对齐：
-    原模板第 9 段：现委托上列受委托人【】（身份证号：【】）在我单位与【】纠纷（案号：【】）...
-    原模板第 14 段：【】年【】月【】日
+      [5]  受委托人：【】       → 1. 代理人姓名（agent.name）
+      [7]  职务：【】          → 2. 代理人职务（agent.position）
+      [7]  电话：【】          → 3. 代理人电话（agent.phone）
+      [9]  与【】纠纷          → 4. 对方当事人（case.opposing_party）
+      [9]  【】纠纷（案号：【】）→ 5. 案由（case.case_cause）
+      [9]  （案号：【】）      → 6. 案号（case.case_number）
+      [14] 【】年【】月【】日  → 7-9. 年、月、日
+
+    F-038 调整：模板已改回"受委托人【】/职务【】/电话【】"（不要身份证号）。
+    案由描述不再拼装（description 函数），改为独立【】对方 + 【】案由。
     """
     agent_name = (agent.get("name") or "").strip()
-    agent_id = (agent.get("id_card") or "").strip()
-    description = build_case_description(case)
+    agent_position = (agent.get("position") or "").strip()
+    agent_phone = (agent.get("phone") or "").strip()
+    opposing = (case.get("opposing_party") or "").strip()
+    cause = (case.get("case_cause") or "").strip()
     case_number = case.get("case_number", "")
     parts = parse_hearing_date(case.get("hearing_date"))
     return [
         agent_name,         # 1. 【】受委托人
-        agent_id,           # 2. 身份证号：【】
-        description,        # 3. 【】纠纷
-        case_number,        # 4. （案号：【】）
-        parts["年"],        # 5. 【】年
-        parts["月"],        # 6. 【】月
-        parts["日"],        # 7. 【】日
+        agent_position,     # 2. 【】职务
+        agent_phone,        # 3. 【】电话
+        opposing,           # 4. 与【】（对方当事人）
+        cause,              # 5. 【】（案由）
+        case_number,        # 6. （案号：【】）
+        parts["年"],        # 7. 【】年
+        parts["月"],        # 8. 【】月
+        parts["日"],        # 9. 【】日
     ]
 
 
 def values_for_recommendation(case: dict, company: dict, agent: dict) -> list:
-    """推荐信模板（5 个【】，按位置）：
-      1. 【】人民法院  → 法院
-      2. 与【】纠纷  → 案由描述
-      3. （案号：【】）  → 案号
-      4. 【】年【】月【】日  → 年、月、日
+    """推荐信模板（11 个【】，按文档出现顺序，F-038 调整）：
+
+      【】人民法院：                       → 1. 法院（case.court）
+      兹推荐本公司员工【】                 → 2. 代理人姓名（agent.name）
+      性别：【】                            → 3. 代理人性别（agent.gender）
+      身份证号：【】                        → 4. 代理人身份证（agent.id_card）
+      职务：【】                            → 5. 代理人职务（agent.position）
+      与【】纠纷                            → 6. 对方当事人（case.opposing_party）
+      【】纠纷（案号：【】）                  → 7. 案由（case.case_cause）
+      （案号：【】）                        → 8. 案号（case.case_number）
+      【】年【】月【】日                    → 9-11. 年、月、日
+
+    F-038 调整：模板已改回"员工【】/性别【】/身份证号【】/职务【】"。
+    案由描述不再拼装，改为独立【】对方 + 【】案由。
     """
     court = case.get("court", "")
-    description = build_case_description(case)
+    agent_name = (agent.get("name") or "").strip()
+    agent_gender = (agent.get("gender") or "").strip()
+    agent_id = (agent.get("id_card") or "").strip()
+    agent_position = (agent.get("position") or "").strip()
+    opposing = (case.get("opposing_party") or "").strip()
+    cause = (case.get("case_cause") or "").strip()
     case_number = case.get("case_number", "")
     parts = parse_hearing_date(case.get("hearing_date"))
     return [
         court,              # 1. 【】人民法院
-        description,        # 2. 与【】纠纷
-        case_number,        # 3. （案号：【】）
-        parts["年"],        # 4. 【】年
-        parts["月"],        # 5. 【】月
-        parts["日"],        # 6. 【】日
+        agent_name,         # 2. 兹推荐本公司员工【】
+        agent_gender,       # 3. 性别：【】
+        agent_id,           # 4. 身份证号：【】
+        agent_position,     # 5. 职务：【】
+        opposing,           # 6. 与【】（对方当事人）
+        cause,              # 7. 【】（案由）
+        case_number,        # 8. （案号：【】）
+        parts["年"],        # 9. 【】年
+        parts["月"],        # 10. 【】月
+        parts["日"],        # 11. 【】日
     ]
 
 
