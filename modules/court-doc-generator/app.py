@@ -614,32 +614,19 @@ def _render_result_card(
             open_in_finder(output_dir)
     with col_print:
         # F-037 在线打印：合并 PDF → 系统默认打印机（无弹窗）
-        # F-038 调整：二次点击确认（防误触，避免依赖 st.dialog 模态框）
         if merged_pdf.exists():
-            # 第一次点击：进入"待确认"状态，提示用户再点一次
             if st.button(
                 "🖨 打印全部",
                 use_container_width=True,
                 key=f"online_print_{id(output_dir)}",
-                help="直接把合并 PDF 送到系统默认打印机。**会弹确认提示**，需二次点击确认才真打印。",
+                help="直接把合并 PDF 送到系统默认打印机（无弹窗）",
             ):
-                confirm_key = f"online_print_confirm_{id(output_dir)}"
-                if st.session_state.get(confirm_key):
-                    # 第二次点击 → 真正打印
-                    st.session_state[confirm_key] = False  # 重置
-                    with st.spinner("正在发送打印任务..."):
-                        success, msg = print_pdf_to_default_printer(merged_pdf)
-                    if success:
-                        st.success(f"✅ 已发送到打印机：{msg}")
-                    else:
-                        st.error(f"❌ 打印失败：{msg}")
+                with st.spinner("正在发送打印任务..."):
+                    success, msg = print_pdf_to_default_printer(merged_pdf)
+                if success:
+                    st.success(f"✅ 已发送到打印机：{msg}")
                 else:
-                    # 第一次点击 → 进入待确认
-                    st.session_state[confirm_key] = True
-                    st.warning("⚠️ 确认打印？**再点一次「🖨 在线打印」按钮**才算数（5 秒内有效）。")
-                    # 5 秒后自动重置（用 st_autorefresh 或简化用 st.stop() 不行，用 timer session_state）
-                    import time
-                    st.session_state[f"{confirm_key}_ts"] = time.time()
+                    st.error(f"❌ 打印失败：{msg}")
 
     # ========== 预览场景：询问是否确认生成 ==========
     if is_preview:

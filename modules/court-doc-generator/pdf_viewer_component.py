@@ -186,11 +186,8 @@ def _build_pdf_html(
 <div id="toolbar">
   <button onclick="zoom(-0.1)" title="缩小">➖</button>
   <button onclick="zoom(0.1)" title="放大">➕</button>
-  <button onclick="prevPage()" title="上一页">◀</button>
-  <span id="page-info">- / -</span>
-  <button onclick="nextPage()" title="下一页">▶</button>
   <span class="spacer"></span>
-  <span style="font-size: 12px; color: #525252;">🖨 打印请用底部「打印全部」按钮（直送打印机）</span>
+  <button onclick="printAll()" class="print-btn" title="打印整套 PDF（弹系统打印界面）">🖨 打印全部</button>
 </div>
 
 <div id="pdf-container"></div>
@@ -241,8 +238,30 @@ def _build_pdf_html(
   }}
 
   function renderAllPages() {{
-    // 简化：单页模式，避免大 PDF 卡顿；通过翻页切换
-    renderPage(currentPage);
+    // 整篇 PDF 连续滚动（一次性渲染所有页）
+    if (!pdfDoc) return;
+    container.innerHTML = '';
+    const promises = [];
+    for (let i = 1; i <= pdfDoc.numPages; i++) {{
+      promises.push(renderPageToContainer(i));
+    }}
+    Promise.all(promises).then(() => {{}});
+  }}
+
+  function renderPageToContainer(num) {{
+    return pdfDoc.getPage(num).then(page => {{
+      const viewport = page.getViewport({{ scale: scale }});
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      const wrap = document.createElement('div');
+      wrap.className = 'page-wrap';
+      wrap.id = 'page-' + num;
+      wrap.appendChild(canvas);
+      container.appendChild(wrap);
+      return page.render({{ canvasContext: ctx, viewport: viewport }}).promise;
+    }});
   }}
 
   function zoom(delta) {{
