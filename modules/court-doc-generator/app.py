@@ -544,22 +544,40 @@ def _render_result_card(
         unsafe_allow_html=True,
     )
 
-    # ========== PyMuPDF 缩略图（整套 PDF 1 张代表）==========
-    if merged_pdf.exists():
-        first_page_b64 = render_first_page_base64(merged_pdf, scale=0.4)
-        if first_page_b64:
-            st.markdown("##### 🖼 整套出庭材料预览（合并 PDF 首页）")
-            # 单张大图（代表整套）
-            st.markdown(
-                f'<div style="text-align: center;">'
-                f'<img src="data:image/png;base64,{first_page_b64}" '
-                f'style="max-width: 600px; border: 1px solid #e5e5e5; border-radius: 8px;" />'
-                f'<div style="font-size: 12px; color: #525252; margin-top: 6px;">'
-                f'📄 共 {pages} 页 · 7 份材料（合并 1 份 PDF）· ~3 MB'
-                f'</div>'
-                f"</div>",
-                unsafe_allow_html=True,
-            )
+    # ========== 缩略图：7 份材料各 1 张（换代理人后看 04/05 是否变）==========
+    material_files = [
+        output_dir / f"01_营业执照.pdf",
+        output_dir / f"02_法定代表人证明_{safe_case}.pdf",
+        output_dir / f"03_法人身份证.pdf",
+        output_dir / f"04_授权委托书_{safe_case}.pdf",
+        output_dir / f"05_推荐信_{safe_case}.pdf",
+        output_dir / f"06_代理人劳动合同.pdf",
+        output_dir / f"07_代理人身份证.pdf",
+    ]
+    material_labels = [
+        "01 营业执照",
+        "02 法定代表人证明",
+        "03 法人身份证",
+        "04 授权委托书",
+        "05 推荐信",
+        "06 代理人合同",
+        "07 代理人身份证",
+    ]
+    st.markdown("##### 🖼 每份材料预览（换代理人后看 04/05 是否变）")
+    cols = st.columns(7, gap="small")
+    for i, (f, label) in enumerate(zip(material_files, material_labels)):
+        if f.exists():
+            b64 = render_first_page_base64(f, scale=0.18)
+            with cols[i]:
+                if b64:
+                    st.markdown(
+                        f'<div style="text-align: center;">'
+                        f'<img src="data:image/png;base64,{b64}" '
+                        f'style="width: 100%; border: 1px solid #e5e5e5; border-radius: 4px;" />'
+                        f'<div style="font-size: 10px; color: #525252; margin-top: 4px;">{label}</div>'
+                        f"</div>",
+                        unsafe_allow_html=True,
+                    )
 
     # ========== PDF.js 全屏预览（默认收起，不占用首屏）==========
     if merged_pdf.exists() and is_pdfjs_ready():
