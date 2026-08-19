@@ -544,23 +544,22 @@ def _render_result_card(
         unsafe_allow_html=True,
     )
 
-    # ========== PyMuPDF 缩略图网格 ==========
+    # ========== PyMuPDF 缩略图（整套 PDF 1 张代表）==========
     if merged_pdf.exists():
-        thumbs = render_all_pages_base64(merged_pdf, scale=0.25, max_pages=7)
-        if thumbs:
-            st.markdown("##### 🖼 缩略图（PyMuPDF 渲染 · 每页 1 张）")
-            # 7 列网格（每列一张缩略图）
-            cols = st.columns(min(len(thumbs), 7), gap="small")
-            for i, b64 in enumerate(thumbs):
-                with cols[i]:
-                    st.markdown(
-                        f'<div style="text-align: center;">'
-                        f'<img src="data:image/png;base64,{b64}" '
-                        f'style="width: 100%; border: 1px solid #e5e5e5; border-radius: 4px;" />'
-                        f'<div style="font-size: 11px; color: #525252; margin-top: 4px;">第 {i + 1} 页</div>'
-                        f"</div>",
-                        unsafe_allow_html=True,
-                    )
+        first_page_b64 = render_first_page_base64(merged_pdf, scale=0.4)
+        if first_page_b64:
+            st.markdown("##### 🖼 整套出庭材料预览（合并 PDF 首页）")
+            # 单张大图（代表整套）
+            st.markdown(
+                f'<div style="text-align: center;">'
+                f'<img src="data:image/png;base64,{first_page_b64}" '
+                f'style="max-width: 600px; border: 1px solid #e5e5e5; border-radius: 8px;" />'
+                f'<div style="font-size: 12px; color: #525252; margin-top: 6px;">'
+                f'📄 共 {pages} 页 · 7 份材料（合并 1 份 PDF）· ~3 MB'
+                f'</div>'
+                f"</div>",
+                unsafe_allow_html=True,
+            )
 
     # ========== PDF.js 全屏预览（默认收起，不占用首屏）==========
     if merged_pdf.exists() and is_pdfjs_ready():
@@ -619,7 +618,7 @@ def _render_result_card(
         if merged_pdf.exists():
             # 第一次点击：进入"待确认"状态，提示用户再点一次
             if st.button(
-                "🖨 在线打印",
+                "🖨 打印全部",
                 use_container_width=True,
                 key=f"online_print_{id(output_dir)}",
                 help="直接把合并 PDF 送到系统默认打印机。**会弹确认提示**，需二次点击确认才真打印。",

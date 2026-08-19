@@ -190,7 +190,7 @@ def _build_pdf_html(
   <span id="page-info">- / -</span>
   <button onclick="nextPage()" title="下一页">▶</button>
   <span class="spacer"></span>
-  <button onclick="printAll()" class="print-btn" title="打印全部 PDF">🖨 打印全部</button>
+  <span style="font-size: 12px; color: #525252;">🖨 打印请用底部「打印全部」按钮（直送打印机）</span>
 </div>
 
 <div id="pdf-container"></div>
