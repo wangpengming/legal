@@ -324,6 +324,7 @@ def values_for_recommendation(case: dict, company: dict, agent: dict) -> list:
     agent_gender = (agent.get("gender") or "").strip()
     agent_id = (agent.get("id_card") or "").strip()
     agent_position = (agent.get("position") or "").strip()
+    agent_phone = (agent.get("phone") or "").strip()  # F-051 新增
     opposing = (case.get("opposing_party") or "").strip()
     cause = (case.get("case_cause") or "").strip()
     case_number = case.get("case_number", "")
@@ -334,12 +335,13 @@ def values_for_recommendation(case: dict, company: dict, agent: dict) -> list:
         agent_gender,       # 3. 性别：【】
         agent_id,           # 4. 身份证号：【】
         agent_position,     # 5. 职务：【】
-        opposing,           # 6. 与【】（对方当事人）
-        cause,              # 7. 【】（案由）
-        case_number,        # 8. （案号：【】）
-        parts["年"],        # 9. 【】年
-        parts["月"],        # 10. 【】月
-        parts["日"],        # 11. 【】日
+        agent_phone,        # 6. 电话：【】（F-051 新增）
+        opposing,           # 7. 与【】（对方当事人）
+        cause,              # 8. 【】（案由）
+        case_number,        # 9. （案号：【】）
+        parts["年"],        # 10. 【】年
+        parts["月"],        # 11. 【】月
+        parts["日"],        # 12. 【】日
     ]
 
 

@@ -37,6 +37,7 @@ from pdf_thumb import (
     render_all_pages_base64,
     render_first_page_base64,
 )
+from scan_service import extract_fields, extract_text, scan_documents
 from pdf_viewer_component import is_pdfjs_ready, render_pdf_viewer
 
 
@@ -740,6 +741,12 @@ def render_new_case_form(current_company, current_agent):
     # ========== session state 初始化 ==========
     defaults = {
         "form_case_number": "",
+        "form_court": "",
+        "form_cause": "",
+        "form_opposing_party": "",
+        "form_hearing_date": date.today(),
+        "scan_ocr_text": "",
+        "scan_show_text": False,
         "last_output_dir": None,
         "last_result_case_data": None,
         "preview_dir": None,
@@ -750,6 +757,50 @@ def render_new_case_form(current_company, current_agent):
     for k, v in defaults.items():
         if k not in st.session_state:
             st.session_state[k] = v
+
+    # F-052 拍照扫描入口（默认展开 + 提示横幅）
+    st.info("💡 上传起诉状/传票等图片 → 自动识别案号/法院/案由/原告/被告/开庭时间/标的金额", icon="📷")
+    with st.expander("📷 拍照扫描（OCR 自动识别）", expanded=True):
+        st.caption("上传起诉状/传票/开庭通知等图片，自动识别案号/法院/案由/原告/被告/开庭时间/标的金额")
+        scan_files = st.file_uploader(
+            "上传图片（可多张）",
+            type=["jpg", "jpeg", "png", "pdf", "bmp", "tiff"],
+            accept_multiple_files=True,
+            key=f"scan_upload_{id(current_company)}_{id(current_agent)}",
+        )
+        if scan_files and st.button("🔍 自动识别字段", key=f"scan_btn_{id(current_company)}_{id(current_agent)}", type="primary"):
+            import tempfile
+            tmp_paths = []
+            for f in scan_files:
+                tmp = Path(tempfile.mkdtemp(prefix="scan_")) / f.name
+                tmp.write_bytes(f.read())
+                tmp_paths.append(tmp)
+            result = scan_documents(tmp_paths)
+            st.session_state.scan_ocr_text = result["text"]
+            st.session_state.scan_show_text = True
+            fields = result["fields"]
+            if fields.get("案号"):
+                st.session_state.form_case_number = fields["案号"]
+            if fields.get("法院"):
+                st.session_state.form_court = fields["法院"]
+            if fields.get("案由"):
+                cause = fields["案由"]
+                if cause.endswith("纠纷"):
+                    cause = cause[:-2]
+                st.session_state.form_cause = cause
+            if fields.get("被告"):
+                st.session_state.form_opposing_party = fields["被告"]
+            if fields.get("开庭时间"):
+                from datetime import datetime as dt_cls
+                try:
+                    st.session_state.form_hearing_date = dt_cls.strptime(fields["开庭时间"], "%Y-%m-%d").date()
+                except Exception:
+                    pass
+            st.success("✅ 识别完成！请检查下方字段")
+            st.rerun()
+        if st.session_state.get("scan_show_text") and st.session_state.scan_ocr_text:
+            with st.expander("📄 扫描识别原文（OCR 抽取）", expanded=False):
+                st.code(st.session_state.scan_ocr_text, language="text")
 
     col1, col2 = st.columns(2)
 
@@ -763,16 +814,18 @@ def render_new_case_form(current_company, current_agent):
         )
         case_cause = st.text_input(
             "案由描述（不含'纠纷'）*",
+            value=st.session_state.form_cause,
             placeholder="合同 / 著作权侵权 / 劳动争议 / 买卖合同 ...",
             help="填案由的【描述部分】即可（如填'合同'，模板自动加'纠纷'二字 = '合同纠纷'）。如填'合同纠纷'会出现'合同纠纷纠纷'重复。",
         )
         court = st.text_input(
             "审理法院 *",
+            value=st.session_state.form_court,
             placeholder="北京市第一中级人民法院",
         )
         hearing_date = st.date_input(
             "开庭日期 *",
-            value=date.today(),
+            value=st.session_state.form_hearing_date,
             min_value=date(2020, 1, 1),
         )
 
@@ -780,6 +833,7 @@ def render_new_case_form(current_company, current_agent):
         st.markdown("##### 👥 当事人 & 权限")
         opposing_party = st.text_input(
             "对方当事人",
+            value=st.session_state.form_opposing_party,
             placeholder="如：北京XX科技有限公司",
         )
         our_role = st.radio(

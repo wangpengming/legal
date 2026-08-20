@@ -107,18 +107,19 @@ def test_values_for_recommendation_includes_agent_and_case():
         "phone": "13900139000",
     }
     values = values_for_recommendation(case, company, agent)
-    assert len(values) == 11, "应返回 11 个值"
+    assert len(values) == 12, "应返回 12 个值（F-051 加 phone）"
     assert values[0] == "北京一中院", "法院"
     assert values[1] == "李四", "员工姓名"
     assert values[2] == "女", "性别"
     assert values[3] == "110101199203054321", "身份证号"
     assert values[4] == "法务专员", "职务"
-    assert values[5] == "对方公司", "对方当事人"
-    assert values[6] == "合同纠纷", "案由"
-    assert values[7] == "（2026）京01民初123号", "案号"
-    assert values[8] == "2026", "年"
-    assert values[9] == "9", "月"
-    assert values[10] == "15", "日"
+    assert values[5] == "13900139000", "电话（F-051 新增）"
+    assert values[6] == "对方公司", "对方当事人"
+    assert values[7] == "合同纠纷", "案由"
+    assert values[8] == "（2026）京01民初123号", "案号"
+    assert values[9] == "2026", "年"
+    assert values[10] == "9", "月"
+    assert values[11] == "15", "日"
 
 
 def test_power_of_attorney_template_has_nine_placeholders():
@@ -132,15 +133,15 @@ def test_power_of_attorney_template_has_nine_placeholders():
     assert total == 9, f"模板应有 9 个【】占位符，实际 {total} 个"
 
 
-def test_recommendation_template_has_eleven_placeholders():
-    """F-038: templates/5.推荐信.docx 含 11 个【】占位符。"""
+def test_recommendation_template_has_twelve_placeholders():
+    """F-051: templates/5.推荐信.docx 含 12 个【】占位符（加 agent.phone）。"""
     from docx import Document
     from pathlib import Path
 
     template_path = Path(__file__).resolve().parent.parent / "templates" / "5.推荐信.docx"
     doc = Document(str(template_path))
     total = sum(p.text.count("【】") for p in doc.paragraphs)
-    assert total == 11, f"模板应有 11 个【】占位符，实际 {total} 个"
+    assert total == 12, f"模板应有 12 个【】占位符，实际 {total} 个"
 
 
 # ============================================================
