@@ -132,7 +132,7 @@ def test_power_of_attorney_template_has_nine_placeholders():
     assert total == 9, f"模板应有 9 个【】占位符，实际 {total} 个"
 
 
-def test_recommendation_template_has_eleven_placeholders():
+def test_recommendation_template_has_twelve_placeholders():
     """F-038: templates/5.推荐信.docx 含 11 个【】占位符。"""
     from docx import Document
     from pathlib import Path
