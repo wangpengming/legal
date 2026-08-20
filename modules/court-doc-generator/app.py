@@ -786,7 +786,7 @@ def render_new_case_form(current_company, current_agent):
     col1, col2 = st.columns(2)
 
     with col1:
-        st.markdown("##### �� 案件基本信息")
+        st.markdown("##### 📌 案件基本信息")
         case_number = st.text_input(
             "案号 *",
             value=st.session_state.form_case_number,
