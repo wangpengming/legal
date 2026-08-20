@@ -762,22 +762,35 @@ def render_new_case_form(current_company, current_agent):
     st.info("💡 上传起诉状/传票等图片 → 自动识别案号/法院/案由/原告/被告/开庭时间/标的金额", icon="📷")
     with st.expander("📷 拍照扫描（OCR 自动识别）", expanded=True):
         st.caption("上传起诉状/传票/开庭通知等图片，自动识别案号/法院/案由/原告/被告/开庭时间/标的金额")
+
+        # 稳定 key（避免 id(dict) 内存地址变化导致状态丢失）
+        scan_key = f"scan_upload_{id(current_company)}_{id(current_agent)}"
+        btn_key = f"scan_btn_{id(current_company)}_{id(current_agent)}"
+
+        # 显式 session_state 缓存（避免 rerun 清空 scan_files）
+        if "scan_files_cache" not in st.session_state:
+            st.session_state.scan_files_cache = []
+
         scan_files = st.file_uploader(
             "上传图片（可多张）",
             type=["jpg", "jpeg", "png", "pdf", "bmp", "tiff"],
             accept_multiple_files=True,
-            key=f"scan_upload_{id(current_company)}_{id(current_agent)}",
+            key=scan_key,
         )
-        if scan_files and st.button("🔍 自动识别字段", key=f"scan_btn_{id(current_company)}_{id(current_agent)}", type="primary"):
+        if scan_files:
+            st.session_state.scan_files_cache = scan_files
+
+        if st.session_state.scan_files_cache and st.button("🔍 自动识别字段", key=btn_key, type="primary"):
             import tempfile
             tmp_paths = []
-            for f in scan_files:
+            for f in st.session_state.scan_files_cache:
                 tmp = Path(tempfile.mkdtemp(prefix="scan_")) / f.name
                 tmp.write_bytes(f.read())
                 tmp_paths.append(tmp)
             result = scan_documents(tmp_paths)
             st.session_state.scan_ocr_text = result["text"]
             st.session_state.scan_show_text = True
+            st.session_state.scan_files_cache = []  # 处理完清空
             fields = result["fields"]
             if fields.get("案号"):
                 st.session_state.form_case_number = fields["案号"]
