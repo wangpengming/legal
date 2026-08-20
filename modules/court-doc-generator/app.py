@@ -740,8 +740,9 @@ def render_new_case_form(current_company, current_agent):
         if k not in st.session_state:
             st.session_state[k] = v
 
-    # F-052 拍照扫描入口
-    with st.expander("📷 拍照扫描（OCR 自动识别）", expanded=False):
+    # F-052 拍照扫描入口（默认展开 + 提示横幅）
+    st.info("💡 上传起诉状/传票等图片 → 自动识别案号/法院/案由/原告/被告/开庭时间/标的金额", icon="📷")
+    with st.expander("📷 拍照扫描（OCR 自动识别）", expanded=True):
         st.caption("上传起诉状/传票/开庭通知等图片，自动识别案号/法院/案由/原告/被告/开庭时间/标的金额")
         scan_files = st.file_uploader(
             "上传图片（可多张）",
