@@ -1,7 +1,10 @@
 """docx 转 PDF：用 reportlab 重新排版生成 PDF。
 
 策略：读取 docx 的段落和 runs，提取对齐、字体大小等基础样式，
-用 reportlab 重排版输出 PDF。中文用 reportlab 内置的 STSong-Light CID 字体。
+用 reportlab 重排版输出 PDF。中文用 macOS 自带的 TTF 字体（STFangsong / STSong），
+reportlab 自动嵌入字体子集，确保 PDF 在任何操作系统打印都能正常显示
+（之前用 reportlab 内置的 STSong-Light CID 字体是伪字体，macOS 打印时找不到
+对应字形导致 04/05 打印空白）。
 """
 from pathlib import Path
 
@@ -14,6 +17,7 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import cm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.cidfonts import UnicodeCIDFont
+from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import (
     BaseDocTemplate,
     Frame,
@@ -25,8 +29,33 @@ from reportlab.platypus import (
 )
 
 
-# 注册中文字体（只注册一次）
-pdfmetrics.registerFont(UnicodeCIDFont("STSong-Light"))
+def _register_cn_font() -> str:
+    """注册中文字体（macOS 自带 TTF 真实字体，reportlab 嵌入子集）。
+
+    优先级：STFangsong（仿宋，docx 模板原意）→ STSong（宋体）→ CID 字体（fallback）。
+    返回注册成功的字体名。
+    """
+    candidates = [
+        # STFangsong（仿宋，TTF 格式，macOS 自带）
+        ("/System/Library/AssetsV2/com_apple_MobileAsset_Font8/1b6b2f148cdf17dd0d788706c83c61ca1998c3a6.asset/AssetData/STFANGSO.ttf", 0),
+        # Songti.ttc（包含 STSong 宋体，face 0 = STSong，face 1 = STFangsong）
+        ("/System/Library/Fonts/Supplemental/Songti.ttc", 0),
+    ]
+    for path, face_index in candidates:
+        try:
+            if not Path(path).exists():
+                continue
+            font = TTFont("CN-Font", path, subfontIndex=face_index)
+            pdfmetrics.registerFont(font)
+            return "CN-Font"
+        except Exception:
+            continue
+    # Fallback：reportlab CID 字体（macOS 打印会空白，但保证 PDF 至少能生成）
+    pdfmetrics.registerFont(UnicodeCIDFont("STSong-Light"))
+    return "STSong-Light"
+
+
+CN_FONT = _register_cn_font()
 
 
 def _get_alignment(para) -> int:
@@ -53,7 +82,7 @@ def _build_story(doc) -> list:
     body_style = ParagraphStyle(
         "ChineseBody",
         parent=styles["Normal"],
-        fontName="STSong-Light",
+        fontName=CN_FONT,
         fontSize=12,
         leading=24,
         alignment=TA_LEFT,
@@ -113,7 +142,7 @@ def _build_story(doc) -> list:
             t.setStyle(
                 TableStyle(
                     [
-                        ("FONT", (0, 0), (-1, -1), "STSong-Light", 10),
+                        ("FONT", (0, 0), (-1, -1), CN_FONT, 10),
                         ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
                         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
                     ]
