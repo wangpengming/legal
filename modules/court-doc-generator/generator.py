@@ -31,6 +31,7 @@ from config import (  # noqa: F401  # 顶层平铺
     STATIC_DIR,
     AGENT_STATIC_FALLBACK,
     get_template_path,
+    get_agent_dir,
 )
 from docx_to_pdf import docx_to_pdf
 from pdf_merger import merge_pdfs
@@ -113,13 +114,14 @@ def validate_agent_paths(agents: list) -> dict:
     return result
 
 
-def save_agent_pdf(agent_id: int, file_bytes: bytes, file_type: str) -> str:
-    """F-032 保存代理人上传的 PDF 到 static/agents/<id>/。
+def save_agent_pdf(agent_id: int, file_bytes: bytes, file_type: str, workspace_id: str = None) -> str:
+    """F-032 保存代理人上传的 PDF 到 workspace 的 agents/<id>/ 目录。
 
     参数：
         agent_id: 代理人 ID（用于创建子目录）
         file_bytes: PDF 二进制内容（来自 st.file_uploader.read()）
         file_type: "contract"（劳动合同）或 "id_card"（身份证）
+        workspace_id: 可选，工作空间 ID。未提供时用旧路径 STATIC_DIR/agents/<id>/（向后兼容）
 
     返回：
         相对 PROJECT_ROOT 的路径字符串（存入数据库）
@@ -132,7 +134,10 @@ def save_agent_pdf(agent_id: int, file_bytes: bytes, file_type: str) -> str:
     if file_type not in ("contract", "id_card"):
         raise ValueError(f"file_type 必须是 'contract' 或 'id_card'，实际 {file_type}")
 
-    agent_dir = STATIC_DIR / "agents" / str(agent_id)
+    if workspace_id:
+        agent_dir = get_agent_dir(workspace_id, agent_id)
+    else:
+        agent_dir = STATIC_DIR / "agents" / str(agent_id)
     agent_dir.mkdir(parents=True, exist_ok=True)
 
     file_name = f"{file_type}_{uuid.uuid4().hex[:8]}.pdf"
@@ -446,10 +451,14 @@ def _generate_to_dir(case: dict, company: dict, agent: dict, output_dir: Path) -
     return output_dir
 
 
-def generate_court_matters(case: dict, company: dict, agent: dict) -> Path:
-    """生成完整出庭手续到 OUTPUTS_DIR，返回输出目录路径。
+def generate_court_matters(case: dict, company: dict, agent: dict, output_base_dir: Path = None) -> Path:
+    """生成完整出庭手续到输出目录，返回输出目录路径。
 
     v1.1.2 重构：内部委托 _generate_to_dir（与 generate_preview 共享核心逻辑）。
+
+    参数：
+        output_base_dir: 可选，输出根目录。默认使用 OUTPUTS_DIR（向后兼容）。
+                         workspace 模式下，app.py 传入 workspace 专属输出目录。
 
     输出结构：
       outputs/YYYY-MM-DD_<案号>/
@@ -474,7 +483,8 @@ def generate_court_matters(case: dict, company: dict, agent: dict) -> Path:
     case_number = case.get("case_number", "未命名案件")
     hearing_date = case.get("hearing_date") or datetime.now().strftime("%Y-%m-%d")
     folder_name = f"{hearing_date}_{sanitize_filename(case_number)}"
-    output_dir = OUTPUTS_DIR / folder_name
+    base = output_base_dir if output_base_dir is not None else OUTPUTS_DIR
+    output_dir = base / folder_name
     output_dir.mkdir(parents=True, exist_ok=True)
     return _generate_to_dir(case, company, agent, output_dir)
 

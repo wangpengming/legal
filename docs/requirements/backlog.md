@@ -4,6 +4,53 @@
 
 ---
 
+## 2026-08-20 court-doc-generator 用户注册/登录与工作空间（Workspace）数据隔离
+
+**类型**: feature
+**模块**: court-doc-generator
+**状态**: done
+**优先级**: P1（多人共用同一台电脑场景下的数据隔离需求）
+
+### 描述
+
+当前模块为单用户本地工具，同一台电脑上多人共用时，所有公司/代理人/案件/生成历史混在同一份 `court_matters.db` 中，无法区分"谁的数据"。需要在保持 Streamlit 技术栈不变的前提下，引入轻量用户注册/登录 + 工作空间（Workspace/Profile）机制，实现每人独立的数据隔离。
+
+### 设计决策
+
+- **方案**：工作空间（Profile）模式。每个注册用户 = 一个独立 workspace 子目录，内含独立的 `court_matters.db` + `outputs/` + `static/agents/`
+- **认证**：用户名 + 密码（pbkdf2_hmac 哈希），零外部依赖
+- **隔离粒度**：DB 文件级物理隔离（不改现有 CRUD SQL）
+- **会话管理**：Streamlit session_state（关闭浏览器需重新登录，本地工具可接受）
+- **技术栈**：不动 Streamlit，不换框架
+
+### 子任务
+
+- [x] **F-042** 新增 `workspace.py`：workspace 元数据管理（`CREATE TABLE workspaces`、`create_workspace`、`verify_workspace`、`list_workspaces`、`hash_password`）
+- [x] **F-043** 改造 `config.py`：路径函数化（`get_db_path(ws_id)` / `get_outputs_dir(ws_id)` / `get_agent_dir(ws_id)`），自动创建目录
+- [x] **F-044** 改造 `app.py`：登录/注册页路由（`render_login_page` / `render_register_page`），`session_state.workspace_id` 驱动
+- [x] **F-045** 适配 `database.py`：`init_db()` 接受 `db_path` 参数（CRUD 函数不改）
+- [x] **F-046** 适配 `generator.py`：`save_agent_pdf` 路径加 workspace 前缀
+- [x] **F-047** 现有数据自动迁移：首次启动检测旧 `data/court_matters.db` → 创建"默认"workspace → 迁移
+- [x] **F-048** 测试覆盖：`test_workspace.py`（密码哈希/创建/验证/重复注册/迁移）
+
+### 验收标准
+
+- [ ] 首次启动显示登录页，可注册新用户（用户名 + 密码）
+- [ ] 已注册用户可登录，密码错误被拒绝
+- [ ] 登录后进入主界面（现有功能不变），数据仅限当前 workspace
+- [ ] 小李注册 → 创建公司/案件 → 退出 → 小王注册登录 → 看不到小李的数据
+- [ ] 关闭浏览器 → 重新打开 → 回到登录页（session 不持久化）
+- [ ] 旧版 `data/court_matters.db` 自动迁移到"默认"workspace
+- [ ] 所有现有测试继续通过（向下兼容）
+- [ ] PII 安全：workspace 密码哈希存储，不存明文
+
+### 待澄清
+
+- 忘记密码：是否需要重置功能？（建议：v1.3.0 先不做，用户可手动删 workspace 目录重新注册）
+- 删除 workspace：是否需要 UI 入口？（建议：先不做，手动删目录即可）
+
+---
+
 ## 2026-08-18 court-doc-generator 多代理人材料绑定边界场景处理（F-039~F-041）
 
 **类型**: improvement

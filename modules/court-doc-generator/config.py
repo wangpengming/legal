@@ -92,3 +92,39 @@ def save_json_config(filename: str, data: dict) -> None:
     config_path = CONFIG_DIR / filename
     with open(config_path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
+
+
+# ============================================================
+# F-043 工作空间（Workspace）路径函数
+# ============================================================
+
+
+def _get_workspaces_dir():
+    """惰性获取 workspace 根目录（支持测试 monkeypatch DATA_DIR）。"""
+    return DATA_DIR / "workspaces"
+
+
+def get_workspace_dir(workspace_id: str) -> Path:
+    """获取 workspace 根目录（自动创建）。"""
+    d = _get_workspaces_dir() / workspace_id
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def get_db_path(workspace_id: str) -> Path:
+    """获取 workspace 的数据库路径。"""
+    return get_workspace_dir(workspace_id) / "court_matters.db"
+
+
+def get_outputs_dir(workspace_id: str) -> Path:
+    """获取 workspace 的输出目录。"""
+    d = get_workspace_dir(workspace_id) / "outputs"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def get_agent_dir(workspace_id: str, agent_id: int) -> Path:
+    """获取 workspace 下某代理人的 PDF 上传目录。"""
+    d = get_workspace_dir(workspace_id) / "agents" / str(agent_id)
+    d.mkdir(parents=True, exist_ok=True)
+    return d

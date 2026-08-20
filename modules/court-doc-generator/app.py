@@ -20,7 +20,8 @@ from pathlib import Path
 import streamlit as st
 
 import database as db
-from config import OUTPUTS_DIR, PROJECT_ROOT, save_json_config
+import workspace as ws
+from config import OUTPUTS_DIR, PROJECT_ROOT, save_json_config, get_db_path, get_outputs_dir
 from generator import (
     generate_court_matters,
     generate_preview,
@@ -174,13 +175,16 @@ st.markdown(
 # ============================================================
 
 @st.cache_resource
-def initialize():
-    """初始化数据库。"""
-    db.init_db()
+def initialize(db_path=None):
+    """初始化数据库（workspace 感知）。"""
+    db.init_db(db_path)
     return True
 
 
-initialize()
+# 模块级初始化：workspace 元数据库（不含业务数据）
+ws.init_workspace_db()
+# 旧数据迁移（幂等，仅首次执行）
+_migration_ws_id = ws.migrate_legacy_data()
 
 
 # ============================================================
@@ -188,17 +192,18 @@ initialize()
 # ============================================================
 
 def ensure_default_company_and_agent():
-    """首次启动时，仅创建空公司/代理人记录，UI 引导用户填写真实信息。
+    """每次登录时，确保默认公司/代理人存在。
 
-    设计原则（v1.1+）：
-    - 严禁硬编码真实 PII（身份证号 / 手机号 / 公司全称）
-    - 默认数据仅作占位，提示用户必须填写真实信息
+    设计原则（v1.3+）：
+    - 默认公司「雷石」是公用委托单位（法务部共用），每个 workspace 都有
+    - 新 workspace 自动创建；已有 workspace 登录时也补上
+    - PII 字段保持空，由用户自行填写
     - 由 main() 调用，不是模块级副作用（避免 import 时写库）
     """
-    if not db.list_companies():
-        # 仅创建一条空记录，UI 会提示“请填公司全称”并校验
+    # 确保「雷石」存在（workspace 新建或已有都适用）
+    if db.get_company_by_name("雷石") is None:
         db.upsert_company({
-            "name": "",  # 占位：用户必须填写真实公司全称
+            "name": "雷石",
             "credit_code": "",
             "legal_rep_name": "",
             "legal_rep_position": "",
@@ -208,9 +213,9 @@ def ensure_default_company_and_agent():
         })
 
     if not db.list_agents():
-        # 仅创建一条空记录，UI 会提示并要求补全
+        # 默认代理人：空记录，引导用户填写
         db.upsert_agent({
-            "name": "",  # 占位：用户必须填写真实姓名
+            "name": "",
             "gender": "男",
             "id_card": "",
             "position": "",
@@ -224,10 +229,20 @@ def ensure_default_company_and_agent():
 # ============================================================
 
 def render_sidebar():
-    """侧边栏：信息管理 + 飞书状态。"""
+    """侧边栏：信息管理 + 飞书状态 + 退出登录。"""
     with st.sidebar:
         st.title("⚖️ 出庭手续生成器")
         st.caption("法务出庭 7 份材料一键生成")
+
+        # F-044 workspace 信息 + 退出按钮
+        ws_name = st.session_state.get("workspace_name", "")
+        if ws_name:
+            st.caption(f"👤 当前用户：{ws_name}")
+            if st.button("🚪 退出登录", key="logout_btn", use_container_width=True):
+                st.session_state.workspace_id = None
+                st.session_state.workspace_name = None
+                st.rerun()
+
         st.divider()
 
         # ========== 公司/法人管理 ==========
@@ -404,7 +419,8 @@ def render_sidebar():
                                 except OSError:
                                     pass  # 静默失败，不阻塞新上传
                             extra["contract_pdf_path"] = save_agent_pdf(
-                                agent_id, contract_file.read(), "contract"
+                                agent_id, contract_file.read(), "contract",
+                                workspace_id=st.session_state.get("workspace_id"),
                             )
                         if id_card_file is not None:
                             # F-040 重传清理：删旧文件
@@ -418,7 +434,8 @@ def render_sidebar():
                                 except OSError:
                                     pass
                             extra["id_card_pdf_path"] = save_agent_pdf(
-                                agent_id, id_card_file.read(), "id_card"
+                                agent_id, id_card_file.read(), "id_card",
+                                workspace_id=st.session_state.get("workspace_id"),
                             )
 
                     db.upsert_agent({
@@ -677,7 +694,8 @@ def _render_result_card(
                         case_id = db.create_case(case_data)
                         full_case = db.get_case(case_id)
                         final_dir = generate_court_matters(
-                            full_case, current_company, current_agent
+                            full_case, current_company, current_agent,
+                            output_base_dir=get_outputs_dir(st.session_state.workspace_id),
                         )
                         file_count = sum(
                             1 for _ in final_dir.iterdir()
@@ -881,7 +899,8 @@ def render_new_case_form(current_company, current_agent):
         try:
             with st.spinner("⏳ 正在生成出庭手续..."):
                 output_dir = generate_court_matters(
-                    full_case, current_company, current_agent
+                    full_case, current_company, current_agent,
+                    output_base_dir=get_outputs_dir(st.session_state.workspace_id),
                 )
             # 记录历史
             file_count = sum(
@@ -999,7 +1018,10 @@ def render_case_history(current_company, current_agent):
                     }
                     try:
                         with st.spinner("⏳ 重新生成中..."):
-                            output_dir = generate_court_matters(full_case, company, agent)
+                            output_dir = generate_court_matters(
+                                full_case, company, agent,
+                                output_base_dir=get_outputs_dir(st.session_state.workspace_id),
+                            )
                         file_count = sum(1 for _ in output_dir.iterdir() if _.suffix in (".docx", ".pdf"))
                         db.add_history(case["id"], case["case_number"], str(output_dir), file_count)
                         st.success(f"✅ 已重新生成 {file_count} 份文件")
@@ -1053,16 +1075,136 @@ def _confirm_print_dialog():
 
 
 # ============================================================
+# F-044 登录/注册页
+# ============================================================
+
+def render_auth_page():
+    """登录/注册页面。
+
+    两个 Tab：
+    - 🔑 登录：选择 workspace + 输入密码
+    - 📝 注册：输入用户名 + 密码 + 确认密码
+    """
+    st.title("⚖️ 出庭手续生成器")
+
+    # 迁移提示
+    global _migration_ws_id
+    if _migration_ws_id:
+        st.info(
+            "ℹ️ 检测到旧版本数据，已自动迁移到 workspace「**默认**」（密码：**admin**）。"
+            "请立即登录并修改密码。"
+        )
+
+    tab_login, tab_register = st.tabs(["🔑 登录", "📝 注册"])
+
+    # ========== 登录 Tab ==========
+    with tab_login:
+        st.subheader("欢迎回来")
+
+        workspaces = ws.list_workspaces()
+        if not workspaces:
+            st.info("还没有用户，请先在「📝 注册」Tab 创建账户")
+        else:
+            ws_names = [w["name"] for w in workspaces]
+            selected_name = st.selectbox("选择用户", ws_names, key="login_select")
+            password = st.text_input(
+                "密码",
+                type="password",
+                key="login_password",
+                placeholder="请输入密码",
+            )
+
+            col_login_btn, _ = st.columns([1, 2])
+            with col_login_btn:
+                if st.button("🔑 登录", type="primary", use_container_width=True, key="login_btn"):
+                    if not password:
+                        st.error("请输入密码")
+                    else:
+                        ws_id = ws.verify_workspace(selected_name, password)
+                        if ws_id:
+                            st.session_state.workspace_id = ws_id
+                            st.session_state.workspace_name = selected_name
+                            st.rerun()
+                        else:
+                            st.error("密码错误，请重试")
+
+    # ========== 注册 Tab ==========
+    with tab_register:
+        st.subheader("创建新账户")
+
+        new_name = st.text_input(
+            "用户名",
+            key="register_name",
+            placeholder="如：张三",
+        )
+        new_password = st.text_input(
+            "密码",
+            type="password",
+            key="register_password",
+            placeholder="至少 4 位",
+        )
+        confirm_password = st.text_input(
+            "确认密码",
+            type="password",
+            key="register_confirm",
+            placeholder="再次输入密码",
+        )
+
+        col_reg_btn, _ = st.columns([1, 2])
+        with col_reg_btn:
+            if st.button("📝 注册并登录", type="primary", use_container_width=True, key="register_btn"):
+                # 校验
+                if not new_name.strip():
+                    st.error("请输入用户名")
+                elif len(new_password) < 4:
+                    st.error("密码至少 4 位")
+                elif new_password != confirm_password:
+                    st.error("两次密码不一致")
+                else:
+                    try:
+                        ws_id = ws.create_workspace(new_name.strip(), new_password)
+                        st.session_state.workspace_id = ws_id
+                        st.session_state.workspace_name = new_name.strip()
+                        st.rerun()
+                    except ValueError as e:
+                        st.error(str(e))
+
+
+# ============================================================
 # 入口
 # ============================================================
 
 def main():
     """Streamlit 主入口。
 
+    v1.3.0 变更：
+    - 新增 workspace 认证：未登录时显示登录/注册页
+    - 已登录后加载对应 workspace 的 DB + 输出目录
+    - 退出登录清除 session_state，回到登录页
+
     注意：
     - ensure_default_company_and_agent() 必须在这里调用，避免模块级副作用
     - 测试场景下 import app 不会创建默认记录
     """
+    # 初始化 session_state
+    if "workspace_id" not in st.session_state:
+        st.session_state.workspace_id = None
+    if "workspace_name" not in st.session_state:
+        st.session_state.workspace_name = None
+
+    # 未登录 → 显示登录/注册页
+    if st.session_state.workspace_id is None:
+        render_auth_page()
+        return
+
+    # 已登录 → 初始化 workspace 业务数据库
+    ws_id = st.session_state.workspace_id
+    ws_db_path = get_db_path(ws_id)
+    initialize(ws_db_path)
+
+    # 让 database.py 后续 CRUD 使用正确的 workspace DB 路径
+    db._current_db_path = ws_db_path
+
     ensure_default_company_and_agent()
     current_company, current_agent = render_sidebar()
     render_main(current_company, current_agent)

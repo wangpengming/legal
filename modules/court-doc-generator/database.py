@@ -6,6 +6,9 @@ from typing import Tuple
 
 from config import DB_PATH
 
+# 模块级变量：当前激活的 workspace DB 路径（由 app.py 在登录后设置）
+_current_db_path: str | None = None
+
 
 SCHEMA_SQL = """
 -- 公司/法人信息表
@@ -76,9 +79,15 @@ CREATE TABLE IF NOT EXISTS generation_history (
 
 
 @contextmanager
-def get_conn():
-    """获取数据库连接（上下文管理器）。"""
-    conn = sqlite3.connect(str(DB_PATH))
+def get_conn(db_path=None):
+    """获取数据库连接（上下文管理器）。
+
+    参数：
+        db_path: 可选，指定数据库路径。默认使用 _current_db_path > DB_PATH（向后兼容）。
+    """
+    if db_path is None:
+        db_path = _current_db_path or DB_PATH
+    conn = sqlite3.connect(str(db_path))
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON;")
     try:
@@ -89,6 +98,10 @@ def get_conn():
         raise
     finally:
         conn.close()
+
+
+# 向后兼容别名
+get_conn_for_path = get_conn
 
 
 def migrate_add_agent_pdf_paths(conn):
@@ -104,9 +117,13 @@ def migrate_add_agent_pdf_paths(conn):
             pass  # 列已存在，幂等
 
 
-def init_db():
-    """初始化数据库（建表 + F-031 迁移）。"""
-    with get_conn() as conn:
+def init_db(db_path=None):
+    """初始化数据库（建表 + F-031 迁移）。
+
+    参数：
+        db_path: 可选，指定数据库路径。默认使用 config.DB_PATH（向后兼容）。
+    """
+    with get_conn(db_path) as conn:
         conn.executescript(SCHEMA_SQL)
         migrate_add_agent_pdf_paths(conn)
 
@@ -138,6 +155,15 @@ def get_company(company_id: int) -> dict | None:
     with get_conn() as conn:
         row = conn.execute(
             "SELECT * FROM companies WHERE id = ?", (company_id,)
+        ).fetchone()
+        return dict(row) if row else None
+
+
+def get_company_by_name(name: str) -> dict | None:
+    """按名称获取公司（v1.3.0 用于确保默认公司存在）。"""
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT * FROM companies WHERE name = ?", (name,)
         ).fetchone()
         return dict(row) if row else None
 
