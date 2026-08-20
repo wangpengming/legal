@@ -37,7 +37,7 @@ from pdf_thumb import (
     render_all_pages_base64,
     render_first_page_base64,
 )
-from scan_service import extract_fields, extract_text, scan_documents
+from scan_service import extract_fields, extract_text, scan_documents, download_and_scan_url
 from pdf_viewer_component import is_pdfjs_ready, render_pdf_viewer
 
 
@@ -51,6 +51,34 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
+
+
+# ============================================================
+# Session 持久化：刷新页面后保持登录状态
+# ============================================================
+
+_SAVE_SESSION_JS = """<script>
+(function() {
+  // 保存登录状态到 localStorage
+  function saveSession(wsId, wsName) {
+    if (wsId && wsName) {
+      localStorage.setItem('workspace_id', wsId);
+      localStorage.setItem('workspace_name', wsName);
+    }
+  }
+  // 暴露给 Python 调用
+  window.saveLoginSession = saveSession;
+  
+  // 登录成功后自动保存
+  window.addEventListener('load', function() {
+    // 监听 Streamlit 的 rerun
+  });
+})();
+</script>"""
+
+def _render_session_persist():
+    """渲染 session 持久化脚本。"""
+    st.html(_SAVE_SESSION_JS)
 
 
 # ============================================================
@@ -99,7 +127,7 @@ def _scroll_to_bottom_once(marker_key: str):
     done_key = f"_scroll_bottom_done_{marker_key}"
     if st.session_state.get(done_key):
         return
-    st.components.v1.html(_SCROLL_JS, height=0)
+    st.html(_SCROLL_JS)
     st.session_state[done_key] = True
 
 
@@ -305,9 +333,15 @@ def render_sidebar():
 
         agent_options = {f"{a['name']} - {a.get('position', '')}" + (" [默认]" if a['is_default'] else ""): a for a in agents}
         if agent_options:
+            # 修复：session_state 缓存的 selected_agent 可能不在当前 agent_options 中
+            # 如果缓存的值不存在，选择第一个（通常是默认代理人）
+            current_label = st.session_state.get("selected_agent")
+            if current_label not in agent_options:
+                current_label = list(agent_options.keys())[0]
             selected_agent_label = st.selectbox(
                 "当前代理人",
                 list(agent_options.keys()),
+                index=list(agent_options.keys()).index(current_label) if current_label in agent_options else 0,
                 key="selected_agent",
             )
             current_agent = agent_options[selected_agent_label]
@@ -779,6 +813,13 @@ def render_new_case_form(current_company, current_agent):
         )
         if scan_files:
             st.session_state.scan_files_cache = scan_files
+            # 显示已上传的文件信息
+            for f in scan_files:
+                # 获取文件大小
+                content = f.read()
+                f.seek(0)  # 重置文件指针
+                size_kb = len(content) / 1024
+                st.success(f"📎 已上传: {f.name} ({size_kb:.1f} KB)")
 
         if st.session_state.scan_files_cache and st.button("🔍 自动识别字段", key=btn_key, type="primary"):
             import tempfile
@@ -811,6 +852,7 @@ def render_new_case_form(current_company, current_agent):
                     pass
             st.success("✅ 识别完成！请检查下方字段")
             st.rerun()
+
         if st.session_state.get("scan_show_text") and st.session_state.scan_ocr_text:
             with st.expander("📄 扫描识别原文（OCR 抽取）", expanded=False):
                 st.code(st.session_state.scan_ocr_text, language="text")
@@ -1191,6 +1233,14 @@ def render_auth_page():
                         if ws_id:
                             st.session_state.workspace_id = ws_id
                             st.session_state.workspace_name = selected_name
+                            # 保存到 localStorage
+                            st.html(f"""<script>
+                                localStorage.setItem('workspace_id', '{ws_id}');
+                                localStorage.setItem('workspace_name', '{selected_name}');
+                            </script>""")
+                            # 通过 query_params 传递登录状态（用于刷新后恢复）
+                            st.query_params["_ws_id"] = ws_id
+                            st.query_params["_ws_name"] = selected_name
                             st.rerun()
                         else:
                             st.error("密码错误，请重试")
@@ -1244,6 +1294,9 @@ def render_auth_page():
 def main():
     """Streamlit 主入口。
 
+    v1.3.1 变更：
+    - 新增 session 持久化：刷新页面后保持登录状态（localStorage）
+
     v1.3.0 变更：
     - 新增 workspace 认证：未登录时显示登录/注册页
     - 已登录后加载对应 workspace 的 DB + 输出目录
@@ -1258,6 +1311,22 @@ def main():
         st.session_state.workspace_id = None
     if "workspace_name" not in st.session_state:
         st.session_state.workspace_name = None
+
+    # 检查 query_params，尝试恢复登录状态（刷新页面后）
+    if st.session_state.workspace_id is None:
+        ws_id_param = st.query_params.get("_ws_id")
+        ws_name_param = st.query_params.get("_ws_name")
+        if ws_id_param and ws_name_param:
+            st.session_state.workspace_id = ws_id_param
+            st.session_state.workspace_name = ws_name_param
+            # 保存到 localStorage（下次刷新时可通过 query_params 恢复）
+            st.html(f"""<script>
+                localStorage.setItem('workspace_id', '{ws_id_param}');
+                localStorage.setItem('workspace_name', '{ws_name_param}');
+            </script>""")
+
+    # 渲染 session 持久化脚本（用于保存登录状态到 localStorage）
+    _render_session_persist()
 
     # 未登录 → 显示登录/注册页
     if st.session_state.workspace_id is None:

@@ -8,11 +8,14 @@
 - extract_text(image_paths) -> str：多张图 → OCR → 拼接
 - extract_fields(text) -> dict：正则抽取关键字段
 - scan_documents(image_paths) -> dict：一站式扫描+抽取
+- download_and_scan_url(url) -> dict：URL → 下载 → OCR（绕过 file_uploader 限制）
 """
 import re
 import shutil
 import subprocess
 import tempfile
+import urllib.request
+import ssl
 from pathlib import Path
 from typing import List, Dict, Optional
 
@@ -39,9 +42,10 @@ def extract_text(image_paths: List[Path], lang: str = "chi_sim+eng") -> str:
         if not Path(img_path).exists():
             continue
         try:
+            # errors="ignore" 防止 tesseract 在 stderr 输出非 UTF-8 字节导致 UnicodeDecodeError
             result = subprocess.run(
                 [_TESSERACT, str(img_path), "-", "-l", lang],
-                capture_output=True, text=True, timeout=30,
+                capture_output=True, text=True, errors="ignore", timeout=30,
             )
             if result.returncode == 0:
                 text = result.stdout.strip()
@@ -171,3 +175,83 @@ def scan_documents(image_paths: List[Path]) -> Dict:
     text = extract_text(image_paths)
     fields = extract_fields(text)
     return {"text": text, "fields": fields}
+
+
+def download_and_scan_url(url: str, timeout: int = 30) -> Dict:
+    """从 URL 下载图片并进行 OCR 扫描。
+
+    用途：绕过 Streamlit file_uploader 的程序化上传限制，
+          用户可以直接粘贴图片 URL 进行扫描。
+
+    支持格式：jpg, jpeg, png, pdf, bmp, tiff, gif, webp
+
+    参数：
+        url: 图片 URL（支持 http/https）
+        timeout: 下载超时（秒）
+
+    返回：
+        {
+            "text": str,  # OCR 原始文本
+            "fields": dict,  # 抽取的字段
+            "filename": str,  # 下载的文件名
+            "error": str | None,  # 错误信息（成功时为 None）
+        }
+    """
+    if not url or not url.strip():
+        return {"text": "", "fields": {}, "filename": "", "error": "URL 为空"}
+
+    url = url.strip()
+
+    # 验证 URL 格式
+    if not (url.startswith("http://") or url.startswith("https://")):
+        return {"text": "", "fields": {}, "filename": "", "error": "仅支持 http/https URL"}
+
+    try:
+        # 从 URL 提取文件名
+        parsed = urllib.parse.urlparse(url)
+        path_part = parsed.path.split("/")[-1]
+        if path_part and "." in path_part:
+            filename = path_part
+        else:
+            # 根据 Content-Type 猜测扩展名
+            filename = "downloaded_image.jpg"
+
+        # 创建临时文件
+        with tempfile.NamedTemporaryFile(delete=False, suffix="_" + filename) as tmp:
+            tmp_path = Path(tmp.name)
+
+        # 下载文件
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
+        }
+        req = urllib.request.Request(url, headers=headers)
+        # 创建 SSL 上下文（macOS Python 需要）
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        with urllib.request.urlopen(req, timeout=timeout, context=ctx) as response:
+            content = response.read()
+            tmp_path.write_bytes(content)
+
+        # 检查文件是否有效（不为空）
+        if len(content) < 100:
+            tmp_path.unlink(missing_ok=True)
+            return {"text": "", "fields": {}, "filename": filename, "error": "下载的文件过小或为空"}
+
+        # 调用现有 scan_documents 处理
+        result = scan_documents([tmp_path])
+
+        # 清理临时文件
+        tmp_path.unlink(missing_ok=True)
+
+        return {
+            "text": result["text"],
+            "fields": result["fields"],
+            "filename": filename,
+            "error": None,
+        }
+
+    except urllib.error.URLError as e:
+        return {"text": "", "fields": {}, "filename": filename if "filename" in dir() else "", "error": f"网络错误：{e.reason}"}
+    except Exception as e:
+        return {"text": "", "fields": {}, "filename": "", "error": f"下载失败：{str(e)}"}

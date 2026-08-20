@@ -95,3 +95,4 @@ outputs/
 
 # ---- F-032 代理人上传材料（PII 防护：劳动合同 / 身份证 含敏感信息）----
 modules/*/static/agents/
+.streamlit/
