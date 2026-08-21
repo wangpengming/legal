@@ -221,12 +221,12 @@ _migration_ws_id = ws.migrate_legacy_data()
 # ============================================================
 
 def ensure_default_company_and_agent():
-    """每次登录时，确保默认公司/代理人存在。
+    """每次登录时，确保默认公司存在。
 
     设计原则（v1.3+）：
     - 默认公司「雷石」是公用委托单位（法务部共用），每个 workspace 都有
     - 新 workspace 自动创建；已有 workspace 登录时也补上
-    - PII 字段保持空，由用户自行填写
+    - 不创建空占位代理人（避免垃圾数据）；用户主动添加即可
     - 由 main() 调用，不是模块级副作用（避免 import 时写库）
     """
     # 确保「雷石」存在（workspace 新建或已有都适用）
@@ -234,23 +234,14 @@ def ensure_default_company_and_agent():
         db.upsert_company({
             "name": "雷石",
             "credit_code": "",
-            "legal_rep_name": "",
-            "legal_rep_position": "",
-            "legal_rep_id_card": "",
-            "address": "",
+            "legal_rep_name": "马杰",  # 已知法人姓名
+            "legal_rep_position": "总经理",
+            "legal_rep_id_card": "",  # PII 字段保持空，用户自行填写
+            "address": "北京市朝阳区望京东园四区1号楼29层2901号10",
             "phone": "",
+            "is_default": 1,
         })
-
-    if not db.list_agents():
-        # 默认代理人：空记录，引导用户填写
-        db.upsert_agent({
-            "name": "",
-            "gender": "男",
-            "id_card": "",
-            "position": "",
-            "phone": "",
-            "company_id": None,
-        })
+    # 不再创建空占位代理人：用户主动添加有效代理人即可
 
 
 # ============================================================

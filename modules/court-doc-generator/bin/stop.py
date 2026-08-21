@@ -1,146 +1,141 @@
 #!/usr/bin/env python3
-# =============================================
-# 跨平台停止脚本
-# =============================================
-# 三重进程定位策略：
-# 1. PID 文件
-# 2. 端口 (lsof / netstat)
-# 3. 进程名匹配 (streamlit run app.py)
-# 全部失败时给出手动排查指引
-# =============================================
+"""
+出庭手续生成器 — 全栈停止脚本。
+
+健壮性：
+  - 三重定位：PID 文件 → 端口 → 残留进程
+  - SIGTERM → 等待1秒 → SIGKILL
+  - 支持单独停止：--backend / --frontend
+  - 退出码：0=全部停止 / 1=部分停止
+"""
 import os
-import sys
-import signal
 import subprocess
+import sys
 import time
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_PORT = 18501
-PID_FILE = PROJECT_ROOT / ".run" / "streamlit.pid"
+SCRIPT_DIR    = Path(__file__).parent
+PROJECT_ROOT  = SCRIPT_DIR.parent
+RUN_DIR       = PROJECT_ROOT / ".run"
+RUN_DIR.mkdir(exist_ok=True)
+
+BACKEND_PID   = RUN_DIR / "backend.pid"
+FRONTEND_PID  = RUN_DIR / "vite.pid"
+BACKEND_PORT  = 8001
+FRONTEND_PORT = 18502
 
 
-def find_pid_by_port(port: int) -> int | None:
-    """通过端口找 PID（macOS/Linux 用 lsof，Windows 用 netstat）。"""
+def pids_on_port(port: int) -> list[int]:
     try:
-        if sys.platform == "win32":
-            out = subprocess.check_output(
-                ["netstat", "-ano"], text=True, stderr=subprocess.DEVNULL
-            )
-            for line in out.splitlines():
-                if f":{port}" in line and "LISTENING" in line:
-                    parts = line.split()
-                    return int(parts[-1])
-        else:
-            out = subprocess.check_output(
-                ["lsof", "-ti", f":{port}"], text=True, stderr=subprocess.DEVNULL
-            )
-            pids = [int(p) for p in out.split() if p.strip()]
-            if pids:
-                return pids[0]
-    except (subprocess.CalledProcessError, FileNotFoundError, ValueError):
-        pass
-    return None
-
-
-def find_pid_by_name() -> list[int]:
-    """通过进程名匹配 streamlit run app.py。"""
-    try:
-        if sys.platform == "win32":
-            out = subprocess.check_output(
-                ["wmic", "process", "where",
-                 "CommandLine like '%streamlit run app.py%'",
-                 "get", "ProcessId"],
-                text=True, stderr=subprocess.DEVNULL,
-            )
-        else:
-            out = subprocess.check_output(
-                ["pgrep", "-f", "streamlit run app.py"],
-                text=True, stderr=subprocess.DEVNULL,
-            )
-        return [int(p) for p in out.split() if p.strip().isdigit()]
-    except (subprocess.CalledProcessError, FileNotFoundError, ValueError):
+        out = subprocess.run(
+            ["lsof", "-ti", f":{port}"],
+            capture_output=True, text=True
+        ).stdout
+        return [int(p) for p in out.strip().split() if p.strip()]
+    except Exception:
         return []
 
 
-def kill_pid(pid: int, force: bool = False) -> bool:
-    """杀进程。macOS/Linux 用 SIGTERM（默认）/ SIGKILL（force），Windows 用 taskkill。"""
+def read_pid(path: Path) -> int | None:
+    if path.exists():
+        try:
+            val = int(path.read_text().strip())
+            return val if val > 0 else None
+        except Exception:
+            pass
+    return None
+
+
+def is_running(pid: int) -> bool:
     try:
-        if sys.platform == "win32":
-            args = ["taskkill", "/PID", str(pid), "/T"]
-            if force:
-                args.append("/F")
-            subprocess.run(args, check=False, capture_output=True)
-        else:
-            os.kill(pid, signal.SIGKILL if force else signal.SIGTERM)
+        os.kill(pid, 0)
         return True
-    except (ProcessLookupError, PermissionError, OSError):
+    except OSError:
         return False
 
 
-def main() -> None:
-    pids_found: set[int] = set()
+def stop_service(name: str, pid_path: Path, port: int) -> bool:
+    """三重定位停止。返回 True=已停止，False=未运行。"""
+    pids = set()
 
     # 1. PID 文件
-    if PID_FILE.exists():
-        try:
-            pid = int(PID_FILE.read_text().strip())
-            pids_found.add(pid)
-            print(f"📄 从 PID 文件找到 PID {pid}")
-        except ValueError:
-            pass
+    p = read_pid(pid_path)
+    if p:
+        pids.add(p)
+        print(f"  📄 [{name}] PID 文件 → {p}")
 
-    # 2. 端口
-    pid_port = find_pid_by_port(DEFAULT_PORT)
-    if pid_port:
-        pids_found.add(pid_port)
-        print(f"🔌 从端口 {DEFAULT_PORT} 找到 PID {pid_port}")
+    # 2. 端口上所有进程
+    for p in pids_on_port(port):
+        pids.add(p)
+    if pids_on_port(port):
+        print(f"  🔌 [{name}] 端口 {port} → {pids_on_port(port)}")
 
-    # 3. 进程名
-    pid_name = find_pid_by_name()
-    for p in pid_name:
-        pids_found.add(p)
-    if pid_name:
-        print(f"🔍 从进程名找到 PID {pid_name}")
+    if not pids:
+        print(f"  ℹ️  [{name}] 未运行")
+        pid_path.unlink(missing_ok=True)
+        return True
 
-    if not pids_found:
-        print(f"ℹ️ 未发现运行中的 streamlit 服务")
-        if PID_FILE.exists():
-            PID_FILE.unlink()
-        return
+    # 3. SIGTERM
+    print(f"  🛑 [{name}] 停止中: {sorted(pids)}")
+    for pid in list(pids):
+        os.kill(pid, 15)  # SIGTERM
 
-    # 杀进程（先 SIGTERM，2 秒后还活着就 SIGKILL）
-    print(f"🛑 准备停止 {len(pids_found)} 个进程：{sorted(pids_found)}")
-    for pid in pids_found:
-        if kill_pid(pid, force=False):
-            print(f"   ✅ SIGTERM → PID {pid}")
+    # 4. 等待确认
+    time.sleep(1.5)
+    survivors = [p for p in pids if is_running(p)]
+    if survivors:
+        print(f"     → 仍存活: {survivors}，SIGKILL")
+        for pid in survivors:
+            os.kill(pid, 9)  # SIGKILL
+        time.sleep(0.5)
 
-    time.sleep(2)
+    # 5. 清理 PID 文件
+    pid_path.unlink(missing_ok=True)
 
-    # 二次确认
-    survivors = set()
-    if PID_FILE.exists():
-        try:
-            survivors.add(int(PID_FILE.read_text().strip()))
-        except ValueError:
-            pass
-    survivors |= set(find_pid_by_name())
-    if find_pid_by_port(DEFAULT_PORT):
-        survivors.add(find_pid_by_port(DEFAULT_PORT) or 0)
+    # 6. 验证端口释放
+    if pids_on_port(port):
+        print(f"  ⚠️  [{name}] 端口 {port} 仍未释放")
+        return False
+    print(f"  ✅ [{name}] 已停止")
+    return True
 
-    survivors &= pids_found  # 只看我们要杀的
-    for pid in survivors:
-        if kill_pid(pid, force=True):
-            print(f"   💥 SIGKILL → PID {pid}")
 
-    # 清理 PID 文件
-    if PID_FILE.exists():
-        PID_FILE.unlink()
-    print("✅ 已停止")
+def main() -> int:
+    import argparse
+    parser = argparse.ArgumentParser(description="全栈停止脚本")
+    parser.add_argument("--backend",  action="store_true", help="仅停止后端")
+    parser.add_argument("--frontend", action="store_true", help="仅停止前端")
+    args = parser.parse_args()
+
+    # 默认全停
+    do_backend  = not args.frontend  # 既没有 --frontend，也没有 --backend → 全停
+    do_frontend = not args.backend
+    if args.backend and args.frontend:
+        do_backend = do_frontend = False
+
+    print("=" * 50)
+    print("🛑 出庭手续生成器 · 全栈停止")
+    print("=" * 50)
+    print()
+
+    results: list[bool] = []
+    if do_backend:
+        results.append(stop_service("后端 (FastAPI)", BACKEND_PID, BACKEND_PORT))
+        print()
+    if do_frontend:
+        results.append(stop_service("前端 (Vite)", FRONTEND_PID, FRONTEND_PORT))
+        print()
+
+    print("=" * 50)
+    if all(results) and len(results) == 2:
+        print("✅ 全部服务已停止")
+    elif all(results):
+        print("✅ 指定服务已停止")
+    else:
+        print("⚠️  部分服务未停止或端口未释放")
+    print("=" * 50)
+    return 0 if all(results) else 1
 
 
 if __name__ == "__main__":
-    try:
-        main()
-    except KeyboardInterrupt:
-        print("\n⚠️ 用户中断")
+    sys.exit(main())

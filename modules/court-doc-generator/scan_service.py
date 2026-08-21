@@ -23,19 +23,32 @@ from typing import List, Dict, Optional
 # Tesseract 命令路径
 _TESSERACT = shutil.which("tesseract") or "/opt/homebrew/bin/tesseract"
 
+# 自动检测中文语言包是否可用（tessdata 目录）
+def _detect_lang() -> str:
+    tessdata_dir = Path(shutil.which(_TESSERACT)).parent.parent / "share" / "tessdata"
+    if not tessdata_dir.exists():
+        return "eng"
+    available = {p.stem for p in tessdata_dir.glob("*.traineddata")}
+    if "chi_sim" in available:
+        return "chi_sim+eng"
+    return "eng"
 
-def extract_text(image_paths: List[Path], lang: str = "chi_sim+eng") -> str:
+_LANG = _detect_lang()
+
+
+def extract_text(image_paths: List[Path], lang: str | None = None) -> str:
     """多张图 OCR 提取文字（拼接返回）。
 
     参数：
         image_paths: 图片路径列表（jpg/png/pdf 等）
-        lang: Tesseract 语言（默认中文+英文）
+        lang: Tesseract 语言（默认自动检测：chi_sim+eng 或 eng）
 
     返回：
         拼接后的纯文本（多张图用换行分隔）
     """
     if not image_paths:
         return ""
+    lang = lang or _LANG
 
     all_text = []
     for i, img_path in enumerate(image_paths):
@@ -51,6 +64,14 @@ def extract_text(image_paths: List[Path], lang: str = "chi_sim+eng") -> str:
                 text = result.stdout.strip()
                 if text:
                     all_text.append(f"=== 图片 {i+1} ===\n{text}")
+            elif "chi_sim" in lang and "Failed loading language" in (result.stderr or ""):
+                # 语言包缺失，回退到英文
+                result2 = subprocess.run(
+                    [_TESSERACT, str(img_path), "-", "-l", "eng"],
+                    capture_output=True, text=True, errors="ignore", timeout=30,
+                )
+                if result2.returncode == 0 and result2.stdout.strip():
+                    all_text.append(f"=== 图片 {i+1} ===\n{result2.stdout.strip()}")
         except (subprocess.TimeoutExpired, FileNotFoundError) as e:
             all_text.append(f"=== 图片 {i+1} 错误：{e} ===")
 

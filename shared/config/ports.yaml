@@ -18,10 +18,10 @@
 # | OCR/文件转换      | 8092-8099       | Gotenberg/Tika              |
 
 allocations:
-  # Streamlit 模块
+  # court-doc-generator 全栈重构（v2.0.0 React + FastAPI）
   court-doc-generator:
-    app: 18501          # Streamlit 主端口（避开默认 8501）
-    fallback: 19000     # 默认端口被占用时备选
+    backend: 8001       # FastAPI Python 后端
+    frontend: 18502    # React/Vite 前端（Vite dev server）
 
   # FastAPI + 前端 模块
   litigation-system:

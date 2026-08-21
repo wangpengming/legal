@@ -498,3 +498,35 @@ F-031~F-035 已完成多代理人材料动态绑定主体功能，但 3 个边�
 | 日期 | 需求 | 结果 |
 |------|------|------|
 | 2026-08-17 | 系统骨架初始化 | done |
+| 2026-08-20 | 案件管理页：查看详情 + 文件预览 + 生成/删除二次确认 | done |
+
+---
+
+## 2026-08-20 court-doc-generator 案件管理页查看/预览 + 二次确认
+
+**类型**: feature + fix
+**模块**: court-doc-generator（FastAPI + Vite 前端）
+**状态**: done
+**优先级**: P1（误操作防护 + 查看报错影响日常使用）
+
+### 描述
+
+案件管理页面只有"生成"没有"查看/预览"，且点查看报错（历史文件 404）。删除/生成均无二次确认，容易误操作。
+
+### 子任务
+
+- [x] **F-053** 后端 history.py：list_history_files 文件路径改为相对 `DATA_DIR`（含 `workspaces/` 前缀），与 files API 拼接逻辑一致（修复预览 404）
+- [x] **F-054** 后端 generate.py：记录生成历史时 PRAGMA 动态检测列，兼容新旧 generation_history schema（修复插入 500）
+- [x] **F-055** 前端 CasesPage：新增"查看"按钮 + 生成/删除二次确认（ConfirmDialog 组件，删除红色 danger）
+- [x] **F-056** 前端 CaseDetailModal：案件详情弹窗（基本信息 + 生成记录 + 文件列表，PDF 可预览 / 全部可下载 ZIP）
+- [x] **F-057** 前端生成后预览路径提取修复（output_dir 取 `workspaces/` 前缀相对路径）
+- [x] **F-058** generator.py：_resolve_company_pdf 的 None fallback 保护（授权委托书/推荐信传 None 不再 TypeError）
+
+### 验收标准
+
+- [x] 案件行有"查看"按钮，打开详情弹窗显示基本信息 + 生成记录 + 文件列表
+- [x] 详情内 PDF 文件可预览（PDF.js canvas 分页），ZIP 可下载
+- [x] 生成按钮二次确认（显示案号 + 公司 + 代理人）
+- [x] 删除按钮二次确认（红色 danger，提示不可恢复）
+- [x] 历史文件预览不再 404，新案件生成后自动预览路径正确
+- [x] `npx tsc --noEmit` 零错误；前端浏览器全链路验证通过

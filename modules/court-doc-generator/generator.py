@@ -41,11 +41,63 @@ from pdf_merger import merge_pdfs
 # F-033 辅助函数：解析代理人级 PDF 路径
 # ============================================================
 
-# 输出文件名 → 数据库字段映射
+# 输出文件名 → agent 字典中的字段名（兼容 FastAPI API 和 Streamlit database）
+# FastAPI: labor_contract / id_card
+# Streamlit: contract_pdf_path / id_card_pdf_path
 _AGENT_PATH_KEYS = {
-    "06_代理人劳动合同.pdf": "contract_pdf_path",
-    "07_代理人身份证.pdf": "id_card_pdf_path",
+    "06_代理人劳动合同.pdf": ["labor_contract", "contract_pdf_path"],
+    "07_代理人身份证.pdf": ["id_card", "id_card_pdf_path"],
 }
+
+
+# ============================================================
+# 公司级 PDF 路径解析
+# ============================================================
+
+# 输出文件名 → company 字典中的字段名
+# 优先级：自定义上传路径 > templates 目录默认模板 > static 目录默认文件
+_COMPANY_PATH_KEYS = {
+    "01_营业执照.pdf": ["business_license_path", "business_license"],
+    "02_法人身份证.pdf": ["legal_rep_id_card_path", "legal_rep_id_card"],
+    "02_法定代表人证明.pdf": ["legal_rep_cert_path", "legal_rep_cert"],
+    # 授权委托书和推荐信：如果公司上传了 PDF 版本则使用，否则用模板生成
+    "04_授权委托书.pdf": ["power_of_attorney_path"],
+    "05_推荐信.pdf": ["recommendation_path"],
+}
+
+# 授权委托书/推荐信的默认模板路径（fallback）
+_TEMPLATE_DEFAULTS = {
+    "04_授权委托书.pdf": ("power_of_attorney", "4.授权委托书.docx"),
+    "05_推荐信.pdf": ("recommendation", "5.推荐信.docx"),
+}
+
+
+def _resolve_company_pdf(company: dict, target_name: str, fallback_filename: str):
+    """解析公司级 PDF 源路径。
+    
+    优先级：
+        1. company[field_key]（自定义上传路径）
+           - 相对路径相对 PROJECT_ROOT 解析
+           - 文件不存在则跳过
+        2. STATIC_DIR / fallback_filename（默认 fallback）
+           - 文件不存在则返回 None
+    """
+    path_keys = _COMPANY_PATH_KEYS.get(target_name, [])
+    for path_key in path_keys:
+        custom = company.get(path_key)
+        if custom:
+            candidate = Path(custom)
+            if not candidate.is_absolute():
+                candidate = PROJECT_ROOT / candidate
+            if candidate.exists():
+                return candidate
+    # Fallback 到 static 目录（fallback_filename 为 None 时放弃 fallback）
+    if fallback_filename is None:
+        return None
+    fallback = STATIC_DIR / fallback_filename
+    if fallback.exists():
+        return fallback
+    return None
 
 
 def _resolve_agent_pdf(agent: dict, target_name: str, fallback_filename: str):
@@ -65,8 +117,9 @@ def _resolve_agent_pdf(agent: dict, target_name: str, fallback_filename: str):
     - 纯函数，易测试（不依赖 docx 模板 / 数据库）
     - 与 _generate_to_dir 解耦
     """
-    path_key = _AGENT_PATH_KEYS.get(target_name)
-    if path_key:
+    path_keys = _AGENT_PATH_KEYS.get(target_name, [])
+    # 尝试多个可能的字段名（FastAPI 新字段 → Streamlit 旧字段）
+    for path_key in path_keys:
         custom = agent.get(path_key)
         if custom:
             candidate = Path(custom)
@@ -92,15 +145,17 @@ def validate_agent_paths(agents: list) -> dict:
     注意：空字段（未上传）不算失效；相对路径相对 PROJECT_ROOT 解析。
     """
     result = {}
+    # 兼容 FastAPI (labor_contract/id_card) 和 Streamlit (contract_pdf_path/id_card_pdf_path)
+    path_keys = ["contract_pdf_path", "id_card_pdf_path", "labor_contract", "id_card"]
     for agent in agents:
         agent_id = agent["id"]
         valid = []
         invalid = []
-        for key in ("contract_pdf_path", "id_card_pdf_path"):
+        for key in path_keys:
             rel_path = agent.get(key)
             if not rel_path:
                 continue
-            full = PROJECT_ROOT / rel_path
+            full = Path(rel_path) if Path(rel_path).is_absolute() else PROJECT_ROOT / rel_path
             if full.exists():
                 valid.append(key)
             else:
@@ -401,23 +456,31 @@ def _generate_to_dir(case: dict, company: dict, agent: dict, output_dir: Path) -
             import warnings
             warnings.warn(f"DOCX→PDF 转换失败（跳过）: {docx_path.name} → {e}", stacklevel=2)
 
-    # === 复制静态 PDF ===
-    # 公司级（与代理人无关，固定）
-    from config import COMPANY_STATIC
-    for src_name in COMPANY_STATIC:
-        src_path = STATIC_DIR / src_name
-        if src_path.exists():
-            # 输出文件名映射：1.营业执照复印件.pdf → 01_营业执照.pdf
-            target_idx = "01" if "营业执照" in src_name else "03"
-            target_suffix = "营业执照" if "营业执照" in src_name else "法人身份证"
-            target_name = f"{target_idx}_{target_suffix}.pdf"
+    # === 复制静态 PDF（公司级，优先使用自定义上传）===
+    # 公司级 PDF：营业执照 + 法人身份证 + 法定代表人证明
+    company_pdf_mappings = [
+        ("01_营业执照.pdf", "1.营业执照复印件.pdf"),
+        ("02_法人身份证.pdf", "法人身份证.pdf"),
+        ("02_法定代表人证明.pdf", "2.法定代表人证明.pdf"),
+    ]
+    for target_name, fallback_filename in company_pdf_mappings:
+        src_path = _resolve_company_pdf(company, target_name, fallback_filename)
+        if src_path:
             shutil.copy2(src_path, output_dir / target_name)
 
-    # F-036 法定代表人证明：固定静态 PDF 文件（从 static/2.法定代表人证明.pdf 复制）
-    # 输出为 .pdf（与 04/05 一样进入 00_合并出庭手续.pdf）
-    legal_rep_src = STATIC_DIR / "2.法定代表人证明.pdf"
-    if legal_rep_src.exists():
-        shutil.copy2(legal_rep_src, output_dir / f"02_法定代表人证明_{safe_case}.pdf")
+    # === 授权委托书 + 推荐信：优先使用公司上传 PDF，否则用模板生成 ===
+    # 如果公司上传了授权委托书/推荐信 PDF，直接使用
+    for target_name, fallback_filename in [
+        ("04_授权委托书.pdf", None),
+        ("05_推荐信.pdf", None),
+    ]:
+        src_path = _resolve_company_pdf(company, target_name, fallback_filename)
+        if src_path:
+            # 直接复制公司上传的 PDF
+            shutil.copy2(src_path, output_dir / target_name)
+        else:
+            # 用模板动态生成（原有逻辑）
+            pass  # 已在上面动态生成
 
     # 代理人级（F-033：按当前 agent 路径取，fallback 到默认文件）
     for target_name, fallback_filename in AGENT_STATIC_FALLBACK.items():

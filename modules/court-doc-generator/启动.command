@@ -1,15 +1,13 @@
 #!/usr/bin/env bash
 # =============================================
-# macOS 双击启动入口（双击 .command 文件触发）
+# macOS 双击启动入口
+# 逻辑：前后端已运行 → 弹出浏览器；未运行 → 启动服务
 # =============================================
-# 关键陷阱：双击 .command 文件时，脚本执行完后 Terminal 窗口会立即关闭
-# 解决方案：用 `read` 让脚本最后阻塞，等待用户按 Enter 才退出
-# =============================================
-# v1.1.3 修复：双击 .command 时 $0 是绝对路径，脚本在 court-doc-generator/ 下
-# 必须 cd 到自身目录；错误使用 ".." 会跳到 modules/，导致 bin/start.py 找不到
 cd "$(dirname "$0")"
 
-# v1.1.3 修复：优先使用项目 .venv 的 Python（系统 python3 未安装 streamlit）
+FRONTEND_URL="http://localhost:18502"
+
+# 定位 Python
 if [ -x ".venv/bin/python" ]; then
     PY=".venv/bin/python"
 elif [ -x ".venv/bin/python3" ]; then
@@ -19,7 +17,6 @@ else
 fi
 
 if [ -z "$PY" ]; then
-    osascript -e 'display alert "Python 未找到" message "请先安装 Python 3.10+ (https://www.python.org/downloads/)" as critical' 2>/dev/null || true
     echo "❌ 未找到 Python。请先安装 Python 3.10+"
     echo
     echo "按任意键关闭此窗口..."
@@ -27,15 +24,54 @@ if [ -z "$PY" ]; then
     exit 1
 fi
 
-echo "🔄 使用 Python：$PY"
-echo "🚀 启动服务中，请稍候..."
-"$PY" bin/start.py
+# 检查端口是否监听（返回 0=在监听）
+is_port_listening() {
+    nc -z localhost "$1" 2>/dev/null
+}
+
+echo "🔍 检查服务状态..."
+echo
+
+backend_ok=false
+frontend_ok=false
+
+if is_port_listening 8001; then
+    echo "✅ 后端 FastAPI (8001) 已运行"
+    backend_ok=true
+else
+    echo "⏳ 后端 FastAPI (8001) 未运行"
+fi
+
+if is_port_listening 18502; then
+    echo "✅ 前端 Vite (18502) 已运行"
+    frontend_ok=true
+else
+    echo "⏳ 前端 Vite (18502) 未运行"
+fi
 
 echo
-echo "✅ 服务已启动。"
-echo "浏览器应已跳转到 http://localhost:18501"
-echo
-echo "关闭服务请运行：bash bin/stop.sh"
+
+if $backend_ok && $frontend_ok; then
+    # 前后端都在，直接开浏览器
+    echo "🎉 所有服务就绪，正在打开浏览器..."
+    open "$FRONTEND_URL"
+    echo "   已打开: $FRONTEND_URL"
+elif $frontend_ok || $backend_ok; then
+    # 部分服务运行中，先等另一侧启动再开浏览器
+    echo "⚙️  部分服务未运行，启动中..."
+    "$PY" bin/start.py
+    echo
+    echo "🌐 正在打开浏览器..."
+    open "$FRONTEND_URL"
+else
+    # 全部未运行
+    echo "🚀 启动全栈服务..."
+    "$PY" bin/start.py
+    echo
+    echo "🌐 正在打开浏览器..."
+    open "$FRONTEND_URL"
+fi
+
 echo
 echo "按任意键关闭此窗口..."
 read -n 1

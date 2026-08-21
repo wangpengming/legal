@@ -1,189 +1,344 @@
 #!/usr/bin/env python3
-# =============================================
-# 跨平台启动脚本（macOS/Linux/Windows 通用）
-# =============================================
-# 设计原则：
-# - 不依赖 bash 3.2 / zsh / PowerShell 差异
-# - 自动定位 Python 解释器（python3 → python）
-# - 端口占用检测与避让（默认 18501，避让 19000）
-# - 自动开浏览器（首次启动）
-# - 健康检查（启动后 8 秒内探测）
-#
-# 使用：
-#     python bin/start.py
-# 或：
-#     bash bin/start.sh     # 包裹脚本
-#     bin\\start.bat          # Windows
-# =============================================
+"""
+出庭手续生成器 — 全栈启动脚本（FastAPI 后端 + Vite 前端）
+
+健壮性设计原则：
+  1. 原子性：PID 先写再 fork，fork 后验证进程真实存在
+  2. 等 HTTP 不等端口：端口通 ≠ 服务就绪，必须等 HTTP 响应
+  3. 完全脱离终端：start_new_session=True 避免 macOS SIGSTOP
+  4. 可独立重启：--backend / --frontend 单独控制
+  5. 防螺旋：同一服务连续失败 3 次则停止并报错
+  6. 退出码：0=全部就绪 / 1=部分就绪 / 2=启动失败
+"""
 import os
 import sys
 import time
 import socket
-import shutil
 import subprocess
-import webbrowser
 from pathlib import Path
+from dataclasses import dataclass, field
+from typing import Optional
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_PORT = 18501
-FALLBACK_PORT = 19000  # 18501 占用时的备选
-HEALTH_URL = "http://localhost:{port}/_stcore/health"
-OPEN_BROWSER_DELAY = 6  # 启动后几秒打开浏览器
-PID_DIR = PROJECT_ROOT / ".run"
-PID_FILE = PID_DIR / "streamlit.pid"
-LOG_FILE = PID_DIR / "streamlit.log"
+# ── 路径配置 ──────────────────────────────────────────────────────────────
+SCRIPT_DIR    = Path(__file__).parent
+PROJECT_ROOT  = SCRIPT_DIR.parent
+BACKEND_ROOT  = PROJECT_ROOT / "backend"
+FRONTEND_ROOT = PROJECT_ROOT / "frontend"
+RUN_DIR       = PROJECT_ROOT / ".run"
+RUN_DIR.mkdir(exist_ok=True)
 
+BACKEND_PORT   = 8001
+FRONTEND_PORT  = 18502
 
-def find_python() -> str:
-    """定位 Python 解释器（兼容 Windows Store 陷阱）。
+BACKEND_HEALTH   = f"http://localhost:{BACKEND_PORT}/health"
+FRONTEND_HEALTH  = f"http://localhost:{FRONTEND_PORT}/"
 
-    顺序：
-    1. sys.executable（脚本解释器，最可靠）
-    2. python3
-    3. python（⚠️ Windows 上 py 命令会触发 Store，所以优先 python.exe 而非 py.exe）
-    """
-    candidates = [sys.executable, "python3", "python"]
-    for cand in candidates:
-        if not cand:
-            continue
-        # sys.executable 永远存在
-        if cand == sys.executable:
-            return cand
-        # 命令查找
-        if shutil.which(cand):
-            return cand
-    print("❌ 未找到 Python 解释器。请先安装 Python 3.10+", file=sys.stderr)
-    sys.exit(1)
+BACKEND_LOG    = RUN_DIR / "backend.log"
+FRONTEND_LOG   = RUN_DIR / "vite.log"
+BACKEND_PID    = RUN_DIR / "backend.pid"
+FRONTEND_PID   = RUN_DIR / "vite.pid"
 
 
-def is_port_listening(port: int) -> bool:
-    """检测端口是否被占用（TCP connect 测试）。"""
+# ── 通用工具 ───────────────────────────────────────────────────────────────
+
+def is_port_listening(port: int, timeout: float = 0.3) -> bool:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.settimeout(0.3)
+        s.settimeout(timeout)
         try:
             s.connect(("127.0.0.1", port))
             return True
-        except (ConnectionRefusedError, socket.timeout, OSError):
+        except OSError:
             return False
 
 
-def wait_for_port(port: int, timeout: float = 15.0) -> bool:
-    """等待端口就绪。"""
+def wait_http(port: int, path: str = "/", timeout: float = 15) -> bool:
+    """等待 HTTP 服务真正响应（不只是端口通）。"""
     deadline = time.time() + timeout
     while time.time() < deadline:
-        if is_port_listening(port):
+        if _http_ping(port, path):
             return True
         time.sleep(0.3)
     return False
 
 
-def check_health(port: int, timeout: float = 8.0) -> bool:
-    """健康检查 GET /_stcore/health。"""
+def _http_ping(port: int, path: str = "/", timeout: float = 2) -> bool:
     try:
         import urllib.request
-        req = urllib.request.urlopen(HEALTH_URL.format(port=port), timeout=2)
-        return req.status == 200
+        r = urllib.request.urlopen(f"http://localhost:{port}{path}", timeout=timeout)
+        return r.status == 200
     except Exception:
         return False
 
 
-def is_already_running() -> int | None:
-    """检查是否已有进程在运行（PID 文件 + 端口检测）。"""
-    if PID_FILE.exists():
-        try:
-            pid = int(PID_FILE.read_text().strip())
-            # 进程是否存在
-            if sys.platform == "win32":
-                subprocess.run(
-                    ["tasklist", "/FI", f"PID eq {pid}"],
-                    capture_output=True, check=False,
-                )
-            else:
-                os.kill(pid, 0)  # 信号 0 仅探测
-            # 同时检查端口
-            if is_port_listening(DEFAULT_PORT):
-                return pid
-        except (ValueError, ProcessLookupError, PermissionError, OSError):
-            pass
-    return None
+def wait_port_free(port: int, timeout: float = 10) -> bool:
+    """等待端口被释放（进程退出后）。"""
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if not is_port_listening(port):
+            return True
+        time.sleep(0.3)
+    return False
 
 
-def open_browser(port: int) -> None:
-    """打开默认浏览器。"""
-    url = f"http://localhost:{port}"
+def find_python() -> str:
+    for p in [
+        PROJECT_ROOT / ".venv" / "bin" / "python",
+        PROJECT_ROOT / ".venv" / "bin" / "python3",
+    ]:
+        if p.exists():
+            return str(p)
+    venv = os.environ.get("VIRTUAL_ENV")
+    if venv and (Path(venv) / "bin" / "python").exists():
+        return str(Path(venv) / "bin" / "python")
+    return str(sys.executable)
+
+
+def pids_on_port(port: int) -> list[int]:
     try:
-        webbrowser.open(url)
-        print(f"🌐 已打开浏览器：{url}")
-    except Exception as e:  # noqa: BLE001
-        print(f"⚠️ 自动打开浏览器失败，请手动访问：{url}（{e}）")
+        out = subprocess.run(["lsof", "-ti", f":{port}"],
+                             capture_output=True, text=True).stdout
+        return [int(p) for p in out.strip().split() if p.strip()]
+    except Exception:
+        return []
 
 
-def main() -> None:
-    PID_DIR.mkdir(exist_ok=True)
+def kill(pid: int, force: bool = False) -> None:
+    try:
+        os.kill(pid, 9 if force else 15)
+    except OSError:
+        pass
 
-    # 1. 已运行检查
-    existing_pid = is_already_running()
-    if existing_pid:
-        print(f"⚠️ 服务已在运行（PID {existing_pid}），无需重复启动")
-        # v1.1.4 修复：服务已存在时也应弹出浏览器，
-        # 否则双击 启动.command 时服务已在跑 → 只能看到终端提示，页面不会打开
-        open_browser(DEFAULT_PORT)
-        return
 
-    # 2. 端口选择（避让）
-    port = DEFAULT_PORT
-    if is_port_listening(port):
-        print(f"⚠️ 端口 {port} 已被占用，切换到 {FALLBACK_PORT}")
-        port = FALLBACK_PORT
-        if is_port_listening(port):
-            print(f"❌ 备选端口 {FALLBACK_PORT} 也被占用。请手动释放端口", file=sys.stderr)
-            sys.exit(1)
+def stop_process(pid_path: Path, port: int, name: str) -> None:
+    """三重定位停止进程：PID 文件 → 端口 → 残留。"""
+    killed = set()
 
-    # 3. 启动
-    python = find_python()
-    cmd = [
-        python, "-m", "streamlit", "run", "app.py",
-        "--server.port", str(port),
-        "--server.headless", "true",
-        "--server.address", "127.0.0.1",
-        "--browser.gatherUsageStats", "false",
-    ]
-    print(f"🚀 启动中：{' '.join(cmd)}")
-    print(f"   cwd: {PROJECT_ROOT}")
-    print(f"   log: {LOG_FILE}")
+    # 1. PID 文件
+    if pid_path.exists():
+        try:
+            pid = int(pid_path.read_text().strip())
+            if pid > 0:
+                kill(pid, force=False)
+                killed.add(pid)
+        except Exception:
+            pass
 
-    log_fp = open(LOG_FILE, "ab")
-    proc = subprocess.Popen(
-        cmd,
-        cwd=str(PROJECT_ROOT),
-        stdout=log_fp,
-        stderr=subprocess.STDOUT,
-        # Windows 上不弹 cmd 窗口
-        creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0,
-    )
-    PID_FILE.write_text(str(proc.pid))
-    print(f"✅ PID={proc.pid} 端口={port}")
+    # 2. 端口上所有进程
+    for pid in pids_on_port(port):
+        if pid not in killed:
+            kill(pid, force=False)
+            killed.add(pid)
 
-    # 4. 等待就绪
-    if wait_for_port(port, timeout=15):
-        print(f"✅ 端口 {port} 已就绪")
-        # 健康检查
-        time.sleep(2)  # 等待 Streamlit 完成初始化
-        if check_health(port):
-            print(f"✅ 健康检查通过：{HEALTH_URL.format(port=port)}")
+    # 3. 等待退出
+    time.sleep(1)
+    # 如果还在，用 SIGKILL
+    for pid in list({int(pid_path.read_text().strip())} if pid_path.exists() else set()) + pids_on_port(port):
+        if pid > 0:
+            kill(pid, force=True)
+    pid_path.unlink(missing_ok=True)
+    wait_port_free(port, timeout=5)
+
+
+# ── 服务描述 ────────────────────────────────────────────────────────────────
+
+@dataclass
+class Service:
+    name: str
+    port: int
+    pid_path: Path
+    log_path: Path
+    health_url: str          # 用于 check()
+    start_cmd: list[str]     # 子类填充
+    cwd: Path = field(default_factory=Path)
+
+    def is_healthy(self) -> bool:
+        return _http_ping(self.port, path=self.health_url.split(f":{self.port}")[1])
+
+    def is_port_open(self) -> bool:
+        return is_port_listening(self.port)
+
+    def start(self) -> "Service":
+        """原子启动：先清旧进程 → 再 fork → 再写 PID（进程已存在则 PID 真实）。"""
+        # 1. 停止旧进程（如果存在）
+        if self.pid_path.exists():
+            try:
+                old_pid = int(self.pid_path.read_text().strip())
+                if old_pid > 0:
+                    kill(old_pid, force=False)
+            except Exception:
+                pass
+
+        # 2. 等待端口释放
+        if self.is_port_open():
+            for pid in pids_on_port(self.port):
+                kill(pid, force=True)
+            wait_port_free(self.port)
+
+        # 3. fork 并启动
+        log = open(self.log_path, "wb")
+        proc = subprocess.Popen(
+            self.start_cmd,
+            cwd=str(self.cwd),
+            stdout=log,
+            stderr=subprocess.STDOUT,
+            start_new_session=True,  # 完全脱离终端，避免 macOS SIGSTOP
+        )
+        log.close()
+
+        # 4. 验证进程真实存在后再写 PID（原子性保证）
+        time.sleep(0.3)
+        if proc.poll() is not None:
+            raise RuntimeError(f"{self.name} 启动后立即退出，请检查日志: {self.log_path}")
+        self.pid_path.write_text(str(proc.pid))
+        return self
+
+    def wait_ready(self, timeout: float = 15) -> bool:
+        """等待服务 HTTP 就绪，返回是否成功。"""
+        return wait_http(self.port, path=self.health_url.split(f":{self.port}")[1], timeout=timeout)
+
+    def stop(self) -> None:
+        stop_process(self.pid_path, self.port, self.name)
+
+
+class BackendService(Service):
+    def __init__(self):
+        python = find_python()
+        super().__init__(
+            name="FastAPI 后端",
+            port=BACKEND_PORT,
+            pid_path=BACKEND_PID,
+            log_path=BACKEND_LOG,
+            health_url=BACKEND_HEALTH,
+            cwd=BACKEND_ROOT,
+            start_cmd=[
+                python, "-m", "uvicorn",
+                "app.main:app",
+                "--host", "0.0.0.0",
+                "--port", str(BACKEND_PORT),
+            ],
+        )
+
+
+class FrontendService(Service):
+    def __init__(self):
+        vite_bin = FRONTEND_ROOT / "node_modules" / ".bin" / "vite"
+        if not vite_bin.exists():
+            raise FileNotFoundError(f"Vite 未找到: {vite_bin}，请先 npm install")
+        super().__init__(
+            name="Vite 前端",
+            port=FRONTEND_PORT,
+            pid_path=FRONTEND_PID,
+            log_path=FRONTEND_LOG,
+            health_url=FRONTEND_HEALTH,
+            cwd=FRONTEND_ROOT,
+            # health_url path = "/"（首页本身）
+            start_cmd=[
+                str(vite_bin),
+                "--port", str(FRONTEND_PORT),
+                "--host", "0.0.0.0",
+            ],
+        )
+
+
+# ── 启动协调器 ────────────────────────────────────────────────────────────
+
+def launch_service(svc: Service, retry: int = 3) -> tuple[bool, str]:
+    """启动单个服务，失败最多重试 retry 次。返回 (成功, 状态描述)。"""
+    for attempt in range(1, retry + 1):
+        try:
+            svc.start()
+        except Exception as e:
+            print(f"  ❌ {svc.name} 启动失败: {e}")
+            if attempt < retry:
+                print(f"     重试 {attempt}/{retry - 1}...")
+                time.sleep(2)
+            return False, f"启动异常: {e}"
+
+        if svc.wait_ready(timeout=15):
+            print(f"  ✅ {svc.name} 就绪 (PID {svc.pid_path.read_text().strip()})")
+            return True, "ok"
+
+        print(f"  ⚠️  {svc.name} 端口已开但 HTTP 无响应，尝试重启...")
+        svc.stop()
+        if attempt < retry:
+            print(f"     重试 {attempt}/{retry - 1}...")
+            time.sleep(1)
+
+    print(f"  ❌ {svc.name} 连续 {retry} 次启动失败，请检查日志: {svc.log_path}")
+    return False, "超时"
+
+
+def main() -> int:
+    import argparse
+    parser = argparse.ArgumentParser(description="全栈启动脚本")
+    parser.add_argument("--backend",  action="store_true", help="仅启动后端")
+    parser.add_argument("--frontend", action="store_true", help="仅启动前端")
+    parser.add_argument("--restart",  metavar="SVC", choices=["backend", "frontend", "all"],
+                        default="all", help="重启目标 (default: all)")
+    args = parser.parse_args()
+
+    # 确定需要操作的服务
+    do_backend  = args.backend  or args.restart in ("backend", "all")
+    do_frontend = args.frontend or args.restart in ("frontend", "all")
+
+    print("=" * 50)
+    print("⚖️  出庭手续生成器 · 全栈启动")
+    print("=" * 50)
+    print()
+
+    # ── 初始化服务对象 ──────────────────────────────────────────────────
+    backend  = BackendService()
+    frontend = FrontendService()
+
+    results: dict[str, bool] = {}
+
+    # ── 后端 ────────────────────────────────────────────────────────────
+    if do_backend:
+        if backend.is_healthy():
+            print(f"✅ 后端 FastAPI 已健康运行 (PID {backend.pid_path.read_text().strip()})")
+            results["backend"] = True
         else:
-            print(f"⚠️ 健康检查未通过（Streamlit 可能仍在初始化）")
-        # 5. 开浏览器
-        # v1.1.3 修复：原 `sleep(OPEN_BROWSER_DELAY - 8)` 在 OPEN_BROWSER_DELAY=6 时
-        # 为负值，触发 ValueError 崩溃导致浏览器永不打开。
-        # wait_for_port 已等端口就绪 + 上方 sleep(2)，这里直接开浏览器即可。
-        open_browser(port)
+            print("🚀 启动后端 FastAPI...")
+            ok, _ = launch_service(backend)
+            results["backend"] = ok
     else:
-        print(f"⚠️ 端口 {port} 启动超时。请查看日志：{LOG_FILE}", file=sys.stderr)
+        print("⏭ 跳过后端")
+        results["backend"] = backend.is_healthy()
+
+    # ── 前端 ────────────────────────────────────────────────────────────
+    if do_frontend:
+        if frontend.is_healthy():
+            print(f"✅ 前端 Vite 已健康运行 (PID {frontend.pid_path.read_text().strip()})")
+            results["frontend"] = True
+        else:
+            print("🚀 启动前端 Vite...")
+            ok, _ = launch_service(frontend)
+            results["frontend"] = ok
+    else:
+        print("⏭ 跳过前端")
+        results["frontend"] = frontend.is_healthy()
+
+    # ── 最终状态 ────────────────────────────────────────────────────────
+    print()
+    print("=" * 50)
+    all_ok = all(results.values())
+    if all_ok:
+        print("🎉 全栈服务已就绪！")
+        print(f"   前端 UI:  http://localhost:{FRONTEND_PORT}/")
+        print(f"   后端 API: http://localhost:{BACKEND_PORT}/")
+        print(f"   API 文档: http://localhost:{BACKEND_PORT}/docs")
+        print()
+        print("关闭: python bin/stop.py")
+    else:
+        failed = [k for k, v in results.items() if not v]
+        print(f"⚠️  以下服务未就绪: {', '.join(failed)}")
+        for name in failed:
+            svc = backend if name == "backend" else frontend
+            print(f"   → 检查日志: {svc.log_path}")
+    print("=" * 50)
+
+    return 0 if all_ok else (1 if any(results.values()) else 2)
 
 
 if __name__ == "__main__":
-    try:
-        main()
-    except KeyboardInterrupt:
-        print("\n⚠️ 用户中断")
+    sys.exit(main())
