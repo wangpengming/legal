@@ -1,27 +1,35 @@
 name: court-doc-generator
-version: 1.3.0
+version: 2.0.0
 status: active
-description: 出庭手续文档生成器（7份材料 + 多代理人材料动态绑定 + 用户注册/登录 + workspace 数据隔离 + PDF合并预览）
-entry: app.py
+description: 出庭手续文档生成器（React+FastAPI 全栈，7份材料 + 多代理人动态绑定 + 用户注册/登录 + workspace 数据隔离 + PDF合并预览 + 在线打印）
+entry: backend/app/main.py
 port:
-  app: 18501          # Streamlit 主端口（避开默认 8501）
+  backend: 8001       # FastAPI Python 后端
+  frontend: 18502     # React/Vite 前端（dev server）
   fallback: 19000     # 默认端口被占用时备选
 deps: [] # 直接依赖的其他模块（当前无）
 created: 2026-08-17
+updated: 2026-08-21
 tech_stack:
   - Python 3.12
-  - Streamlit
+  - FastAPI + Uvicorn
+  - React 18 + TypeScript + Vite
   - SQLite
   - python-docx
   - pypdf
   - PyMuPDF
+  - reportlab
+  - PDF.js
 features:
   - Word模板填充（中文全角【】占位符）
   - DOCX转PDF
   - PDF合并
-  - 浏览器内PDF预览（PDF.js base64方案）
+  - 浏览器内PDF预览（PDF.js）
   - ZIP打包
+  - 在线打印（浏览器打印预览 + 系统打印机）
   - 多代理人材料动态绑定（v1.2.0）：06/07 PDF 跟随 agent + 04 授权委托书被授权人姓名/身份证号动态填充
   - 用户注册/登录与 workspace 数据隔离（v1.3.0）：每人独立 DB + outputs + agents 目录，密码 pbkdf2_hmac 哈希
-  - 拍照扫描功能（规划中，待澄清需求）
-readme: docs/README.md
+  - 拍照扫描（OCR）：上传起诉状/传票图片，Tesseract 识别后自动回填案件表单
+  - 案件管理：查看/编辑/删除/二次确认
+  - 生成记录查看与文件预览
+readme: README.md

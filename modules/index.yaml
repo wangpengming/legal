@@ -4,9 +4,9 @@ modules:
   - name: court-doc-generator
     path: modules/court-doc-generator
     status: active
-    version: 1.1.4
-    description: 出庭手续文档生成器（7份材料一键生成）
-    entry: app.py
+    version: 2.0.0
+    description: 出庭手续文档生成器（React+FastAPI 全栈，7份材料 + OCR扫描 + 在线打印 + 多用户 workspace 隔离）
+    entry: backend/app/main.py
     created: 2026-08-17
     integrated: 2026-08-17
 

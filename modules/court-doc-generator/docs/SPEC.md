@@ -1,8 +1,9 @@
 # 出庭手续生成器 · 技术规格（SPEC）
 
-> **文档版本**：v1.0
-> **最后更新**：2026-08-17
+> **文档版本**：v2.0
+> **最后更新**：2026-08-21
 > **模块名**：court-doc-generator
+> **当前架构**：React 18 + TypeScript + Vite（前端） + FastAPI + Uvicorn（后端） + SQLite（数据）
 > **对应需求**：见 [REQUIREMENTS.md](./REQUIREMENTS.md)
 > **配套索引**：`docs/SPEC.md`（系统级）→ 本文件（模块级）
 
@@ -65,26 +66,31 @@
 
 ### 1.1 一句话定义
 
-> **一个本地一键启动的 Streamlit 应用，让法务小白在 5 分钟内独立完成 7 份出庭材料的生成、合并、在线预览与打印，数据全留本机。**
+> **一个本地一键启动的 React + FastAPI 全栈应用，让法务小白在 5 分钟内独立完成 7 份出庭材料的生成、合并、在线预览与打印，数据全留本机。**
 
 ### 1.2 关键能力图
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│              出庭手续生成器（CGD）                            │
+│              出庭手续生成器（CGD）v2.0                        │
 ├─────────────────────────────────────────────────────────────┤
-│  输入层            │  处理层                  │  输出层      │
-│  ──────────        │  ──────────             │  ────────── │
-│  • 案件表单       │  • 模板占位符替换       │  • 3 份 DOCX│
-│  • 公司/代理人    │  • DOCX → PDF           │  • 4 份 PDF │
-│                   │  • PDF 合并              │  • 1 份 ZIP │
-│                   │  • ZIP 打包              │  • 1 份合并│
-│                   │                          │  • PDF +    │
-│                   │                          │    在线预览 │
+│  前端层 (React + Vite :18502)                                │
+│  ──────────                                                 │
+│  • 案件管理 / 公司 / 代理人 CRUD                             │
+│  • PDF.js 浏览器内预览（缩放/翻页/打印）                      │
+│  • 拍照扫描上传 + OCR 识别                                   │
+│  • 用户注册/登录 + workspace 切换                            │
 ├─────────────────────────────────────────────────────────────┤
-│  数据层：SQLite（公司/代理人/案件/历史）                        │
-│  部署层：Streamlit 端口 18501                                  │
-│  分发层：本地优先 + 可选 Cloudflare Tunnel                      │
+│  后端层 (FastAPI :8001)                                      │
+│  ──────────                                                 │
+│  • RESTful API /api/v1/*                                    │
+│  • 模板占位符替换 + DOCX→PDF + PDF 合并                      │
+│  • ZIP 打包 + 系统打印机调用                                 │
+│  • Tesseract OCR 文字识别                                    │
+├─────────────────────────────────────────────────────────────┤
+│  数据层：SQLite（workspace 隔离）                             │
+│  部署层：bin/start.py 一键启动（backend + frontend）          │
+│  分发层：本地优先 + 可选 Cloudflare Tunnel                    │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -104,42 +110,51 @@
 ```
 ┌─────────────────────────────── 浏览器层 ───────────────────────────────┐
 │                                                                          │
-│   ┌────────────────────┐    ┌────────────────────┐   ┌────────────────┐ │
-│   │ Streamlit 渲染层    │    │ components.html   │   │ PDF.js 全内联  │ │
-│   │ (app.py)           │    │ (iframe)          │   │ (base64)       │ │
-│   │                    │    │                    │   │                │ │
-│   │ • 表单             │    │ • 浏览器内 PDF     │   │ • pdf.min.js   │ │
-│   │ • 侧边栏           │    │ • 工具栏           │   │ • pdf.worker   │ │
-│   │ • Tab 切换         │    │ • 打印按钮         │   │ • PDF 文件     │ │
-│   └────────────────────┘    └────────────────────┘   └────────────────┘ │
+│   ┌────────────────────────────────────────────────────────────────────┐ │
+│   │ React 18 + TypeScript + Vite (localhost:18502)                     │ │
+│   │                                                                    │ │
+│   │ • Pages: Login / Dashboard / Cases / Companies / Agents / History │ │
+│   │ • Components: PdfPreviewModal / CaseDetailModal / ConfirmDialog   │ │
+│   │ • PDF.js 浏览器内预览 + 打印                                        │ │
+│   │ • Vite proxy /api → localhost:8001                                │ │
+│   └────────────────────────────────────────────────────────────────────┘ │
 │                                                                          │
 └──────────────────────────────────────────────────────────────────────────┘
                                     ▲
-                                    │ base64 data URI（绕过 SPA 路由）
+                                    │ HTTP REST /api/v1/*
                                     ▼
-┌─────────────────────────────── 服务层（localhost:18501）────────────────┐
+┌─────────────────────────────── 服务层 (localhost:8001) ──────────────────┐
 │                                                                          │
-│   ┌─────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐ │
-│   │ app.py      │  │ database.py  │  │ generator.py │  │ docx_to_pdf  │ │
-│   │             │  │              │  │              │  │ + pdf_merger │ │
-│   │ • UI 控制   │  │ • SQLite     │  │ • 模板替换   │  │ • PDF 转换   │ │
-│   │ • 表单事件  │  │ • CRUD       │  │ • ZIP 打包   │  │ • PDF 合并   │ │
-│   │ • 状态管理  │  │              │  │              │  │              │ │
-│   └─────────────┘  └──────────────┘  └──────────────┘  └──────────────┘ │
-│         │                                                                │
-│         ▼                                                                │
-│   ┌─────────────────────────────┐                                       │
-│   │ config.py（路径/常量/JSON） │                                       │
-│   │ feishu_api.py（Stub 占位）  │                                       │
-│   └─────────────────────────────┘                                       │
+│   ┌──────────────────────────────────────────────────────────────────┐   │
+│   │ FastAPI + Uvicorn                                                │   │
+│   │                                                                  │   │
+│   │ API 路由:                                                        │   │
+│   │   /api/v1/auth      — 注册/登录                                  │   │
+│   │   /api/v1/companies — 公司 CRUD                                  │   │
+│   │   /api/v1/agents    — 代理人 CRUD                                │   │
+│   │   /api/v1/cases     — 案件 CRUD                                  │   │
+│   │   /api/v1/generate  — 材料生成                                   │   │
+│   │   /api/v1/history   — 生成历史                                   │   │
+│   │   /api/v1/files     — 文件预览 + DOCX→PDF                        │   │
+│   │   /api/v1/scan      — OCR 扫描                                   │   │
+│   │   /api/v1/print     — 系统打印                                   │   │
+│   │   /health           — 健康检查                                   │   │
+│   └──────────────────────────────────────────────────────────────────┘   │
+│         │                                                                 │
+│         ▼                                                                 │
+│   ┌──────────────────────────────────────────────────────────────────┐   │
+│   │ 共享模块（通过 sys.path 引用）:                                    │   │
+│   │   config.py / generator.py / docx_to_pdf.py / pdf_merger.py      │   │
+│   │   scan_service.py                                                │   │
+│   └──────────────────────────────────────────────────────────────────┘   │
 │                                                                          │
 └──────────────────────────────────────────────────────────────────────────┘
                                     ▲
                                     ▼
 ┌─────────────────────────────── 数据 & 资源层 ────────────────────────────┐
 │                                                                          │
-│   data/court_matters.db  templates/*.docx  static/*.pdf                  │
-│   outputs/YYYY-MM-DD_<案号>/  .run/streamlit.{log,pid}                   │
+│   data/workspaces/<id>/court_matters.db  templates/*.docx  static/*.pdf  │
+│   outputs/  .run/backend.{pid,log}  .run/frontend.pid                    │
 │                                                                          │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
@@ -148,13 +163,15 @@
 
 | 模块 | 职责 | 不应做 |
 |------|------|--------|
-| `config.py` | 路径常量、JSON 配置读写 | 业务逻辑 |
-| `database.py` | SQLite 连接、CRUD、上下文管理器 | 业务编排 |
-| `generator.py` | 模板替换、ZIP 打包、Finder 打开 | UI 交互 |
+| `backend/app/main.py` | FastAPI 入口 + /health | 业务逻辑 |
+| `backend/app/api/` | REST API 路由 + 请求校验 | 核心生成逻辑 |
+| `backend/app/core/config.py` | 路径常量 + 环境变量 | 业务逻辑 |
+| `backend/app/core/database.py` | SQLite 连接 + 建表 | 业务编排 |
+| `generator.py` | 模板替换、PDF 合并、ZIP 打包 | UI 交互 |
 | `docx_to_pdf.py` | DOCX 解析 + reportlab 重渲染 | 模板替换 |
 | `pdf_merger.py` | pypdf 合并 | 文件命名 |
-| `feishu_api.py` | 飞书 OpenAPI Stub | 业务决策 |
-| `app.py` | Streamlit UI + 编排 | 业务规则 |
+| `scan_service.py` | Tesseract OCR + 字段提取 | 业务决策 |
+| `frontend/src/` | React UI + 状态管理 + 路由 | 核心业务规则 |
 
 ### 2.3 状态管理
 
@@ -180,15 +197,16 @@
 
 | 层 | 选型 | 版本基线 | 决策依据 |
 |----|------|---------|---------|
-| 前端框架 | **Streamlit** | ≥ 1.40 | 法务小白能改 + 内置组件够用 |
-| 前端增强 | **components.html + PDF.js** | pdfjs-dist 4.x | 浏览器内 PDF 预览 |
+| 前端框架 | **React 18 + TypeScript + Vite** | react 18.3 / vite 6.0 | SPA 架构，PDF.js 集成，zustand 状态管理 |
+| 后端框架 | **FastAPI + Uvicorn** | fastapi 0.115 | RESTful API，自动 OpenAPI 文档 |
 | Word 处理 | **python-docx** | ≥ 1.1.0 | 模板填充标准库 |
 | PDF 生成 | **reportlab** | ≥ 4.0 | 内置 STSong-Light 中文字体，零外部依赖 |
 | PDF 合并 | **pypdf** | ≥ 4.0 | 维护活跃，API 清晰 |
-| PDF 缩略图 | **PyMuPDF (pymupdf)** | ≥ 1.24 | 速度快，质量高 |
-| 数据库 | **SQLite (stdlib)** | Python 3.10+ 内置 | 零安装，文件即数据库 |
-| 进程管理 | **nohup + PID 文件** | - | macOS/Linux 原生 |
-| 健康检查 | **curl /_stcore/health** | - | Streamlit 内置 |
+| PDF 预览 | **PDF.js (pdfjs-dist)** | 4.x | 浏览器内渲染，支持缩放/翻页/打印 |
+| 数据库 | **SQLite (stdlib)** | Python 3.10+ 内置 | 零安装，文件即数据库，workspace 隔离 |
+| OCR | **Tesseract CLI** | 系统安装 | 中文识别（chi_sim+eng），可选依赖 |
+| 进程管理 | **bin/ Python 脚本** | - | 跨平台统一，PID + 端口检测 |
+| 健康检查 | **GET /health** | - | FastAPI 端点，返回 `{"status":"ok","version":"..."}` |
 
 ### 3.2 关键决策评分（量化对比）
 
@@ -266,78 +284,100 @@
 
 ## 4. 目录结构
 
-### 4.1 重新实现的目录树
+### 4.1 当前目录树
 
 ```
 court-doc-generator/
-├── 启动.command                    # macOS 双击启动入口
-├── 启动.bat                        # Windows 双击启动入口（→ bin/start.py）
 ├── README.md                       # 模块说明
-├── REQUIREMENTS.md                 # 本文档（已生成）
-├── SPEC.md                         # 技术规格（本文件）
 ├── module.yaml                      # 模块注册元数据
-├── requirements.txt                # 依赖锁版本
-│
-├── app.py                          # Streamlit 主入口
-├── config.py                       # 路径常量 + JSON 配置
-├── database.py                     # SQLite 模型
-├── generator.py                    # 模板替换 + ZIP 打包
+├── requirements.txt                # 共享 Python 依赖
+├── config.py                       # 路径常量
+├── generator.py                    # 核心生成逻辑
 ├── docx_to_pdf.py                  # DOCX → PDF（reportlab）
 ├── pdf_merger.py                   # PDF 合并（pypdf）
-├── feishu_api.py                   # 飞书 API（Stub）
-├── pdf_viewer_component.py         # PDF.js 全内联预览组件 🆕
+├── scan_service.py                 # OCR 扫描服务
 │
-├── templates/                      # Word 模板（用户后续添加）
+├── bin/                            # 一键启动/停止脚本
+│   ├── start.py                    # 启动 backend + frontend
+│   ├── stop.py                     # 停止全部
+│   ├── status.py                   # 查看状态
+│   └── restart.py                  # 重启全部
+│
+├── backend/                        # FastAPI 后端
+│   ├── app/
+│   │   ├── main.py                 # 入口 + /health
+│   │   ├── api/                    # REST API 路由
+│   │   │   ├── auth.py             # 注册/登录
+│   │   │   ├── companies.py        # 公司 CRUD
+│   │   │   ├── agents.py           # 代理人 CRUD
+│   │   │   ├── cases.py            # 案件 CRUD
+│   │   │   ├── generate.py         # 材料生成
+│   │   │   ├── history.py          # 生成历史
+│   │   │   ├── files.py            # 文件预览
+│   │   │   ├── scan.py             # OCR 扫描
+│   │   │   └── print_api.py        # 在线打印
+│   │   └── core/
+│   │       ├── config.py           # 配置
+│   │       └── database.py         # SQLite
+│   ├── bin/                        # 后端启动/停止/状态/重启
+│   │   ├── start.py
+│   │   ├── stop.py
+│   │   ├── status.py
+│   │   └── restart.py
+│   ├── requirements.txt
+│   └── .env.example
+│
+├── frontend/                       # React + Vite 前端
+│   ├── src/
+│   │   ├── pages/                  # 页面组件
+│   │   │   ├── LoginPage.tsx
+│   │   │   ├── Dashboard.tsx
+│   │   │   ├── CasesPage.tsx
+│   │   │   ├── CompaniesPage.tsx
+│   │   │   ├── AgentsPage.tsx
+│   │   │   ├── HistoryPage.tsx
+│   │   │   └── ScanPage.tsx
+│   │   └── components/             # 共享组件
+│   │       ├── Layout.tsx
+│   │       ├── PdfPreviewModal.tsx
+│   │       ├── CaseDetailModal.tsx
+│   │       └── ConfirmDialog.tsx
+│   ├── bin/                        # 前端启动/停止/状态/重启
+│   │   ├── start.py
+│   │   ├── stop.py
+│   │   ├── status.py
+│   │   └── restart.py
+│   ├── package.json
+│   └── vite.config.ts
+│
+├── templates/                      # Word 模板
 │   ├── 2.法定代表人证明.docx
 │   ├── 4.授权委托书.docx
 │   └── 5.推荐信.docx
 │
 ├── static/                          # 静态 PDF + PDF.js 资源
-│   ├── 1.营业执照复印件.pdf        # 用户自行准备
+│   ├── 1.营业执照复印件.pdf
 │   ├── 法人身份证.pdf
 │   ├── 代理人劳动合同.pdf
 │   ├── 代理人身份证.pdf
-│   └── pdfjs/                      # 🆕 PDF.js 库（pdf.min.js + worker）
+│   └── pdfjs/                      # PDF.js 库
 │       ├── pdf.min.js
 │       └── pdf.worker.min.js
 │
-├── bin/                            # 服务管理脚本
-│   ├── manage.sh                   # 统一入口
-│   ├── manage.bat                  # Windows 统一入口
-│   ├── start.sh
-│   ├── start.bat                   # 调用 start.py
-│   ├── start.py                    # 纯 Python 跨平台启动 🆕
-│   ├── stop.sh
-│   ├── stop.bat
-│   ├── restart.sh
-│   ├── restart.bat
-│   ├── status.sh
-│   └── status.bat
-│
 ├── outputs/                        # 生成结果（不入 git）
-│   └── 2026-08-17_（2026）京0101民初1234号/
-│       ├── 01_营业执照.pdf
-│       ├── 02_法定代表人证明_<案号>.docx
-│       ├── 03_法人身份证.pdf
-│       ├── 04_授权委托书_<案号>.docx
-│       ├── 05_推荐信_<案号>.docx
-│       ├── 06_代理人劳动合同.pdf
-│       ├── 07_代理人身份证.pdf
-│       ├── 00_合并出庭手续_<案号>.pdf  🆕
-│       └── 出庭手续全套_<案号>.zip
-│
 ├── data/                           # SQLite 数据库（不入 git）
-│   └── court_matters.db
-│
+│   └── workspaces/
+│       └── <workspace_id>/
+│           └── court_matters.db
 ├── .run/                           # 运行时（不入 git）
-│   ├── streamlit.pid
-│   └── streamlit.log
-│
-└── tests/                          # 单元测试
-    ├── test_placeholder.py
-    ├── test_database.py
-    ├── test_generator.py
-    └── test_pdf_merger.py
+│   ├── backend.{pid,log}
+│   └── frontend.pid
+├── tests/                          # 单元测试
+└── docs/                           # 设计文档
+    ├── README.md
+    ├── REQUIREMENTS.md
+    ├── SPEC.md
+    └── PROMPTS.md
 ```
 
 ### 4.2 与 SPEC.md（系统级）的关系
@@ -862,163 +902,38 @@ port = 18501
 
 ## 12. 服务管理与部署
 
-### 12.1 bin/manage.sh 接口
+### 12.1 一键启动
 
 ```bash
-bash bin/manage.sh {start|stop|restart|status}
+cd modules/court-doc-generator
+python3 bin/start.py          # 启动 backend + frontend
+python3 bin/start.py backend  # 仅启动后端
+python3 bin/start.py frontend # 仅启动前端
 ```
 
-### 12.2 三重进程定位
-
-> **必须三重验证**，避免 PID 文件残留导致误操作。
+### 12.2 服务管理
 
 ```bash
-is_service_running() {
-    local pid_file="$2"
-    local port="$3"
-    local service_name="$4"
-    
-    # 1. PID 文件存在且进程存在
-    if [[ -f "$pid_file" ]]; then
-        local pid=$(cat "$pid_file")
-        if kill -0 "$pid" 2>/dev/null; then
-            return 0  # 进程活着
-        fi
-    fi
-    
-    # 2. 端口被占用（lsof）
-    if lsof -ti :"$port" >/dev/null 2>&1; then
-        return 0
-    fi
-    
-    # 3. 进程名匹配（ps）
-    if pgrep -f "$service_name" >/dev/null 2>&1; then
-        return 0
-    fi
-    
-    return 1
-}
+python3 bin/status.py      # 查看状态
+python3 bin/stop.py        # 停止全部
+python3 bin/restart.py     # 重启全部
 ```
 
 ### 12.3 健康检查
 
-```bash
-health_check() {
-    local url="http://localhost:${SERVICE_PORT}/_stcore/health"
-    local retries=10
-    for i in $(seq 1 $retries); do
-        if curl -sf "$url" >/dev/null 2>&1; then
-            echo "✅ 健康检查通过"
-            return 0
-        fi
-        sleep 1
-    done
-    echo "❌ 健康检查失败"
-    return 1
-}
-```
+| 服务 | 端点 | 返回 |
+|------|------|------|
+| 后端 | `GET http://localhost:8001/health` | `{"status": "ok", "version": "1.1.0"}` |
+| 前端 | `GET http://localhost:18502/` | HTML 200 |
 
-### 12.4 macOS bash 3.2 兼容
+### 12.4 端口配置
 
-```bash
-# ❌ 错误（bash 4 数组语法）
-pids+=($pid)
+| 服务 | 端口 | 注册表 |
+|------|------|--------|
+| 后端 API | 8001 | `shared/config/ports.yaml` |
+| 前端界面 | 18502 | `shared/config/ports.yaml` |
 
-# ✅ 正确（字符串拼接）
-pids="$pids $pid"
-
-# 去重输出
-echo "$pids" | tr ' ' '\n' | grep -v '^$' | sort -u
-```
-
-### 12.5 .command 窗口保持
-
-```bash
-#!/bin/bash
-# 启动.command
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-EXIT_CODE=0
-"$SCRIPT_DIR/bin/manage.sh" start || EXIT_CODE=$?
-echo ""
-echo "服务已启动，访问 http://localhost:18501"
-echo "关闭窗口请按 Ctrl+C"
-read -p "按回车键关闭此窗口..." _
-exit $EXIT_CODE
-```
-
-### 12.6 Windows 启动（bin/start.py + 启动.bat）
-
-```python
-# bin/start.py（纯 Python，零外部命令依赖）
-import subprocess, sys, time, webbrowser, os
-from pathlib import Path
-
-SCRIPT_DIR = Path(__file__).resolve().parent.parent
-SERVICE_PORT = 18501
-
-def find_python():
-    """按优先级查找 Python"""
-    candidates = [
-        SCRIPT_DIR / ".venv" / "Scripts" / "python.exe",  # 1. 项目虚拟环境
-    ]
-    # 2. PATH 中的 python / python3
-    for name in ["python", "python3"]:
-        r = subprocess.run(["where", name], capture_output=True, text=True)
-        if r.returncode == 0:
-            return r.stdout.strip().split("\n")[0]
-    # 3. 都没找到 → 打开下载页
-    webbrowser.open("https://www.python.org/downloads/")
-    sys.exit(1)
-
-def health_check():
-    import socket
-    for _ in range(15):
-        with socket.socket() as s:
-            if s.connect_ex(("localhost", SERVICE_PORT)) == 0:
-                return True
-        time.sleep(1)
-    return False
-
-if __name__ == "__main__":
-    python = find_python()
-    # 启动 streamlit
-    subprocess.Popen([python, "-m", "streamlit", "run", "app.py",
-                       "--server.port", str(SERVICE_PORT),
-                       "--server.headless", "true"],
-                      cwd=SCRIPT_DIR)
-    if health_check():
-        webbrowser.open(f"http://localhost:{SERVICE_PORT}")
-    input("按回车键关闭窗口...")
-```
-
-```batch
-@echo off
-:: 启动.bat（仅做 Python 探测）
-chcp 65001 >nul
-cd /d "%~dp0"
-python bin\start.py
-if errorlevel 1 (
-  echo 未检测到 Python，请访问 https://www.python.org/downloads/ 安装
-  pause
-)
-```
-
-> **关键约束**：不要用 `py` 命令！Windows 10/11 自带 Python Launcher，没装 Python 时会触发 Microsoft Store 引导。
-
-### 12.7 端口配置
-
-固定 **18501**，避开：80, 443, 3000, 5000, 8000, 8080, 8501, 8888。
-
-冲突时不自动换端口，启动脚本明确报错：
-
-```bash
-if lsof -ti :"$SERVICE_PORT" >/dev/null 2>&1; then
-    echo "❌ 端口 $SERVICE_PORT 被占用："
-    lsof -i :"$SERVICE_PORT"
-    echo "请关闭占用进程或修改 SERVICE_PORT"
-    exit 1
-fi
-```
+端口冲突时 `start.py` 自动检测并报错，不自动换端口。
 
 ---
 
@@ -1261,4 +1176,5 @@ def mask_id_card(id_card: str) -> str:
 
 | 日期 | 版本 | 变更摘要 |
 |------|------|---------|
+| 2026-08-21 | v2.0 | React+FastAPI 全栈重构完成：Streamlit → React+Vite 前端 + FastAPI 后端；bin/ 一键启动双服务；README/module.yaml/SPEC 同步更新至 v2.0；清除 Streamlit 遗骸 8 文件 |
 | 2026-08-17 | v1.0 | 首次从 docs/ + qoder-raw 全量反推整合，确立技术规格 |

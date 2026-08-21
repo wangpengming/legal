@@ -1,19 +1,21 @@
 # ⚖️ 出庭手续生成器
 
-> Streamlit 本地应用 · 法务一键生成出庭 7 份材料
+> React + FastAPI 全栈应用 · 法务一键生成出庭 7 份材料
 
-**v1.1.4** · 2026-08-17
+**v2.0.0** · 2026-08-21
 
 ---
 
 ## ✨ 核心功能
 
-- 📋 **新建案件**：填写案号/案由/法院/开庭日期 → 一键生成 7 份出庭材料
-- 🖨 **浏览器内 PDF 预览**：基于 PDF.js 全内联技术，可缩放/翻页/打印全部
-- 📦 **完整 zip 包**：包含 DOCX 模板 + PDF 文件 + 合并 PDF
-- 🏢 **公司/代理人管理**：左侧侧边栏管理委托单位、代理人信息
-- 💾 **历史案件**：SQLite 持久化所有生成记录
-- 🔌 **飞书集成**（预留接口）：MVP 阶段占位
+- 📋 **案件管理**：新建/编辑/删除案件，二次确认防误操作
+- 🏢 **公司/代理人管理**：委托单位、代理人信息维护，支持上传自定义 PDF
+- 🚀 **一键生成**：7 份出庭材料自动生成（DOCX 模板填充 + DOCX→PDF 转换 + PDF 合并）
+- 👁 **浏览器内 PDF 预览**：基于 PDF.js，支持缩放/翻页/打印
+- 🖨 **在线打印**：浏览器打印预览 + 系统打印机直打
+- 📸 **拍照扫描（OCR）**：上传起诉状/传票图片，Tesseract 识别后自动回填表单
+- 👥 **多用户隔离**：注册/登录 + workspace 数据隔离（每人独立 DB + 文件）
+- 📦 **ZIP 打包下载**：所有生成文件 + 合并 PDF 一键打包
 
 ---
 
@@ -34,88 +36,60 @@
 
 ## 🚀 快速启动
 
-### macOS / Linux（任意方式选一）
+### 前置条件
 
-**方式 1：双击启动**（最简单）
-```
-双击 启动.command
-```
+- **Python 3.10+**（推荐 3.12）
+- **Node.js 18+**（推荐 20 LTS）
+- **npm**（随 Node.js 安装）
+- **Tesseract**（可选，仅 OCR 扫描需要）：`brew install tesseract tesseract-lang`
 
-**方式 2：命令行启动**
+### 一键启动（推荐）
+
 ```bash
-bash bin/start.sh
-```
+cd modules/court-doc-generator
 
-**方式 3：Python 直接启动**
-```bash
+# 1. 创建虚拟环境 + 安装依赖（首次）
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt -r backend/requirements.txt
+
+# 2. 安装前端依赖（首次）
+cd frontend && npm install && cd ..
+
+# 3. 一键启动
 python3 bin/start.py
 ```
 
-启动成功后浏览器自动打开 http://localhost:18501
+启动后：
+- 前端界面：http://localhost:18502
+- 后端 API 文档：http://localhost:8001/docs
 
-### Windows
-
-**方式 1：双击 `bin\start.bat`**
-
-**方式 2：命令行**
-```cmd
-bin\start.bat
-```
-
-### 首次启动检查
+### 单独启动
 
 ```bash
-bash bin/status.sh    # macOS/Linux
-bin\status.bat        # Windows
+# 仅后端
+python3 backend/bin/start.py
+
+# 仅前端
+python3 frontend/bin/start.py
 ```
 
-正常输出：
-```
-🔌 端口 18501: ✅ 已监听
-📄 PID 文件: 12345
-💚 健康检查: ✅ 通过
-🎉 服务正常运行
-```
+### 服务管理
 
----
-
-## 📥 安装依赖
-
-### 创建虚拟环境（推荐）
 ```bash
-cd modules/court-doc-generator
-python3 -m venv .venv
-
-# macOS/Linux
-source .venv/bin/activate
-
-# Windows
-.venv\Scripts\activate
-
-pip install -r requirements.txt
+python3 bin/status.py      # 查看状态
+python3 bin/stop.py        # 停止全部
+python3 bin/restart.py     # 重启全部
 ```
-
-### 系统 Python 直接安装
-```bash
-pip install -r requirements.txt
-```
-
-### 依赖说明（详见 [requirements.txt](requirements.txt)）
-- `streamlit ≥ 1.40` — Web 框架
-- `python-docx ≥ 1.1` — Word 模板处理
-- `reportlab ≥ 4.0` — DOCX → PDF（用内置 STSong-Light 中文字体）
-- `pypdf ≥ 4.0` — PDF 合并
-- `PyMuPDF ≥ 1.24` — 缩略图（v1.x 预留）
-- `pytest ≥ 7.4` — 测试
 
 ---
 
 ## 🧪 运行测试
 
 ```bash
+cd modules/court-doc-generator
+source .venv/bin/activate
 pytest tests/ -v
-# 覆盖率
-pytest tests/ --cov=. --cov-report=term-missing
 ```
 
 ---
@@ -124,30 +98,70 @@ pytest tests/ --cov=. --cov-report=term-missing
 
 ```
 court-doc-generator/
-├── app.py                          # Streamlit 主入口
-├── config.py                       # 路径常量 + JSON 配置
-├── database.py                     # SQLite CRUD
-├── generator.py                    # 占位符替换 + 文件生成
-├── docx_to_pdf.py                  # DOCX → PDF（reportlab）
-├── pdf_merger.py                   # PDF 合并（pypdf）
-├── feishu_api.py                   # 飞书集成（stub）
-├── pdf_viewer_component.py         # PDF.js 全内联浏览器预览
-├── requirements.txt                # Python 依赖
-├── module.yaml                     # 模块元数据
-├── README.md                       # 本文件
-├── bin/                            # 服务管理脚本
-│   ├── start.{py,sh,bat}          # 启动
-│   ├── stop.{py,sh,bat}           # 停止
-│   ├── restart.{py,sh,bat}        # 重启
-│   ├── status.{py,sh,bat}         # 状态查询
-│   └── 启动.command                # macOS 双击入口（项目根）
-├── tests/                          # 单元测试
-├── data/                           # SQLite 数据库
-├── outputs/                        # 生成的出庭手续（按案件分目录）
-├── .run/                           # PID + 日志
-├── templates/                      # Word 模板（含 README）
-├── static/                         # 静态 PDF + PDF.js 库（含 README）
-└── docs/                           # 设计与规格
+├── bin/                    # 一键启动/停止/状态/重启
+│   ├── start.py
+│   ├── stop.py
+│   ├── status.py
+│   └── restart.py
+├── backend/                # FastAPI 后端
+│   ├── app/
+│   │   ├── main.py         # 入口 + /health
+│   │   ├── api/            # REST API 路由
+│   │   │   ├── auth.py     # 注册/登录
+│   │   │   ├── companies.py
+│   │   │   ├── agents.py
+│   │   │   ├── cases.py
+│   │   │   ├── generate.py # 材料生成
+│   │   │   ├── history.py  # 生成历史
+│   │   │   ├── files.py    # 文件预览
+│   │   │   ├── scan.py     # OCR 扫描
+│   │   │   └── print_api.py # 在线打印
+│   │   └── core/
+│   │       ├── config.py   # 配置
+│   │       └── database.py # SQLite
+│   ├── bin/                # 后端启动/停止/状态/重启
+│   │   ├── start.py
+│   │   ├── stop.py
+│   │   ├── status.py
+│   │   └── restart.py
+│   ├── requirements.txt
+│   └── .env.example
+├── frontend/               # React + Vite 前端
+│   ├── src/
+│   │   ├── pages/          # 页面组件
+│   │   │   ├── LoginPage.tsx
+│   │   │   ├── Dashboard.tsx
+│   │   │   ├── CasesPage.tsx
+│   │   │   ├── CompaniesPage.tsx
+│   │   │   ├── AgentsPage.tsx
+│   │   │   ├── HistoryPage.tsx
+│   │   │   └── ScanPage.tsx
+│   │   └── components/     # 共享组件
+│   │       ├── Layout.tsx
+│   │       ├── PdfPreviewModal.tsx
+│   │       ├── CaseDetailModal.tsx
+│   │       └── ConfirmDialog.tsx
+│   ├── bin/                # 前端启动/停止/状态/重启
+│   │   ├── start.py
+│   │   ├── stop.py
+│   │   ├── status.py
+│   │   └── restart.py
+│   ├── package.json
+│   └── vite.config.ts
+├── generator.py            # 核心生成逻辑（共享）
+├── docx_to_pdf.py          # DOCX → PDF 转换（共享）
+├── pdf_merger.py           # PDF 合并（共享）
+├── scan_service.py         # OCR 扫描服务（共享）
+├── config.py               # 路径常量（共享）
+├── requirements.txt        # 共享 Python 依赖
+├── module.yaml             # 模块元数据
+├── templates/              # Word 模板
+├── static/                 # 静态 PDF + PDF.js 库
+├── data/                   # SQLite 数据库（不入 git）
+├── outputs/                # 生成结果（不入 git）
+├── .run/                   # PID + 日志（不入 git）
+├── tests/                  # 单元测试
+└── docs/                   # 设计文档
     ├── README.md
     ├── REQUIREMENTS.md
     ├── SPEC.md
@@ -160,17 +174,32 @@ court-doc-generator/
 
 ### 端口
 
-默认端口 **18501**。被占用时自动切换到 **19000**。
+| 服务 | 端口 | 说明 |
+|------|------|------|
+| 后端 API | 8001 | FastAPI + Uvicorn |
+| 前端界面 | 18502 | Vite dev server |
 
-修改方法：编辑 `bin/start.py` 的 `DEFAULT_PORT` 常量。
+端口注册表：`shared/config/ports.yaml`
 
-### PDF.js 库（浏览器内预览）
+### 环境变量
 
-需要在 `static/pdfjs/` 准备两个文件：
-- `pdf.min.js`（约 320 KB）
-- `pdf.worker.min.js`（约 1 MB）
+复制 `.env.example` 为 `.env`（可选，默认值即可运行）：
 
-下载方法见 [static/README.md](static/README.md)。库未就位时，浏览器内预览自动降级为"系统 Preview 打开"按钮。
+```bash
+cp backend/.env.example backend/.env
+```
+
+### OCR 扫描（可选）
+
+拍照扫描需要系统安装 Tesseract：
+
+```bash
+# macOS
+brew install tesseract tesseract-lang
+
+# Ubuntu/Debian
+apt install tesseract-ocr tesseract-ocr-chi-sim
+```
 
 ---
 
@@ -178,12 +207,13 @@ court-doc-generator/
 
 | 问题 | 排查 |
 |------|------|
-| 端口被占用 | `bash bin/stop.sh` 或手动释放 |
-| Python 未找到 | 装 Python 3.10+ 并勾选 "Add to PATH"（Windows）|
+| 端口被占用 | `python3 bin/stop.py` 或手动释放 |
+| Python 未找到 | 安装 Python 3.10+ |
+| npm 未找到 | 安装 Node.js 18+ |
+| 前端白屏 | 确认后端已启动（`python3 bin/status.py`） |
 | PDF.js 加载失败 | 下载 `pdf.min.js` + `pdf.worker.min.js` 到 `static/pdfjs/` |
 | 合并 PDF 失败 | 检查 `outputs/<案件>/` 下是否生成 7 份 PDF |
-| DOCX→PDF 字体丢失 | reportlab 内置 STSong-Light，无需额外字体 |
-| 中文字段乱码 | STSong-Light 已内置，无需配置 |
+| OCR 不工作 | 确认 Tesseract 已安装：`tesseract --list-langs` |
 
 ---
 
@@ -197,11 +227,10 @@ court-doc-generator/
 
 ## 📜 版本
 
-- **v1.1.4** (2026-08-17)：修复服务已存在时双击启动也应弹出浏览器
-- **v1.1.3** (2026-08-17)：修复启动/在线预览/布局三问题
-- **v1.1.2** (2026-08-17)：仅预览真预览（临时目录 + PyMuPDF 缩略图）+ 生成后固定结果卡片 + 自动滚动；新增 pdf_thumb.py
-- **v1.1.0** (2026-08-17)：移除 PII 硬编码、修复 agents 唯一性 bug、接入 docx_to_pdf + pdf_merger、实现 PDF.js 全内联浏览器预览、跨平台启动脚本
-- **v1.0.x** (历史)：MVP 初版
+- **v2.0.0** (2026-08-21)：React+FastAPI 全栈重构，Streamlit 遗骸清理
+- **v1.3.0** (2026-08-20)：用户注册/登录 + workspace 数据隔离
+- **v1.2.0** (2026-08-18)：多代理人材料动态绑定
+- **v1.1.x** (2026-08-17)：PDF.js 预览、在线打印、跨平台脚本
 
 ---
 

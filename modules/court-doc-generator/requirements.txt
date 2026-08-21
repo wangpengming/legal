@@ -1,14 +1,13 @@
 # =============================================
-# 出庭手续生成器 · Python 依赖锁定
+# 出庭手续生成器 · Python 依赖
 # =============================================
 # 建议 Python 3.10+（最低 3.9 兼容）
 # 安装：pip install -r requirements.txt
 # 或：python -m pip install -r requirements.txt（虚拟环境推荐）
+#
+# 注意：本文件为模块根目录共享依赖（generator / scan_service / docx_to_pdf / pdf_merger）。
+# 后端 FastAPI 依赖见 backend/requirements.txt。
 # =============================================
-
-# ---------- Web 框架 ----------
-streamlit>=1.40.0,<2.0
-# 注：1.40+ 已废弃 use_column_width，统一 use_container_width
 
 # ---------- Word 模板处理 ----------
 python-docx>=1.1.0,<2.0
@@ -16,7 +15,7 @@ python-docx>=1.1.0,<2.0
 # ---------- PDF 处理 ----------
 pypdf>=4.0.0,<5.0           # 合并多份 PDF
 reportlab>=4.0.0,<5.0       # DOCX → PDF（用内置 STSong-Light 中文字体）
-PyMuPDF>=1.24.0,<2.0        # 缩略图生成（v1.x 未启用）
+PyMuPDF>=1.24.0,<2.0        # PDF 页面分析
 
 # ---------- 测试 ----------
 pytest>=7.4.0,<9.0
