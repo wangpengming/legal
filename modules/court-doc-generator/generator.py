@@ -58,7 +58,7 @@ _AGENT_PATH_KEYS = {
 # 优先级：自定义上传路径 > templates 目录默认模板 > static 目录默认文件
 _COMPANY_PATH_KEYS = {
     "01_营业执照.pdf": ["business_license_path", "business_license"],
-    "02_法人身份证.pdf": ["legal_rep_id_card_path", "legal_rep_id_card"],
+    "03_法人身份证.pdf": ["legal_rep_id_card_path", "legal_rep_id_card"],
     "02_法定代表人证明.pdf": ["legal_rep_cert_path", "legal_rep_cert"],
     # 授权委托书和推荐信：如果公司上传了 PDF 版本则使用，否则用模板生成
     "04_授权委托书.pdf": ["power_of_attorney_path"],
@@ -460,8 +460,8 @@ def _generate_to_dir(case: dict, company: dict, agent: dict, output_dir: Path) -
     # 公司级 PDF：营业执照 + 法人身份证 + 法定代表人证明
     company_pdf_mappings = [
         ("01_营业执照.pdf", "1.营业执照复印件.pdf"),
-        ("02_法人身份证.pdf", "法人身份证.pdf"),
         ("02_法定代表人证明.pdf", "2.法定代表人证明.pdf"),
+        ("03_法人身份证.pdf", "法人身份证.pdf"),
     ]
     for target_name, fallback_filename in company_pdf_mappings:
         src_path = _resolve_company_pdf(company, target_name, fallback_filename)
