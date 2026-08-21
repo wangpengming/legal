@@ -114,7 +114,7 @@ export default function PdfPreviewModal({ filePath, title, onClose }: PdfPreview
   }
 
   return (
-    <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+    <div className="modal-overlay" style={{ zIndex: 1100 }} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="modal-panel" style={{ maxWidth: 900, width: "95vw", height: "90vh", display: "flex", flexDirection: "column" }}>
         <div className="modal-header">
           <span style={{ fontWeight: 600 }}>{title || "PDF 预览"}</span>

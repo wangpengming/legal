@@ -26,8 +26,8 @@ def test_merge_two_pdfs(tmp_path):
 
 
 def test_merge_with_nonexistent_file_raises(tmp_path):
-    """输入文件不存在时应抛 FileNotFoundError。"""
-    with pytest.raises(FileNotFoundError):
+    """输入文件不存在时（跳过所有文件后）抛 ValueError。"""
+    with pytest.raises(ValueError):
         pdf_merger.merge_pdfs([tmp_path / "ghost.pdf"], tmp_path / "out.pdf")
 
 

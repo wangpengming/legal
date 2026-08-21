@@ -9,6 +9,8 @@ from app.core.config import settings
 
 def _ws_db_path(workspace_id: str) -> Path:
     """workspace 业务 DB 路径。"""
+    if not workspace_id or workspace_id in ("null", "undefined"):
+        raise ValueError(f"无效的 workspace_id: {workspace_id!r}")
     p = settings.workspaces_dir / workspace_id / "court_matters.db"
     p.parent.mkdir(parents=True, exist_ok=True)
     return p

@@ -18,13 +18,13 @@ def test_strip_leading_trailing_dots_and_spaces():
 
 
 def test_empty_string():
-    """空字符串应返回下划线。"""
-    assert sanitize_filename("") == "_"
+    """空字符串应返回'未命名'。"""
+    assert sanitize_filename("") == "未命名"
 
 
 def test_only_unsafe():
-    """全是不安全字符时返回下划线。"""
-    assert sanitize_filename("///") == "_"
+    """全是不安全字符时返回'未命名'。"""
+    assert sanitize_filename("///") == "未命名"
 
 
 # ============================================================

@@ -16,8 +16,8 @@ def test_pdfjs_paths():
 def test_pdfjs_not_ready_when_libs_missing():
     """库未就位时 is_pdfjs_ready() 应返回 False。"""
     from pdf_viewer_component import is_pdfjs_ready
-    # 当前环境无 PDF.js 库（用户明确说先忽略 static 内容）
-    assert is_pdfjs_ready() is False
+    # static/pdfjs/ 已包含 PDF.js 库文件，预期返回 True
+    assert is_pdfjs_ready() is True
 
 
 def test_render_pdf_viewer_signature():

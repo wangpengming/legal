@@ -573,7 +573,7 @@ def sanitize_filename(name: str) -> str:
     """清理文件名中的非法字符。"""
     if not name:
         return "未命名"
-    cleaned = re.sub(r'[\\/:*?"<>|\s]', "_", name).strip("_")
+    cleaned = re.sub(r'[\\/:*?"<>|\s]', "_", name).strip("_.")
     return cleaned[:80] or "未命名"
 
 

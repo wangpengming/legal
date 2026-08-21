@@ -105,15 +105,27 @@ export default function CaseDetailModal({ caseItem, onClose }: CaseDetailModalPr
                 </div>
               </div>
             ) : (
-              records.map(h => (
+              records.map(h => {
+                const files = filesMap[h.id] || [];
+                const mergedPdf = files.find(f => f.is_pdf && f.name.startsWith("00_"));
+                return (
                 <div key={h.id} className="card" style={{ marginBottom: 12, padding: 12 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
                     <span className="text-muted text-sm">
-                      {h.created_at ? new Date(h.created_at).toLocaleString("zh-CN") : "—"}
+                      {h.created_at ? new Date(h.created_at).toLocaleString("zh-CN") : "\u2014"}
                     </span>
                     <span className="text-muted text-sm" style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {h.output_dir}
                     </span>
+                    {mergedPdf && (
+                      <button
+                        className="btn btn-primary" style={{ padding: "4px 8px", fontSize: 12 }}
+                        onClick={() => setPreviewFile({ name: mergedPdf.name, path: mergedPdf.path })}
+                        title="预览合并 PDF"
+                      >
+                        <Eye size={12} /> 合并预览
+                      </button>
+                    )}
                     <a
                       href={`/api/v1/history/${h.id}/download-zip`}
                       className="btn" style={{ padding: "4px 8px", fontSize: 12 }}
@@ -155,7 +167,7 @@ export default function CaseDetailModal({ caseItem, onClose }: CaseDetailModalPr
                     </div>
                   )}
                 </div>
-              ))
+              )})
             )}
           </div>
         </div>

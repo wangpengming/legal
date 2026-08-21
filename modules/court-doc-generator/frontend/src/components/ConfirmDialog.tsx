@@ -19,7 +19,7 @@ export default function ConfirmDialog({
   onCancel,
 }: ConfirmDialogProps) {
   return (
-    <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onCancel(); }}>
+    <div className="modal-overlay" style={{ zIndex: 1100 }} onClick={e => { if (e.target === e.currentTarget) onCancel(); }}>
       <div className="modal-panel" style={{ maxWidth: 420, width: "90vw" }}>
         <div className="modal-header">
           <span style={{ fontWeight: 600 }}>{title}</span>
