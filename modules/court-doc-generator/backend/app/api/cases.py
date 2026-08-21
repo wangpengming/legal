@@ -65,10 +65,14 @@ def list_cases(x_workspace_id: str = Header(alias="X-Workspace-Id")):
 @router.post("", response_model=CaseOut)
 def create_case(body: CaseIn, x_workspace_id: str = Header(alias="X-Workspace-Id")):
     from app.core.database import get_conn
+    from app.api.presets import register_preset
     import sqlite3
     with get_conn(x_workspace_id) as conn:
         cols = {r[1] for r in conn.execute("PRAGMA table_info(cases)")}
         cause_col = "case_cause" if "case_cause" in cols else "cause"
+        # 自动注册预设库（新法院/案由入库，已有则频次 +1）
+        register_preset(conn, x_workspace_id, "court", body.court)
+        register_preset(conn, x_workspace_id, "cause", body.cause)
         conn.execute(
             f"""INSERT INTO cases
                (case_number, court, {cause_col}, hearing_date, opposing_party,

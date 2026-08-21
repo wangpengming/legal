@@ -42,6 +42,7 @@ def init_db(workspace_id: str):
         legal_rep_id_card TEXT DEFAULT '',
         address TEXT DEFAULT '',
         phone TEXT DEFAULT '',
+        is_default INTEGER DEFAULT 0,
         -- 公司级文件路径
         business_license_path TEXT DEFAULT '',
         legal_rep_id_card_path TEXT DEFAULT '',
@@ -87,7 +88,21 @@ def init_db(workspace_id: str):
         output_dir TEXT NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
+
+    CREATE TABLE IF NOT EXISTS presets (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        workspace_id TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        value TEXT NOT NULL,
+        usage_count INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE (workspace_id, kind, value)
+    );
     """
     with get_conn(workspace_id) as conn:
         conn.executescript(schema)
+        # 兼容旧 schema：老库 companies 表缺 is_default 列
+        cols = {r[1] for r in conn.execute("PRAGMA table_info(companies)")}
+        if "is_default" not in cols:
+            conn.execute("ALTER TABLE companies ADD COLUMN is_default INTEGER DEFAULT 0")
         conn.commit()
