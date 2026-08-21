@@ -41,7 +41,7 @@ def generate_court_matters(
     company = dict(company)
     agent = dict(agent)
 
-    # 输出目录
+    # 输出目录（覆盖旧生成）
     case_number = case["case_number"]
     output_dir = (
         settings.DATA_DIR
@@ -50,6 +50,8 @@ def generate_court_matters(
         / "outputs"
         / case_number
     )
+    if output_dir.exists():
+        shutil.rmtree(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
     files = []
@@ -99,8 +101,10 @@ def generate_court_matters(
     if merged.exists():
         files.insert(0, str(merged))
 
-    # 记录历史（动态兼容新旧 schema）
+    # 记录历史（覆盖：一个案件只保留一条记录）
     with get_conn(x_workspace_id) as conn:
+        conn.execute("DELETE FROM generation_history WHERE case_id = ?", (body.case_id,))
+        conn.commit()
         cols = {r[1] for r in conn.execute("PRAGMA table_info(generation_history)")}
         insert_cols = ["case_id", "output_dir"]
         insert_vals: list = [body.case_id, str(output_dir)]
