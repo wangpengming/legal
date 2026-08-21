@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import * as pdfjsLib from "pdfjs-dist";
-import { X } from "lucide-react";
+import { Printer, X } from "lucide-react";
 
 // Set worker source
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
@@ -40,6 +40,41 @@ export default function PdfPreviewModal({ filePath, title, onClose }: PdfPreview
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [useIframe, setUseIframe] = useState(false);
+  const [printing, setPrinting] = useState(false);
+
+  const handlePrint = () => {
+    setPrinting(true);
+    const url = buildFileUrl(filePath);
+    // 打开 PDF 在新窗口，让浏览器原生 PDF 阅读器渲染
+    const w = window.open(url, "_blank");
+    if (w) {
+      // 等待 PDF 加载后触发打印预览
+      const checkReady = setInterval(() => {
+        try {
+          if (w.document.readyState === "complete") {
+            clearInterval(checkReady);
+            setTimeout(() => {
+              w.print();
+              setPrinting(false);
+            }, 500);
+          }
+        } catch {
+          // 跨域或其他异常，直接触发打印
+          clearInterval(checkReady);
+          w.print();
+          setPrinting(false);
+        }
+      }, 200);
+      // 超时保护
+      setTimeout(() => {
+        clearInterval(checkReady);
+        setPrinting(false);
+      }, 10000);
+    } else {
+      setPrinting(false);
+      alert("浏览器拦截了弹窗，请允许弹窗后重试");
+    }
+  };
 
   useEffect(() => {
     if (!filePath) return;
@@ -121,9 +156,23 @@ export default function PdfPreviewModal({ filePath, title, onClose }: PdfPreview
       <div className="modal-panel" style={{ maxWidth: 900, width: "95vw", height: "90vh", display: "flex", flexDirection: "column" }}>
         <div className="modal-header">
           <span style={{ fontWeight: 600 }}>{title || "PDF 预览"}</span>
-          <button className="btn" style={{ padding: "4px 8px" }} onClick={onClose}>
-            <X size={16} />
-          </button>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            {!loading && !error && !useIframe && (
+              <button
+                className="btn"
+                style={{ padding: "4px 10px", display: "flex", alignItems: "center", gap: 4, fontSize: 13 }}
+                onClick={handlePrint}
+                disabled={printing}
+                title="打印 PDF（弹出打印预览）"
+              >
+                <Printer size={16} />
+                {printing ? "打印中..." : "打印"}
+              </button>
+            )}
+            <button className="btn" style={{ padding: "4px 8px" }} onClick={onClose}>
+              <X size={16} />
+            </button>
+          </div>
         </div>
         <div className="modal-body" style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", padding: 12, overflow: "auto" }}>
           {loading && <div className="empty">加载中...</div>}
