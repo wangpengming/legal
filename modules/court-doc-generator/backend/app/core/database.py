@@ -98,6 +98,16 @@ def init_db(workspace_id: str):
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         UNIQUE (workspace_id, kind, value)
     );
+
+    CREATE TABLE IF NOT EXISTS audit_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        workspace_id TEXT NOT NULL,
+        username TEXT NOT NULL,
+        action TEXT NOT NULL,
+        target TEXT NOT NULL,
+        result TEXT DEFAULT 'ok',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
     """
     with get_conn(workspace_id) as conn:
         conn.executescript(schema)

@@ -28,6 +28,7 @@ def generate_court_matters(
     from app.core.database import get_conn
     import sqlite3
     from app.core.config import settings
+    from app.api.audit import log_action
 
     with get_conn(x_workspace_id) as conn:
         conn.row_factory = sqlite3.Row
@@ -35,6 +36,7 @@ def generate_court_matters(
         company = conn.execute("SELECT * FROM companies WHERE id = ?", (body.company_id,)).fetchone()
         agent = conn.execute("SELECT * FROM agents WHERE id = ?", (body.agent_id,)).fetchone()
         if not (case and company and agent):
+            log_action(x_workspace_id, "generate", f"case {body.case_id}", result="failed")
             raise ValueError("case/company/agent not found")
 
     case = dict(case)
@@ -55,7 +57,12 @@ def generate_court_matters(
     sys.path.insert(0, str(settings.MODULE_ROOT))
     from generator import _generate_to_dir
 
-    _generate_to_dir(case, company, agent, output_dir)
+    # F6 操作日志（成功/失败）
+    try:
+        _generate_to_dir(case, company, agent, output_dir)
+    except Exception:
+        log_action(x_workspace_id, "generate", f"case {body.case_id}", result="failed")
+        raise
 
     # 收集输出文件
     files = sorted(str(p) for p in output_dir.iterdir() if p.suffix in (".pdf", ".docx", ".zip"))
@@ -83,5 +90,7 @@ def generate_court_matters(
             insert_vals,
         )
         conn.commit()
+
+    log_action(x_workspace_id, "generate", f"case {body.case_id}", result="ok")
 
     return GenerateOut(output_dir=str(output_dir), files=files, merged_pdf=merged_str)

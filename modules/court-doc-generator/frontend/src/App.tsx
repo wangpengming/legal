@@ -10,6 +10,7 @@ import AgentDetailPage from "./pages/AgentDetailPage";
 import CasesPage from "./pages/CasesPage";
 import HistoryPage from "./pages/HistoryPage";
 import ScanPage from "./pages/ScanPage";
+import AuditLogsPage from "./pages/AuditLogsPage";
 import Layout from "./components/Layout";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -44,6 +45,7 @@ export default function App() {
         <Route path="cases" element={<CasesPage />} />
         <Route path="history" element={<HistoryPage />} />
         <Route path="scan" element={<ScanPage />} />
+        <Route path="audit-logs" element={<AuditLogsPage />} />
       </Route>
     </Routes>
   );

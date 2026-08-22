@@ -185,6 +185,21 @@ export const historyApi = {
   },
 };
 
+// ── 操作日志 ─────────────────────────────────────────────────────────────
+export interface AuditLog {
+  id: number;
+  username: string;
+  action: string;
+  target: string;
+  result: string;
+  created_at: string;
+}
+
+export const auditApi = {
+  list: (limit = 100, offset = 0) =>
+    api<AuditLog[]>(`/audit-logs?limit=${limit}&offset=${offset}`),
+};
+
 // ── 文件服务（直接 URL，支持 ?ws= query 参数）───────────────────────────────────
 export function fileUrl(relativePath: string): string {
   const wsId = sessionStorage.getItem("_ws_id") || "";

@@ -1,7 +1,7 @@
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuthStore } from "../stores/authStore";
 import {
-  LayoutDashboard, Building2, Users, FileText, History, LogOut, Camera,
+  LayoutDashboard, Building2, Users, FileText, History, LogOut, Camera, ScrollText,
 } from "lucide-react";
 
 const NAV = [
@@ -11,6 +11,7 @@ const NAV = [
   { to: "/cases", icon: FileText, label: "案件" },
   { to: "/history", icon: History, label: "历史记录" },
   { to: "/scan", icon: Camera, label: "拍照扫描" },
+  { to: "/audit-logs", icon: ScrollText, label: "操作日志" },
 ];
 
 export default function Layout() {

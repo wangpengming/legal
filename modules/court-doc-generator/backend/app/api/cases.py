@@ -109,6 +109,9 @@ def create_case(body: CaseIn, x_workspace_id: str = Header(alias="X-Workspace-Id
         row = conn.execute("SELECT * FROM cases WHERE id = last_insert_rowid()").fetchone()
         conn.row_factory = sqlite3.Row
         d = dict(row)
+        # F6 操作日志
+        from app.api.audit import log_action
+        log_action(x_workspace_id, "case_create", f"case {d['id']} {d['case_number']}")
         return CaseOut(
             id=d["id"], case_number=d["case_number"], court=d.get("court", ""),
             cause=d.get("cause") or d.get("case_cause", ""),
@@ -123,6 +126,11 @@ def create_case(body: CaseIn, x_workspace_id: str = Header(alias="X-Workspace-Id
 def delete_case(case_id: int, x_workspace_id: str = Header(alias="X-Workspace-Id")):
     from app.core.database import get_conn
     with get_conn(x_workspace_id) as conn:
+        row = conn.execute("SELECT case_number FROM cases WHERE id = ?", (case_id,)).fetchone()
+        case_number = row["case_number"] if row else ""
         conn.execute("DELETE FROM cases WHERE id = ?", (case_id,))
         conn.commit()
+    # F6 操作日志
+    from app.api.audit import log_action
+    log_action(x_workspace_id, "case_delete", f"case {case_id} {case_number}")
     return {"ok": True}

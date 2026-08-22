@@ -109,6 +109,10 @@ def register(body: RegisterIn):
     # 写默认公司「雷石」
     _ensure_leishi(ws_id)
 
+    # F6 操作日志
+    from app.api.audit import log_action
+    log_action(ws_id, "register", f"workspace {ws_id}", username=body.name)
+
     token = secrets.token_hex(16)
     return LoginOut(workspace_id=ws_id, workspace_name=body.name, token=token)
 
@@ -125,6 +129,10 @@ def login(body: LoginIn):
 
     if not row or not _verify_password(body.password, row["password_hash"]):
         raise HTTPException(401, "用户名或密码错误")
+
+    # F6 操作日志
+    from app.api.audit import log_action
+    log_action(row["id"], "login", f"workspace {row['id']}", username=body.name)
 
     token = secrets.token_hex(16)
     return LoginOut(
