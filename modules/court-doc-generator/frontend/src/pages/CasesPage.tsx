@@ -133,7 +133,6 @@ export default function CasesPage() {
             clearDraft(draftKeyStr);
             setDraftPending(null);
             setForm({ ...EMPTY_FORM, ...m });
-            setShowForm(true);
             setScanOpen(false);
           }}
         />
@@ -181,9 +180,6 @@ export default function CasesPage() {
       <div className="page-header">
         <h1 className="page-title">📋 案件管理</h1>
         <div className="page-actions">
-          <button className="btn btn-outline" onClick={() => setScanOpen(true)}>
-            <Camera size={14} /> 扫描起诉状
-          </button>
           <button className="btn btn-primary" onClick={() => setShowForm(!showForm)}>
             <Plus size={14} /> 新建案件
           </button>
@@ -198,7 +194,13 @@ export default function CasesPage() {
 
       {showForm && (
         <div className="card">
-          <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>新建案件</h3>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+            <h3 style={{ fontSize: 14, fontWeight: 600 }}>新建案件</h3>
+            {/* 扫描起诉状入口：服务于当前新建表单，识别后一键填入 */}
+            <button type="button" className="btn btn-outline" style={{ padding: "4px 10px", fontSize: 12 }} onClick={() => setScanOpen(true)}>
+              <Camera size={12} /> 扫描起诉状填入
+            </button>
+          </div>
           {formError && <div className="alert alert-error">{formError}</div>}
           {formSuccess && <div className="alert alert-success">{formSuccess}</div>}
           <form onSubmit={e => { e.preventDefault(); if (!form.case_number.trim()) { setFormError("请填写案号"); return; } setFormError(""); create.mutate(form); }}>
