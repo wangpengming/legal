@@ -79,6 +79,7 @@ env/
 .coverage
 htmlcov/
 .pytest_cache/
+.pytest-data/
 coverage/
 .nyc_output/
 

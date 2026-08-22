@@ -15,13 +15,26 @@ class Settings(BaseSettings):
     # 路径（向上四级到模块根：backend/app/core/config.py → court-doc-generator/）
     MODULE_ROOT: Path = Path(__file__).parent.parent.parent.parent
     DATA_DIR: Path = MODULE_ROOT / "data"
-    WORKSPACES_DIR: Path = DATA_DIR / "workspaces"
-    STATIC_DIR: Path = MODULE_ROOT / "static"
-    TEMPLATES_DIR: Path = MODULE_ROOT / "templates"
-    OUTPUTS_DIR: Path = MODULE_ROOT / "outputs"
-
-    # CORS（开发时全开）
     CORS_ORIGINS: list[str] = ["http://localhost:18502", "http://localhost:3000"]
+
+    # 派生路径必须用 property：pydantic 字段默认值在类定义时求值，
+    # 若写成 `X: Path = DATA_DIR / "x"`，DATA_DIR 被环境变量覆盖后 X 仍指向旧目录
+    #（2026-08-22 事故：pytest 隔离 DATA_DIR 后业务库仍写入生产 data/workspaces）
+    @property
+    def WORKSPACES_DIR(self) -> Path:
+        return self.DATA_DIR / "workspaces"
+
+    @property
+    def STATIC_DIR(self) -> Path:
+        return self.MODULE_ROOT / "static"
+
+    @property
+    def TEMPLATES_DIR(self) -> Path:
+        return self.MODULE_ROOT / "templates"
+
+    @property
+    def OUTPUTS_DIR(self) -> Path:
+        return self.MODULE_ROOT / "outputs"
 
     @property
     def workspaces_dir(self) -> Path:

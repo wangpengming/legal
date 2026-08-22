@@ -154,6 +154,15 @@ outputs/          生成结果
 cd modules/<module-name> && pytest tests/ -v
 ```
 
+### 7.5 测试/验证数据隔离（强制，2026-08-22 事故后）
+
+| 场景 | 强制要求 |
+|------|---------|
+| pytest / 单测 | 测试必须与真实数据全隔离：`backend/tests/conftest.py` 全局把 `DATA_DIR` 指向 `.pytest-data`（模块根，已 gitignore）；**禁止直连生产 `data/`**（2026-08-22 曾累计产生 400+ TestUser workspace） |
+| 浏览器 E2E / 手工验证 | 严禁复用真实账号（如「张洋」）演练增删改；必须注册**专用验证账号**（命名 `e2e_*` / `verify_*`），验证完毕即删（注册表 + 目录同步） |
+| 数据清理 | 以注册表 `data/workspaces.db` 为准，白名单法：保留真实账号，其余全清；目录与注册表必须同步，无孤儿 |
+| 路径派生 | 模块配置中**派生路径必须用 property**（如 `DATA_DIR` env 覆盖后 `WORKSPACES_DIR` 不得残留类体求值），否则测试隔离形同虚设 |
+
 ---
 
 ## 8. 文档要求

@@ -712,3 +712,39 @@ v2.2.0 将「扫描起诉状」按钮放在案件页工具栏（新建按钮旁�
 - [x] 点击「新建案件」→ 表单内出现「扫描起诉状填入」按钮
 - [x] 表单内打开 Modal → 上传自造起诉状图 → OCR 识别 7/7 → 填入表单（案号/案由/法院/开庭日期/对方当事人/角色推断正常）
 - [x] tsc 零错误；浏览器实测截图 docs/qoder-raw/v221-entry-fix/01-scan-in-form.png
+
+---
+
+## 2026-08-22 court-doc-generator 测试数据隔离与生产数据治理（434 workspace 清理）
+
+**类型**: fix
+**模块**: court-doc-generator（backend）
+**状态**: done
+**优先级**: P1（生产数据被 pytest 污染 + 真实数据被 E2E 误删）
+
+### 描述
+
+pytest 直连真实 FastAPI 应用，累计产生 434 个测试 workspace（TestUser_* 429 + T_* 2 + v21 验证工作室 1 + e2e_scan_ws 2）；多轮浏览器 E2E 复用「张洋」真实账号演练删除验证，导致 case 1~4（含（2026）京0101民初9999号）、company 1、agent 1 被删。
+
+### 根因
+
+1. pytest 无数据隔离：test_api.py 等 5 个模块 TestClient(app) 直连真实 app + random_name() 注册
+2. config.py 派生路径类体求值：DATA_DIR 被 env 覆盖后 WORKSPACES_DIR 仍指向生产目录（注册表隔离但业务库未隔离）
+3. E2E 无专用账号规范：删除验证打在真实数据上
+
+### 子任务
+
+- [x] 清理 434 测试 workspace（data/workspaces 目录 + 注册表白名单法，仅保留「张洋」）
+- [x] 恢复 case 4（（2026）京0101民初9999号）：案号取自 generation_history#8，法院由 0101 推导，公司/代理人关联现存雷石/张洋；案由/开庭/对方待用户补充
+- [x] 删除垃圾案件 5/6（E2E 数字填充产物）+ 关联 generation_history 11/12 + outputs/1
+- [x] backend/tests/conftest.py 全局 DATA_DIR → .pytest-data（临时目录，session 结束清理）
+- [x] config.py 派生路径改 property（WORKSPACES_DIR / STATIC_DIR / TEMPLATES_DIR / OUTPUTS_DIR 不再类体固定）
+- [x] .gitignore 追加 .pytest-data/
+- [x] AGENTS.md §7.5 测试/验证数据隔离规范（E2E 专用账号强制）
+
+### 验收标准
+
+- [x] 生产注册表仅剩 1 个 workspace（张洋）
+- [x] pytest 40 passed 且运行前后生产 data/ 零增长
+- [x] 张洋库恢复 case 4 且 generation_history 关联完好
+- [x] 备份存档 data/backups/2026-08-22_fix/（workspaces.db + zhangyang_court_matters.db）
