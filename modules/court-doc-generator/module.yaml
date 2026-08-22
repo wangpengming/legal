@@ -1,7 +1,7 @@
 name: court-doc-generator
-version: 2.2.2
+version: 2.2.5
 status: active
-description: 出庭手续文档生成器（React+FastAPI 全栈，7份材料 + 多代理人动态绑定 + 用户注册/登录 + workspace 数据隔离 + PDF合并预览 + 在线打印 + 搜索筛选/预设库/操作日志/CSV导出/草稿/开庭提醒/暗色模式/拍照扫描建档）
+description: 出庭手续文档生成器（React+FastAPI 全栈，7份材料 + 多代理人动态绑定 + 用户注册/登录 + workspace 数据隔离 + PDF合并预览 + 在线打印 + 搜索筛选/预设库/操作日志/CSV导出/草稿/开庭提醒/暗色模式/拍照扫描建档（多图合并识别））
 entry: backend/app/main.py
 port:
   backend: 8001       # FastAPI Python 后端
@@ -30,7 +30,10 @@ features:
   - 多代理人材料动态绑定（v1.2.0）：06/07 PDF 跟随 agent + 04 授权委托书被授权人姓名/身份证号动态填充
   - 用户注册/登录与 workspace 数据隔离（v1.3.0）：每人独立 DB + outputs + agents 目录，密码 pbkdf2_hmac 哈希
   - 拍照扫描（v2.2.0/v2.2.1）：新建表单内扫描起诉状入口，上传/URL → Tesseract OCR → 识别案号/法院/案由/当事人/开庭时间 → 一键填入表单；我方角色 原告/被告/第三人/法院
+  - 扫描多图合并与识别鲁棒化（v2.2.5）：多文件一次上传（图片/PDF 混传）合并识别；双 PSM 通道交叉 OCR；法院形近字还原；当事人评分截断；案由四级抽取（标签行/复合词表/正则/兜底）
   - 测试数据隔离（v2.2.2）：pytest 全局 DATA_DIR → .pytest-data（conftest 强制）+ 配置派生路径 property 化，杜绝测试污染生产数据
+  - 生成正确性与稳定性（v2.2.3）：进程级互斥锁消除同案号并发生成 rmtree 竞态（抢锁失败提示「正在生成中」）+ 生成不完整显性化（missing 清单透出到前端告警，不再假装成功）
+  - 预览防缓存（v2.2.4）：files API 响应加 Cache-Control: no-store + 前端预览/下载 URL 带时间戳参数，杜绝浏览器启发式缓存旧生成结果（修复合并 PDF 缺委托书/推荐信的“假象”）
   - 案件管理：查看/编辑/删除/二次确认
   - 生成记录查看与文件预览
   - 案件搜索与筛选（v2.1.0 F1）：案号/法院/案由关键词 + 状态 + 开庭日期区间（防抖 300ms）

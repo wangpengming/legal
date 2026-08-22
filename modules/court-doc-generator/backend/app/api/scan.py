@@ -47,47 +47,61 @@ class ScanOut(BaseModel):
 
 @router.post("/scan", response_model=ScanOut)
 async def scan_image(
-    file: Annotated[UploadFile, File(description="上传法律文书图片或 PDF")],
+    files: Annotated[list[UploadFile] | None, File(description="上传法律文书图片或 PDF（支持多文件，多图信息自动合并识别）")] = None,
+    file: Annotated[UploadFile | None, File(description="单文件兼容参数（旧版前端使用）")] = None,
     x_workspace_id: str = Header(alias="X-Workspace-Id"),
 ):
-    """拍照扫描入口：接收本地文件上传，OCR 识别并抽取字段。"""
-    content_type = file.content_type or ""
-    if content_type not in ALLOWED_TYPES:
-        return ScanOut(text="", fields={}, error=f"不支持的文件类型: {content_type}，仅支持 jpg/png/pdf")
+    """拍照扫描入口：接收一个或多个文件，OCR 合并识别并抽取字段。
 
-    try:
-        content = await file.read()
-    except Exception as e:
-        return ScanOut(text="", fields={}, error=f"读取文件失败: {e}")
+    起诉状往往多页/多图，各文件依次转图片后交由 scan_service
+    extract_text 统一拼接识别，字段从合并文本中抽取。
+    """
+    targets = list(files) if files else []
+    if file is not None:
+        targets.append(file)
+    if not targets:
+        return ScanOut(text="", fields={}, error="未收到文件，请选择图片或 PDF 上传")
 
-    if len(content) > MAX_FILE_SIZE:
-        return ScanOut(text="", fields={}, error="文件超过 20MB 限制")
-    if len(content) == 0:
-        return ScanOut(text="", fields={}, error="文件为空")
-
-    ext = {"application/pdf": "pdf", "image/jpeg": "jpg", "image/jpg": "jpg", "image/png": "png"}.get(content_type, "bin")
-
-    try:
-        # macOS sandbox 下 subprocess 无法访问 /tmp/，用 .run/ 目录
-        _RUN_DIR.mkdir(exist_ok=True)
-        import uuid
-        tmp_name = _RUN_DIR / f"scan_{uuid.uuid4().hex}.{ext}"
-        tmp_name.write_bytes(content)
-        input_path = tmp_name
-    except Exception as e:
-        return ScanOut(text="", fields={}, error=f"创建临时文件失败: {e}")
+    import uuid
+    _RUN_DIR.mkdir(exist_ok=True)
 
     img_paths: list[Path] = []
+    cleanup_paths: list[Path] = []
+    cleanup_dirs: list[Path] = []
+
     try:
-        if content_type == "application/pdf":
-            pdf_tmp_dir = _RUN_DIR / f"scan_pdf_{uuid.uuid4().hex}"
-            pdf_tmp_dir.mkdir(exist_ok=True)
-            imgs = _pdf_to_images(input_path, pdf_tmp_dir)
-            if not imgs:
-                return ScanOut(text="", fields={}, error="PDF 解析失败，请确保为可识别图片的 PDF")
-            img_paths = imgs
-        else:
-            img_paths = [input_path]
+        for i, up in enumerate(targets):
+            content_type = up.content_type or ""
+            if content_type not in ALLOWED_TYPES:
+                return ScanOut(text="", fields={}, error=f"第 {i+1} 个文件类型不支持: {content_type}，仅支持 jpg/png/pdf")
+            try:
+                content = await up.read()
+            except Exception as e:
+                return ScanOut(text="", fields={}, error=f"读取第 {i+1} 个文件失败: {e}")
+            if len(content) > MAX_FILE_SIZE:
+                return ScanOut(text="", fields={}, error=f"第 {i+1} 个文件超过 20MB 限制")
+            if len(content) == 0:
+                return ScanOut(text="", fields={}, error=f"第 {i+1} 个文件为空")
+
+            ext = {"application/pdf": "pdf", "image/jpeg": "jpg", "image/jpg": "jpg", "image/png": "png"}.get(content_type, "bin")
+            # macOS sandbox 下 subprocess 无法访问 /tmp/，用 .run/ 目录
+            tmp_path = _RUN_DIR / f"scan_{uuid.uuid4().hex}.{ext}"
+            tmp_path.write_bytes(content)
+            cleanup_paths.append(tmp_path)
+
+            if content_type == "application/pdf":
+                pdf_tmp_dir = _RUN_DIR / f"scan_pdf_{uuid.uuid4().hex}"
+                pdf_tmp_dir.mkdir(exist_ok=True)
+                cleanup_dirs.append(pdf_tmp_dir)
+                imgs = _pdf_to_images(tmp_path, pdf_tmp_dir)
+                if not imgs:
+                    return ScanOut(text="", fields={}, error=f"第 {i+1} 个 PDF 解析失败，请确保为可识别图片的 PDF")
+                img_paths.extend(imgs)
+            else:
+                img_paths.append(tmp_path)
+
+        if not img_paths:
+            return ScanOut(text="", fields={}, error="没有可识别的图片")
 
         text = extract_text(img_paths)
         if not text.strip():
@@ -97,11 +111,13 @@ async def scan_image(
     except Exception as e:
         return ScanOut(text="", fields={}, error=f"OCR 处理失败: {e}")
     finally:
-        input_path.unlink(missing_ok=True)
-        if content_type == "application/pdf":
-            import shutil as _sh
-            try: _sh.rmtree(pdf_tmp_dir) 
-            except: pass
+        for p in cleanup_paths:
+            p.unlink(missing_ok=True)
+        for d in cleanup_dirs:
+            try:
+                shutil.rmtree(d)
+            except Exception:
+                pass
 
 
 @router.post("/scan-url", response_model=ScanOut)

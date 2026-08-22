@@ -2,7 +2,7 @@
 
 > React + FastAPI 全栈应用 · 法务一键生成出庭 7 份材料
 
-**v2.0.0** · 2026-08-21
+**v2.2.5** · 2026-08-22
 
 ---
 
@@ -81,6 +81,25 @@ python3 bin/status.py      # 查看状态
 python3 bin/stop.py        # 停止全部
 python3 bin/restart.py     # 重启全部
 ```
+
+---
+
+## 🏭 生产部署（后端托管前端，单端口 8001）
+
+生产形态：`npm run build` 产物（`frontend/dist/`）由 FastAPI 统一托管，服务器只跑一个后端进程，浏览器访问 `http://<server>:8001`。
+
+```bash
+# 1. 构建前端（构建机或服务器上执行，dist/ 不入 git 需单独携带）
+cd frontend && npm ci && npm run build
+
+# 2. 生产启动（自动校验 dist 存在）
+python3 bin/start.py --prod
+python3 bin/status.py   # 健康检查可用性验证
+```
+
+日志：`backend/.run/backend.log`（超过 5MB 自动轮转，保留 5 份）；生产建议 systemd 托管（崩溃自愈 + journalctl 日志，systemd 模式不要再用 bin 四件套）。
+
+📖 完整部署手册（安装步骤 / .env / systemd / 日志 / 排障 / 备份）：[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)
 
 ---
 
@@ -227,6 +246,8 @@ apt install tesseract-ocr tesseract-ocr-chi-sim
 
 ## 📜 版本
 
+- **v2.2.5** (2026-08-22)：扫描多图合并 + OCR 鲁棒化、测试数据隔离、生成互斥锁/不完整显性化、预览防缓存、**部署完备性**（后端托管前端生产形态、字体多平台自适应、日志轮转、部署手册 + systemd 样例）
+- **v2.1.0** (2026-08-22)：七项体验增强（搜索/筛选、草稿、开庭提醒、CSV 导出、预设库、操作日志、暗色模式）
 - **v2.0.0** (2026-08-21)：React+FastAPI 全栈重构，Streamlit 遗骸清理
 - **v1.3.0** (2026-08-20)：用户注册/登录 + workspace 数据隔离
 - **v1.2.0** (2026-08-18)：多代理人材料动态绑定

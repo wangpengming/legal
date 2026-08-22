@@ -21,7 +21,8 @@ function buildFileUrl(relPath: string): string {
   }
   const hex = Array.from(new TextEncoder().encode(relPath))
     .map(b => b.toString(16).padStart(2, "0")).join("");
-  return `/api/v1/files/~hex/${hex}?ws=${wsId}`;
+  // 生成产物可能变化，带时间戳参数避免浏览器缓存旧版本（与 templates/ 分支一致）
+  return `/api/v1/files/~hex/${hex}?ws=${wsId}&t=${Date.now()}`;
 }
 
 async function isImagePdf(url: string): Promise<boolean> {

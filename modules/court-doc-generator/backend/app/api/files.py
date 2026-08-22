@@ -123,4 +123,9 @@ def serve_workspace_file(
     }
     suffix = full_path.suffix.lower()
     media_type = media_type_map.get(suffix, "application/octet-stream")
-    return FileResponse(str(full_path), media_type=media_type)
+    # 生成产物 URL 无语义变化，禁止浏览器启发式缓存旧版本（合并 PDF 显示旧内容问题）
+    return FileResponse(
+        str(full_path),
+        media_type=media_type,
+        headers={"Cache-Control": "no-store, no-cache, must-revalidate"},
+    )

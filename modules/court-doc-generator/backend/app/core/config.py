@@ -29,6 +29,11 @@ class Settings(BaseSettings):
         return self.MODULE_ROOT / "static"
 
     @property
+    def FRONTEND_DIST_DIR(self) -> Path:
+        """前端 build 产物目录（生产形态由后端统一托管）。"""
+        return self.MODULE_ROOT / "frontend" / "dist"
+
+    @property
     def TEMPLATES_DIR(self) -> Path:
         return self.MODULE_ROOT / "templates"
 

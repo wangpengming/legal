@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { Upload, X, Camera, CheckCircle2 } from "lucide-react";
-import { scanUpload, scanImageUrl, mapFieldsToCaseForm, ScanResult, ScanCaseMapping } from "../lib/scan";
+import { scanUploadFiles, scanImageUrl, mapFieldsToCaseForm, ScanResult, ScanCaseMapping } from "../lib/scan";
 
 interface ScanModalProps {
   open: boolean;
@@ -26,30 +26,47 @@ export default function ScanModal({ open, onClose, onApply }: ScanModalProps) {
   const [scanningUrl, setScanningUrl] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ScanResult | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!open) return null;
 
-  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    // 只收集文件到列表，由用户点击「开始识别」后批量上传（支持多图合并识别）
+    const files = Array.from(e.target.files ?? []);
+    if (!files.length) return;
+    setError(null);
+    setResult(null);
+    setRawText(null);
+    setUploading(false);
+    setSelectedFiles(prev => [...prev, ...files]);
+    e.target.value = "";
+  }
+
+  async function handleUpload() {
+    if (!selectedFiles.length) return;
     setUploading(true);
     setError(null);
     setResult(null);
     setRawText(null);
     try {
-      const data = await scanUpload(file);
+      const data = await scanUploadFiles(selectedFiles);
       if (data.error) setError("OCR 解析失败: " + data.error);
       else if (data.text) {
         setResult(data);
         setRawText(data.text);
+      } else {
+        setError("OCR 未识别到文字，请确认图片清晰");
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "扫描失败");
     } finally {
       setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
     }
+  }
+
+  function removeFile(index: number) {
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
   }
 
   async function handleScanUrl() {
@@ -90,21 +107,46 @@ export default function ScanModal({ open, onClose, onApply }: ScanModalProps) {
             上传起诉状照片 / 扫描件，系统自动 OCR 识别案号、法院、案由、当事人、开庭时间等，一键填入新建案件表单。
           </p>
 
-          {/* 文件上传 */}
+          {/* 文件上传（支持多选） */}
           <div style={{ border: "2px dashed var(--border)", borderRadius: 8, padding: "24px 16px", textAlign: "center", marginBottom: 16, background: "var(--bg-secondary)" }}>
             <input
               ref={fileInputRef}
               type="file"
               accept=".jpg,.jpeg,.png,.pdf"
+              multiple
               style={{ display: "none" }}
               id="scan-file-input"
               onChange={handleFileChange}
             />
             <label htmlFor="scan-file-input" className="btn btn-primary" style={{ cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}>
               <Upload size={14} />
-              {uploading ? "识别中..." : "选择文件上传"}
+              选择文件上传
             </label>
-            <div className="text-muted text-sm" style={{ marginTop: 8 }}>支持 JPG、PNG、PDF，单文件不超过 20MB</div>
+            <div className="text-muted text-sm" style={{ marginTop: 8 }}>支持多选 JPG、PNG、PDF，单个不超过 20MB，多图自动合并识别</div>
+
+            {/* 已选文件列表 */}
+            {selectedFiles.length > 0 && (
+              <div style={{ marginTop: 12, textAlign: "left" }}>
+                {selectedFiles.map((f, i) => (
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 0", fontSize: 13 }}>
+                    <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.name}</span>
+                    <span style={{ color: "var(--text-muted)", fontSize: 12 }}>{(f.size / 1024).toFixed(0)} KB</span>
+                    <button className="btn" style={{ padding: "2px 6px" }} onClick={() => removeFile(i)} disabled={uploading} aria-label="移除">
+                      <X size={12} />
+                    </button>
+                  </div>
+                ))}
+                <div style={{ display: "flex", gap: 8, marginTop: 8, justifyContent: "center" }}>
+                  <button className="btn btn-primary" onClick={handleUpload} disabled={uploading || selectedFiles.length === 0} style={{ fontSize: 13 }}>
+                    <Camera size={14} />
+                    {uploading ? `识别中（${selectedFiles.length} 张）...` : `开始识别（${selectedFiles.length} 个文件）`}
+                  </button>
+                  <button className="btn btn-outline" onClick={() => setSelectedFiles([])} disabled={uploading} style={{ fontSize: 13 }}>
+                    清空
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* URL 方式 */}
@@ -171,7 +213,7 @@ export default function ScanModal({ open, onClose, onApply }: ScanModalProps) {
             </details>
           )}
 
-          {!result && !uploading && !scanningUrl && !error && (
+          {!result && !uploading && !scanningUrl && !error && selectedFiles.length === 0 && (
             <div className="empty" style={{ padding: 24 }}>
               <div className="empty-icon">📷</div>
               <div>上传起诉状文件或粘贴 URL 开始识别</div>

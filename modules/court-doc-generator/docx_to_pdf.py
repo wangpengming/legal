@@ -1,11 +1,14 @@
 """docx 转 PDF：用 reportlab 重新排版生成 PDF。
 
 策略：读取 docx 的段落和 runs，提取对齐、字体大小等基础样式，
-用 reportlab 重排版输出 PDF。中文用 macOS 自带的 TTF 字体（STFangsong / STSong），
-reportlab 自动嵌入字体子集，确保 PDF 在任何操作系统打印都能正常显示
+用 reportlab 重排版输出 PDF。中文字体按平台自适应探测（macOS 仿宋/宋体、
+Linux Noto CJK、Windows 宋体/黑体），reportlab 自动嵌入字体子集，
+确保 PDF 在任何操作系统打印都能正常显示
 （之前用 reportlab 内置的 STSong-Light CID 字体是伪字体，macOS 打印时找不到
-对应字形导致 04/05 打印空白）。
+对应字形导致 04/05 打印空白）。可用 FONT_DIR 环境变量指定自定义字体目录。
 """
+import os
+import sys
 from pathlib import Path
 
 from docx import Document
@@ -29,33 +32,85 @@ from reportlab.platypus import (
 )
 
 
-def _register_cn_font() -> str:
-    """注册中文字体（macOS 自带 TTF 真实字体，reportlab 嵌入子集）。
+def _font_candidates() -> list:
+    """探测可用的中文字体文件，返回 (路径, subfontIndex) 候选列表（多平台自适应）。
 
-    优先级：STFangsong（仿宋，docx 模板原意）→ STSong（宋体）→ CID 字体（fallback）。
-    返回注册成功的字体名。
+    优先级：
+    1. FONT_DIR 环境变量指向的目录（扫描 *.ttf / *.ttc / *.otf，排除隐藏文件）
+    2. 平台内置字体：
+       - macOS：Songti.ttc（face 0 = STSong，face 1 = STFangsong）/ STFangsong TTF
+       - Linux：Noto CJK、文泉驿微米黑、AR PL UMing、DroidSansFallback 常见路径
+       - Windows：SimSun / SimHei / Microsoft YaHei
+    全部候选失败时由调用方回退 CID 字体（保证 PDF 可生成，打印可能空白）。
     """
-    candidates = [
-        # STFangsong（仿宋，TTF 格式，macOS 自带）
-        ("/System/Library/AssetsV2/com_apple_MobileAsset_Font8/1b6b2f148cdf17dd0d788706c83c61ca1998c3a6.asset/AssetData/STFANGSO.ttf", 0),
-        # Songti.ttc（包含 STSong 宋体，face 0 = STSong，face 1 = STFangsong）
-        ("/System/Library/Fonts/Supplemental/Songti.ttc", 0),
-    ]
-    for path, face_index in candidates:
+    candidates = []
+
+    # 1. FONT_DIR 环境变量（server 部署时可将字体文件放进指定目录，优先级最高）
+    font_dir = os.environ.get("FONT_DIR", "").strip()
+    if font_dir:
+        d = Path(font_dir)
+        if d.is_dir():
+            for pattern in ("*.ttf", "*.ttc", "*.otf"):
+                for p in sorted(d.glob(pattern)):
+                    if p.name.startswith("."):
+                        continue
+                    candidates.append((str(p), 0))
+            if candidates:
+                return candidates  # FONT_DIR 命中即独占返回；目录空/缺失时回退平台候选
+
+    # 2. 平台内置字体
+    if sys.platform == "darwin":
+        candidates.extend(
+            [
+                # Songti.ttc（face 0 = STSong 宋体，face 1 = STFangsong 仿宋）
+                ("/System/Library/Fonts/Supplemental/Songti.ttc", 0),
+                # STFangsong（仿宋，TTF 格式，macOS 自带，docx 模板原意）
+                ("/System/Library/AssetsV2/com_apple_MobileAsset_Font8/1b6b2f148cdf17dd0d788706c83c61ca1998c3a6.asset/AssetData/STFANGSO.ttf", 0),
+            ]
+        )
+    elif sys.platform.startswith("linux"):
+        candidates.extend(
+            [
+                ("/usr/share/fonts/opentype/noto/NotoSerifCJK-Regular.ttc", 0),
+                ("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc", 0),
+                ("/usr/share/fonts/truetype/noto/NotoSerifCJKsc-Regular.otf", 0),
+                ("/usr/share/fonts/truetype/wqy/wqy-microhei.ttc", 0),
+                ("/usr/share/fonts/truetype/arphic/uming.ttc", 0),
+                ("/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf", 0),
+            ]
+        )
+    elif sys.platform.startswith("win"):
+        candidates.extend(
+            [
+                ("C:/Windows/Fonts/simsun.ttc", 0),
+                ("C:/Windows/Fonts/simhei.ttf", 0),
+                ("C:/Windows/Fonts/msyh.ttc", 0),
+            ]
+        )
+    return candidates
+
+
+def _register_cn_font() -> tuple:
+    """注册中文字体（真实 TTF 嵌入子集，多平台自适应）。
+
+    返回 (字体名, 来源描述)。不依赖任何单一平台路径：
+    FONT_DIR 环境变量 → 平台内置候选 → CID 字体 fallback。
+    """
+    for path, face_index in _font_candidates():
         try:
             if not Path(path).exists():
                 continue
             font = TTFont("CN-Font", path, subfontIndex=face_index)
             pdfmetrics.registerFont(font)
-            return "CN-Font"
+            return "CN-Font", path
         except Exception:
             continue
     # Fallback：reportlab CID 字体（macOS 打印会空白，但保证 PDF 至少能生成）
     pdfmetrics.registerFont(UnicodeCIDFont("STSong-Light"))
-    return "STSong-Light"
+    return "STSong-Light", "CID STSong-Light（无真实字体文件，部分系统打印可能空白）"
 
 
-CN_FONT = _register_cn_font()
+CN_FONT, CN_FONT_SOURCE = _register_cn_font()
 
 
 def _get_alignment(para) -> int:

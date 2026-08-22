@@ -413,7 +413,58 @@ def generate_dynamic_docx(template_key: str, values: list, output_path: Path) ->
     return count
 
 
-def _generate_to_dir(case: dict, company: dict, agent: dict, output_dir: Path) -> Path:
+# ============================================================
+# F-059 进程级生成锁（v2.2.3）
+# ============================================================
+
+def _acquire_generation_lock(output_dir: Path):
+    """为 output_dir 加进程级互斥锁，防止同案号并发生成互相删除目录。
+
+    - 锁文件放 output_dir 的父目录（.<name>.lock），避免被 rmtree 误删
+    - 非阻塞抢锁：拿不到立即抛 RuntimeError（快失败，让用户重试）
+    - 返回文件句柄，调用方须在 finally 中 close 释放锁
+
+    跨平台：Unix 用 fcntl.flock，Windows 用 msvcrt.locking（LK_NBLCK）。
+    不同 output_dir 的锁文件互不影响（preview 临时目录天然隔离）。
+    """
+    lock_path = output_dir.parent / f".{output_dir.name}.lock"
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    handle = open(lock_path, "w")
+    try:
+        if platform.system() == "Windows":
+            import msvcrt
+            handle.seek(0)
+            msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except (OSError, IOError):
+        handle.close()
+        raise RuntimeError("该案件正在生成中，请稍候再试") from None
+    return handle
+
+
+def _release_generation_lock(handle):
+    """释放生成锁（幂等：close 会自动释放 flock/locking）。"""
+    try:
+        handle.close()
+    except OSError:
+        pass
+
+
+# F-060 缺失校验：预期 7 份材料（前缀 glob 匹配，兼容带案号后缀的动态模板）
+_EXPECTED_PDF_LABELS = [
+    ("01_营业执照", "01 营业执照"),
+    ("02_法定代表人证明", "02 法定代表人证明"),
+    ("03_法人身份证", "03 法人身份证"),
+    ("04_授权委托书", "04 授权委托书"),
+    ("05_推荐信", "05 推荐信"),
+    ("06_代理人劳动合同", "06 代理人劳动合同"),
+    ("07_代理人身份证", "07 代理人身份证"),
+]
+
+
+def _generate_to_dir_unlocked(case: dict, company: dict, agent: dict, output_dir: Path, missing: list = None) -> Path:
     """把案件材料生成到指定目录（不写数据库，纯文件系统操作）。
 
     这是所有生成入口的内部核心：动态 docx + 静态 PDF 拷贝 + 合并 + zip 打包。
@@ -423,6 +474,8 @@ def _generate_to_dir(case: dict, company: dict, agent: dict, output_dir: Path) -
         company: 公司数据
         agent: 代理人数据
         output_dir: 输出目录（必须已创建）
+        missing: 可选，传入 list 时生成结束后收集缺失的 7 份材料名
+                 （F-060：docx→PDF 失败或静态 PDF 缺失时，调用方可显性告警）
 
     返回：
         output_dir
@@ -430,6 +483,8 @@ def _generate_to_dir(case: dict, company: dict, agent: dict, output_dir: Path) -
     F-043 物理隔离：若 output_dir 已存在（同案号重新生成场景），先清空整个
     目录再重建，避免新旧文件混合导致二次污染。临时目录（tmp）每次 mkdtemp
     都不存在，无需清空。
+
+    F-059 说明：本函数无锁，对外入口 _generate_to_dir 负责加互斥锁。
     """
     if output_dir.exists():
         shutil.rmtree(output_dir)
@@ -513,7 +568,32 @@ def _generate_to_dir(case: dict, company: dict, agent: dict, output_dir: Path) -
                 continue  # 上面已写
             zf.write(file, arcname=file.name)
 
+    # === F-060 缺失校验：7 份材料 + 合并件缺什么都显性告诉调用方 ===
+    if missing is not None:
+        merged_final = output_dir / f"00_合并出庭手续_{safe_case}.pdf"
+        for base, label in _EXPECTED_PDF_LABELS:
+            if not list(output_dir.glob(f"{base}*.pdf")):
+                missing.append(label)
+        if not merged_final.exists():
+            missing.append("合并 PDF")
+
     return output_dir
+
+
+def _generate_to_dir(case: dict, company: dict, agent: dict, output_dir: Path, missing: list = None) -> Path:
+    """带进程级互斥锁的生成入口（F-059，v2.2.3）。
+
+    包装 _generate_to_dir_unlocked：同案号（同 output_dir）同一时间只允许一个
+    进程执行清空/生成/合并/打包，消除并发互相删目录导致的缺份竞态。
+
+    - generate.py / generate_court_matters / generate_preview 均走此入口
+    - 抢锁失败立即抛 RuntimeError（「该案件正在生成中」），快失败而非排队
+    """
+    lock_handle = _acquire_generation_lock(output_dir)
+    try:
+        return _generate_to_dir_unlocked(case, company, agent, output_dir, missing=missing)
+    finally:
+        _release_generation_lock(lock_handle)
 
 
 def generate_court_matters(case: dict, company: dict, agent: dict, output_base_dir: Path = None) -> Path:

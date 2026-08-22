@@ -94,6 +94,16 @@ export default function CasesPage() {
       generateApi.generate(case_id, company_id, agent_id),
     onSuccess: (data) => {
       setGenerating(null);
+      // F-062（v2.2.3）：生成不完整时显性告警，不再假装全部成功
+      const missing = data.missing ?? [];
+      if (missing.length > 0) {
+        const total = data.total_expected ?? 7;
+        setResult(
+          `⚠️ 生成不完整：${total} 份材料中缺 ${missing.length} 份（${missing.join("、")}）。` +
+          `${data.merged_pdf ? "已生成合并 PDF（缺份不在其中），请补充后重新生成。" : "未生成合并 PDF。"}`
+        );
+        return;
+      }
       if (data.merged_pdf) {
         // 提取 output_dir 中 workspaces/ 前缀的相对路径（与 files API 拼接一致）
         const wsIdx = data.output_dir.indexOf("workspaces/");

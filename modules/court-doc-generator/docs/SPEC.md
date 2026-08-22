@@ -1,11 +1,13 @@
 # 出庭手续生成器 · 技术规格（SPEC）
 
-> **文档版本**：v2.0
-> **最后更新**：2026-08-21
+> **文档版本**：v2.0（历史档案；v2.x 增量规格见 docs/SPEC-enhancements-*.md）
+> **最后更新**：2026-08-22
 > **模块名**：court-doc-generator
 > **当前架构**：React 18 + TypeScript + Vite（前端） + FastAPI + Uvicorn（后端） + SQLite（数据）
 > **对应需求**：见 [REQUIREMENTS.md](./REQUIREMENTS.md)
 > **配套索引**：`docs/SPEC.md`（系统级）→ 本文件（模块级）
+> ⚠️ **历史档案说明**：本文档保留 v1.x Streamlit 时代的决策档案（§3 决策矩阵 / 端口等）；当前实现已切换
+>    React+FastAPI，生产运行与部署以 [DEPLOYMENT.md](./DEPLOYMENT.md) 为准。
 
 ---
 
@@ -207,6 +209,7 @@
 | OCR | **Tesseract CLI** | 系统安装 | 中文识别（chi_sim+eng），可选依赖 |
 | 进程管理 | **bin/ Python 脚本** | - | 跨平台统一，PID + 端口检测 |
 | 健康检查 | **GET /health** | - | FastAPI 端点，返回 `{"status":"ok","version":"..."}` |
+| 文件服务缓存 | **Cache-Control: no-store** | v2.2.4 | files API 禁用启发式缓存（生成产物 URL 无语义变化），前端预览/下载 URL 追加时间戳参数兜底 |
 
 ### 3.2 关键决策评分（量化对比）
 
@@ -1176,6 +1179,7 @@ def mask_id_card(id_card: str) -> str:
 
 | 日期 | 版本 | 变更摘要 |
 |------|------|---------|
+| 2026-08-22 | v2.2.5 | 拍照扫描多图合并 + OCR 识别鲁棒化（用户补充需求：起诉状常为多页/多图需合并识别）：scan_service 双 PSM（psm3+psm6）交叉 OCR；法院形近字映射还原；当事人全候选评分截断（身份词+公司尾词+机构词评分）；案由四级抽取（标签行→复合词表→正则→兜底）；scan.py files 多文件列表参数 + file 单文件兼容；ScanModal 多选文件列表 + 批量上传，scan.ts scanUploadFiles。真实双图（腾讯音乐诉北京雷石）实测 5 字段全精确（法院/案由/原告/被告/标的金额 2260000）。pytest 45 passed + tsc 零错误。细节见 SPEC-enhancements-v2.2.5.md |
 | 2026-08-22 | v2.2 | 拍照扫描集成到新建案件（dev 分支自主完成）：扫描入口收敛至案件页（新建按钮旁「扫描起诉状」+ ScanModal 上传/URL 双方式）；字段映射纯函数 lib/scan.ts（案号/法院/案由/开庭日期归一化/对方当事人智能推断/空格噪音清洗）；我方角色扩展 原告/被告/第三人/法院；移除 /scan 独立路由导航；scan_service 案由前缀清洗；补 chi_sim 语言包。细节见 SPEC-enhancements-v2.2.md。pytest 40 passed + tsc 零错误 + 浏览器 E2E 全链路通过 |
 | 2026-08-22 | v2.1 | 七项体验增强（dev 分支 TDD）：F5 预设库（presets 表 + 自动注册 + 频次排序 + workspace 隔离）；F1 案件搜索/筛选（search/status/hearing 区间服务端过滤，前端防抖 300ms）；F6 操作日志（audit_logs 表 + mask_pii 遮罩 + 4 接 入点含失败记录 + 列表页）；F4 CSV 导出（UTF-8 BOM + 注入防护 + JOIN 公司/代理人 ）；F2 草稿自动保存（localStorage 1s 防抖 + 恢复弹窗）；F3 开庭提醒（7 天窗口 + Dashboard 横幅 + 浏览器通知）；F7 暗色模式（三态 + CSS 变量 + 记忆）。细节见 SPEC-enhancements-v2.1.md。pytest 35 passed（模块根 51）+ tsc 零错误 + 浏览器 E2E  验证通过 |
 | 2026-08-21 | v2.0 | React+FastAPI 全栈重构完成：Streamlit → React+Vite 前端 + FastAPI 后端；bin/ 一键启动双服务；README/module.yaml/SPEC 同步更新至 v2.0；清除 Streamlit 遗骸 8 文件 |

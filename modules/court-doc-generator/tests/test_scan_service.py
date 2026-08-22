@@ -43,6 +43,24 @@ def test_extract_fields_chuanpiao():
     assert fields["被告"] is None
 
 
+def test_extract_fields_chuanpiao_table_layout_noisy_date():
+    """传票表格跨行 + OCR 竖线噪声：表头/值分离、日期数字误读为 |，仍能抽取。"""
+    # 模拟真实传票 OCR 输出（psm3 通道）：表头行与值行分开，| 为日期数字噪声
+    text = """事由    应到地点            开庭时间     签发人
+朝阳法院 民五庭
+开庭     《广顺北大街)     2026年4月|日
+三层 第三法庭         fe We 00 4"""
+    fields = extract_fields(text)
+    assert fields["开庭时间"] == "2026-4-?"
+
+
+def test_extract_fields_hearing_date_table_header_only():
+    """仅表头含「开庭时间」且日期在表格值时同样抽取。"""
+    text = """开庭时间：2026年8月20日"""
+    fields = extract_fields(text)
+    assert fields["开庭时间"] == "2026-8-20"
+
+
 def test_extract_fields_cause_strip_litigation():
     """案由清洗：去掉末尾"纠纷"二字。"""
     text = """案由：合同纠纷

@@ -168,6 +168,9 @@ export interface GenerateResult {
   output_dir: string;
   files: string[];
   merged_pdf: string | null;
+  // v2.2.3：生成不完整时后端返回缺失清单（如 ["04 授权委托书", "05 推荐信"]）
+  missing?: string[];
+  total_expected?: number;
 }
 
 export const generateApi = {

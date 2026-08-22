@@ -13,6 +13,23 @@ PID_FILE = RUN_DIR / "backend.pid"
 LOG_FILE = RUN_DIR / "backend.log"
 PORT = 8001
 
+MAX_LOG_SIZE = 5 * 1024 * 1024   # 超过 5MB 触发轮转
+KEEP_LOGS = 5                    # 保留 N 份归档（.1 最新 → .N 最旧）
+
+
+def rollover_log(log_file: Path):
+    """启动前日志轮转：超限旧日志归档为 .1/.2/...，防止单文件激增。"""
+    if not log_file.exists() or log_file.stat().st_size < MAX_LOG_SIZE:
+        return
+    oldest = Path(str(log_file) + f".{KEEP_LOGS}")
+    oldest.unlink(missing_ok=True)
+    for i in range(KEEP_LOGS - 1, 0, -1):
+        src = Path(str(log_file) + f".{i}")
+        if src.exists():
+            src.rename(Path(str(log_file) + f".{i + 1}"))
+    log_file.rename(Path(str(log_file) + ".1"))
+    print(f"🔄 日志轮转：{log_file.name} 已归档为 {log_file.name}.1（保留 {KEEP_LOGS} 份）")
+
 # 检查端口是否已被占用
 def port_in_use(port):
     import socket
@@ -62,6 +79,8 @@ if __name__ == "__main__":
     if venv_site.exists():
         env["VIRTUAL_ENV"] = str(venv_site)
 
+    rollover_log(LOG_FILE)  # 覆盖写前先轮转归档
+
     pid = os.fork()
     if pid == 0:
         # 子进程
@@ -73,6 +92,9 @@ if __name__ == "__main__":
             "app.main:app", "--host", "0.0.0.0", "--port", str(PORT_NEW)])
 
     # 父进程
+    dist_dir = ROOT.parent / "frontend" / "dist"
+    if (dist_dir / "index.html").exists():
+        print(f"🌐 生产模式：前端由后端统一托管，浏览器访问 http://localhost:{PORT_NEW}")
     PID_FILE.write_text(str(pid))
     print(f"🚀 启动 backend (PID {pid}) 端口 {PORT_NEW}")
     print(f"   日志: {LOG_FILE}")

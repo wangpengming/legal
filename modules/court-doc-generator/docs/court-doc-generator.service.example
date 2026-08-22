@@ -1,0 +1,44 @@
+# ============================================================
+# systemd 单元示例：court-doc-generator（生产托管）
+# 说明：systemd 直接托管 uvicorn（Type=simple），不经过 bin/start.py
+#       （其 os.fork 后台化逻辑与 systemd 管理模型冲突）。
+#       手动模式（无 systemd）用 bin/ 四件套，日志走 .run/backend.log。
+#
+# 安装：
+#   sudo cp court-doc-generator.service.example \
+#        /etc/systemd/system/court-doc-generator.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now court-doc-generator
+#
+# 常用命令：
+#   systemctl status court-doc-generator
+#   journalctl -u court-doc-generator -f        # 实时看日志
+#   sudo systemctl restart court-doc-generator
+# ============================================================
+
+[Unit]
+Description=Court Document Generator (court-doc-generator)
+Documentation=file:///opt/legal/modules/court-doc-generator/docs/DEPLOYMENT.md
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+# 部署根按实际路径调整（下文示例统一 /opt/legal）
+WorkingDirectory=/opt/legal/modules/court-doc-generator/backend
+EnvironmentFile=/opt/legal/modules/court-doc-generator/backend/.env
+ExecStart=/opt/legal/modules/court-doc-generator/backend/.venv/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port 8001
+Restart=on-failure
+RestartSec=3
+# 日志交给 journald（按容量裁剪）：
+# journalctl --vacuum-size=200M 或 --vacuum-time=30d 定期清理
+StandardOutput=journal
+StandardError=journal
+
+# 数据目录需运行用户可写（data/ + outputs/ + .run/）：
+#   sudo -u www-data mkdir -p /opt/legal/modules/court-doc-generator/{data,outputs,.run,backend/.run}
+#   sudo chown -R www-data:www-data 上述目录
+
+[Install]
+WantedBy=multi-user.target

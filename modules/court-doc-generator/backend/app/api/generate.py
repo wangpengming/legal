@@ -18,6 +18,9 @@ class GenerateOut(BaseModel):
     output_dir: str
     files: list[str]
     merged_pdf: str | None = None
+    # F-061：（v2.2.3）生成不完整时明确列出缺失材料，前端不再假装成功
+    missing: list[str] = []
+    total_expected: int = 7
 
 
 @router.post("")
@@ -57,9 +60,12 @@ def generate_court_matters(
     sys.path.insert(0, str(settings.MODULE_ROOT))
     from generator import _generate_to_dir
 
+    # F-060/F-061：收集缺失材料清单，响应带 missing 字段（显性化，不静默）
+    missing: list[str] = []
+
     # F6 操作日志（成功/失败）
     try:
-        _generate_to_dir(case, company, agent, output_dir)
+        _generate_to_dir(case, company, agent, output_dir, missing=missing)
     except Exception:
         log_action(x_workspace_id, "generate", f"case {body.case_id}", result="failed")
         raise
@@ -93,4 +99,10 @@ def generate_court_matters(
 
     log_action(x_workspace_id, "generate", f"case {body.case_id}", result="ok")
 
-    return GenerateOut(output_dir=str(output_dir), files=files, merged_pdf=merged_str)
+    return GenerateOut(
+        output_dir=str(output_dir),
+        files=files,
+        merged_pdf=merged_str,
+        missing=missing,
+        total_expected=7,
+    )

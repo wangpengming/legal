@@ -748,3 +748,98 @@ pytest 直连真实 FastAPI 应用，累计产生 434 个测试 workspace（Test
 - [x] pytest 40 passed 且运行前后生产 data/ 零增长
 - [x] 张洋库恢复 case 4 且 generation_history 关联完好
 - [x] 备份存档 data/backups/2026-08-22_fix/（workspaces.db + zhangyang_court_matters.db）
+
+---
+
+## 2026-08-22 court-doc-generator 生成正确性与稳定性修复（进程级锁 + 失败显性化 ）
+
+**类型**: fix
+**模块**: court-doc-generator（generator.py + generate API + 前端）
+**状态**: done
+**优先级**: P0（用户实测：doc 模板生成的 PDF 未被合并进最终 PDF，静默缺份）
+
+### 描述
+
+用户实测：点击生成后 04 授权委托书 + 05 推荐信（doc 模板动态生成）的 PDF 未并入最终合并 PDF。
+
+**根因（静默降级链）**：
+
+1. generator.py：docx→PDF 转换失败仅 `warnings.warn`（stderr，前端不可见）→ 04/05 PDF 缺失
+2. pdf_merger.py：缺失文件 `continue` 静默跳过 → 合并件悄悄少 1-2 份
+3. generator.py：`except ValueError: pass` 吞掉「无任何可合并 PDF」
+
+**触发器（已实证）**：generator.py 的 `rmtree + mkdir` 非原子 + generate.py 全程无锁 → 同一案件重复点击/多端并发时互相删除目录（8 进程复现：FileNotFoundError / EmptyFileError / 「OK 但 merged 缺失」）。
+
+### 修复
+
+- [x] F-059 generator.py：`_generate_to_dir` 加进程级互斥锁（fcntl.flock / msvcrt.locking 兼容，锁文件放 output_dir 父目录避免被 rmtree 误删）；抢锁失败抛出「该案件正在生成中」
+- [x] F-060 generator.py：生成结束收集缺失 PDF 清单（7 份材料的 glob 校验），`_generate_to_dir` 增可选 `missing` 参数透出
+- [x] F-061 generate.py API：`GenerateOut` 增 `missing` / `total_expected` 字段 ，生成不完整时响应带缺失清单（不再假装成功）
+- [x] F-062 前端：CasesPage 生成结果提示——缺失时显示告警「已生成 X/7 份，缺：01 营业执照…」，合并件缺份同样提示
+- [x] F-063 tests：并发抢锁（第二进程拒绝）+ 缺失清单收集（monkeypatch docx_to_pdf 失败）单测
+
+### 验收标准
+
+- [x] 同案号并发生成：第二个请求快速失败并提示「正在生成中」，不再出现 rmtree 竞态
+- [x] docx→PDF 转换失败时，前端显示「已生成 X/7 份，缺：04 授权委托书、05 推荐信」而非「✅ 生成完成」
+- [x] 合并 PDF 缺份时前端同样显性告警
+- [x] pytest 全量通过（含新增并发锁/缺失清单用例）
+- [x] `npx tsc --noEmit` 零错误
+
+---
+
+## 2026-08-22 court-doc-generator 拍照扫描多图合并 + OCR 识别鲁棒化（增强）
+
+**类型**: feat
+**模块**: court-doc-generator（scan_service.py + backend/app/api/scan.py + 前端 ScanModal/scan.ts）
+**状态**: done
+**优先级**: P1（用户实测：起诉状常为多页/多图，单图上传信息不全；真实照片识别准确率不足）
+
+### 描述
+
+用户补充需求：起诉状往往不止一张图片，需要一次上传多个图片/文档并整合识别信息；同时用真实拍摄的起诉状照片（Downloads/20260822-220005.jpg + 20260822-220019.jpg，腾讯音乐诉北京雷石著作权案）实测，识别准确率不足。
+
+### 实现
+
+- [x] svc01 scan_service.py：双 PSM 交叉 OCR（psm3 自动分页 + psm6 统一文本块，逐图双通道互补拼接）；法院「人民法院」形近字映射还原（法→活、院→区等）；当事人全候选评分截断（身份词/公司尾词截断 + 机构词评分选优）；案由四级抽取策略（案由标签行 → 复合案由词表 → XX纠纷正则清洗 → 关键词兜底）
+- [x] api01 scan.py：/api/v1/scan/scan 支持 files 多文件列表参数（FormData 同名多次）+ file 单文件向后兼容；逐文件类型/大小校验 → PDF 转图 → img_paths 合并统一识别；finally 统一清理临时文件
+- [x] fe01 前端：ScanModal input multiple 多选 → 已选文件列表（名称/大小/移除）→「开始识别（N 个文件）」批量上传；scan.ts 新增 scanUploadFiles(files: File[])
+- [x] tst01 测试：test_scan_service 新增 5 个真实场景用例（法院形近字/案由标签行/复合词表/真实 OCR 段落当事人截断/多页合并抽取）
+
+### 验收标准
+
+- [x] 双图上传端到端实测：法院=北京市朝阳区人民法院、案由=侵害作品信息网络传播权纠纷、原告=腾讯音乐娱乐(珠海) 有限公司、被告=北京雷石天地电子技术股份有限公司、标的金额=2260000 全部精确识别
+- [x] 单文件 file 参数向后兼容（旧版前端调用不破坏）
+- [x] pytest 全量 45 passed（含新增 5 用例）；`npx tsc --noEmit` 零错误
+
+---
+
+## 2026-08-22 court-doc-generator server 部署完备性补全
+
+**类型**: feat
+**模块**: court-doc-generator
+**状态**: proposed
+**优先级**: P1（用户计划部署到 server，当前缺生产运行形态）
+
+### 描述
+
+用户拟将 court-doc-generator 部署到 server。评估结论：本地自洽（bin 4件套 + PID/日志 + /health + ports.yaml + README 一键启动），但缺生产形态：① 前端仅 Vite dev server（无 build 产物托管）；② docx_to_pdf 中文硬编码 macOS 字体路径（server 无该路径 → CID fallback 打印空白）；③ 无部署手册/.env.example；④ 日志无轮转；⑤ docs/README.md 仍为旧 Streamlit 架构描述。
+
+### 实现方案（用户裁决）
+
+- [ ] svc01 docx_to_pdf.py 字体自适应：多平台候选探测（macOS Songti/STFangsong → Linux Noto CJK → Windows SimSun/SimHei）+ FONT_DIR 环境变量自定义 + CID fallback 兜底
+- [ ] svc02 生产形态：后端 FastAPI 自动托管 frontend/dist/（检测到 build 产物则挂载 + SPA fallback），server 单进程访问
+- [ ] svc03 日志轮转：bin 启动脚本对旧日志 rollover 保留 N 份，防单文件激增
+- [ ] fe01 README 新增「生产部署」章节：前端 build → 后端统一端口运行 → systemd 可选单元样例
+- [ ] docs01 新增部署手册（docs/部署指南.md）：前置依赖/字体/数据迁移/日志查看/升级
+- [ ] docs02 .env.example：PORT/HOST/DATA_DIR/CORS 等可覆盖项示例
+- [ ] docs03 更新 docs/README.md 为 React+FastAPI 当前架构
+- [ ] tst01 字体自适应单测（多平台路径候选探测顺序 + FONT_DIR 覆盖）+ 全量 pytest 回归
+
+### 验收标准
+
+- [ ] tesseract 安装后（无 screen 服务器）OCR 扫描可用
+- [ ] 无 macOS 字体环境下生成 04/05 PDF 不依赖 CID fallback（有 Linux/Windows 字体即真嵌入）
+- [ ] 生产模式：npm run build 一次 → 仅启动后端 → http://server:8001 完整可用
+- [ ] 日志文件不无限增长（保留最近 N 份）
+- [ ] docs/README.md 与当前 React+FastAPI 架构一致，无 Streamlit 残留

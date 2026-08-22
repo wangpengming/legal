@@ -26,10 +26,10 @@ async function postScan(url: string, body: FormData | string, headers: Record<st
   return data as ScanResult;
 }
 
-/** 上传本地图片/PDF 进行 OCR 识别 */
-export async function scanUpload(file: File): Promise<ScanResult> {
+/** 上传本地图片/PDF 进行 OCR 识别（支持多文件，后端合并识别并整合字段） */
+export async function scanUploadFiles(files: File[]): Promise<ScanResult> {
   const form = new FormData();
-  form.append("file", file);
+  files.forEach(f => form.append("files", f));
   return postScan("/api/v1/scan/scan", form, {});
 }
 

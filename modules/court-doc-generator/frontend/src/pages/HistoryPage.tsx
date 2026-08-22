@@ -134,7 +134,7 @@ export default function HistoryPage() {
                               </button>
                             )}
                             <a
-                              href={`/api/v1/files/~hex/${toHex(f.path)}?ws=${sessionStorage.getItem("_ws_id") || ""}`}
+                              href={`/api/v1/files/~hex/${toHex(f.path)}?ws=${sessionStorage.getItem("_ws_id") || ""}&t=${Date.now()}`}
                               target="_blank"
                               rel="noreferrer"
                               className="btn" style={{ padding: "4px 8px", fontSize: 12 }}

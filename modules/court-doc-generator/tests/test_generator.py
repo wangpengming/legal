@@ -497,3 +497,96 @@ def test_print_pdf_to_default_printer_unsupported_os(monkeypatch, tmp_path):
     success, msg = print_pdf_to_default_printer(fake_pdf)
     assert success is False
     assert "不支持的系统" in msg
+
+
+# ============================================================
+# F-059/F-060 生成正确性与稳定性：进程级锁 + 缺失清单
+# ============================================================
+
+_LOCK_SAMPLE_CASE = {
+    "case_number": "（2026）京0101民初9999号",
+    "case_cause": "合同纠纷",
+    "court": "北京市第一中级人民法院",
+    "hearing_date": "2026-09-15",
+    "opposing_party": "上海某某科技公司",
+    "our_role": "原告",
+    "authority_type": "特别授权",
+}
+
+_LOCK_SAMPLE_COMPANY = {
+    "name": "测试公司有限公司",
+    "legal_rep_name": "张三",
+    "legal_rep_position": "董事长",
+    "address": "北京市朝阳区测试路 1 号",
+    "phone": "010-12345678",
+}
+
+_LOCK_SAMPLE_AGENT = {
+    "name": "李四",
+    "gender": "男",
+    "id_card": "110101199001011234",
+    "position": "法务总监",
+    "phone": "13800138000",
+}
+
+
+def test_generation_lock_serializes(tmp_path):
+    """F-059: 同一 output_dir 并发生成抢锁 → 第二把锁立即失败（进程级互斥）。
+
+    flock 对同进程不同 fd 同样互斥，因此单测内可直接验证双请求场景。
+    """
+    import pytest
+    from generator import _acquire_generation_lock, _release_generation_lock
+
+    h1 = _acquire_generation_lock(tmp_path)
+    try:
+        with pytest.raises(RuntimeError, match="正在生成中"):
+            _acquire_generation_lock(tmp_path)
+    finally:
+        _release_generation_lock(h1)
+
+    # 释放后可重入（锁文件残留不阻塞后续生成）
+    h2 = _acquire_generation_lock(tmp_path)
+    _release_generation_lock(h2)
+
+
+def test_missing_list_collects_failed_conversion(tmp_path, monkeypatch):
+    """F-060: docx→PDF 转换失败 → missing 清单包含对应材料（不再静默）。
+
+    monkeypatch docx_to_pdf 抛异常模拟 LibreOffice 不可用：
+    04 授权委托书 / 05 推荐信 无静态 fallback → 必须模板转换 → 缺；
+    01/02/03/06/07 静态 fallback 存在 → 不缺 → 合并 PDF 仍生成成功。
+    """
+    import generator
+    from generator import _generate_to_dir
+
+    def boom(src, dst):
+        raise RuntimeError("soffice unavailable")
+
+    monkeypatch.setattr(generator, "docx_to_pdf", boom)
+    missing = []
+    _generate_to_dir(
+        dict(_LOCK_SAMPLE_CASE),
+        dict(_LOCK_SAMPLE_COMPANY),
+        dict(_LOCK_SAMPLE_AGENT),
+        tmp_path,
+        missing=missing,
+    )
+    assert "04 授权委托书" in missing, f"授权委托书应缺失，missing={missing}"
+    assert "05 推荐信" in missing, f"推荐信应缺失，missing={missing}"
+    assert "合并 PDF" not in missing, "静态 5 份存在 → 合并应成功"
+
+
+def test_missing_list_empty_on_success(tmp_path):
+    """F-060 负向：转换全部成功时 missing 为空（正常生成不受影响）。"""
+    from generator import _generate_to_dir
+
+    missing = []
+    _generate_to_dir(
+        dict(_LOCK_SAMPLE_CASE),
+        dict(_LOCK_SAMPLE_COMPANY),
+        dict(_LOCK_SAMPLE_AGENT),
+        tmp_path,
+        missing=missing,
+    )
+    assert missing == [], f"正常生成不应报告缺失，missing={missing}"
