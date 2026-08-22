@@ -1,16 +1,27 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Trash2, Zap, Eye, Search, X, Download } from "lucide-react";
 import { caseApi, companyApi, agentApi, generateApi, Case } from "../lib/api";
 import { useDebounced } from "../hooks/useDebounced";
+import { useFormDraft, draftKey, loadDraft, clearDraft } from "../hooks/useFormDraft";
+import { useAuthStore } from "../stores/authStore";
 import PdfPreviewModal from "../components/PdfPreviewModal";
 import CaseDetailModal from "../components/CaseDetailModal";
 import ConfirmDialog from "../components/ConfirmDialog";
 import PresetInput from "../components/PresetInput";
 
+const EMPTY_FORM = {
+  case_number: "", court: "", cause: "",
+  hearing_date: "", opposing_party: "", our_role: "原告",
+  company_id: null as number | null, agent_id: null as number | null,
+};
+
 export default function CasesPage() {
   const qc = useQueryClient();
+  const workspaceId = useAuthStore(s => s.workspaceId);
   const [showForm, setShowForm] = useState(false);
+  // F2：待恢复草稿（检测到未提交草稿时弹确认）
+  const [draftPending, setDraftPending] = useState<null | typeof EMPTY_FORM>(null);
   const [formError, setFormError] = useState("");
   const [formSuccess, setFormSuccess] = useState("");
   const [generating, setGenerating] = useState<number | null>(null);
@@ -25,11 +36,19 @@ export default function CasesPage() {
   const [selCompany, setSelCompany] = useState<number | null>(null);
   const [selAgent, setSelAgent] = useState<number | null>(null);
 
-  const [form, setForm] = useState({
-    case_number: "", court: "", cause: "",
-    hearing_date: "", opposing_party: "", our_role: "原告",
-    company_id: null as number | null, agent_id: null as number | null,
-  });
+  const [form, setForm] = useState(EMPTY_FORM);
+
+  // F2：表单打开期间 1s 防抖保存草稿；关闭/卸载时落盘
+  const draftKeyStr = workspaceId ? draftKey(workspaceId, "case-form") : "";
+  useFormDraft(draftKeyStr, form, showForm);
+  // 打开表单时检测是否有未提交草稿
+  useEffect(() => {
+    if (!showForm || !draftKeyStr) return;
+    const draft = loadDraft<typeof EMPTY_FORM>(draftKeyStr);
+    if (draft && (draft.case_number || draft.court || draft.cause || draft.hearing_date || draft.opposing_party)) {
+      setDraftPending(draft);
+    }
+  }, [showForm, draftKeyStr]);
 
   // 搜索/筛选（防抖搜索词 300ms）
   const [filters, setFilters] = useState({
@@ -52,7 +71,8 @@ export default function CasesPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["cases"] });
       setShowForm(false);
-      setForm({ case_number: "", court: "", cause: "", hearing_date: "", opposing_party: "", our_role: "原告", company_id: null, agent_id: null });
+      setForm(EMPTY_FORM);
+      clearDraft(draftKeyStr); // 提交成功即清除草稿
       setFormError("");
       setFormSuccess("案件已创建");
       setTimeout(() => setFormSuccess(""), 3000);
@@ -103,6 +123,15 @@ export default function CasesPage() {
       )}
       {detailCase && (
         <CaseDetailModal caseItem={detailCase} onClose={() => setDetailCase(null)} />
+      )}
+      {draftPending && (
+        <ConfirmDialog
+          title="检测到未提交的草稿"
+          message={`之前填写的案件信息尚未提交（案号：${draftPending.case_number || "无"}）。\n要恢复继续填写吗？`}
+          confirmText="恢复草稿"
+          onCancel={() => { clearDraft(draftKeyStr); setDraftPending(null); }}
+          onConfirm={() => { setForm(draftPending); setDraftPending(null); }}
+        />
       )}
       {confirm && (
         <ConfirmDialog
