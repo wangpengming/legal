@@ -115,19 +115,35 @@ export interface Case {
   created_at: string;
 }
 
+function buildQuery(filters?: Record<string, string>): string {
+  return filters
+    ? "?" + Object.entries(filters)
+        .filter(([, v]) => v !== undefined && v !== null && v !== "")
+        .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
+        .join("&")
+    : "";
+}
+
 export const caseApi = {
-  list: (filters?: Record<string, string>) => {
-    const qs = filters
-      ? "?" + Object.entries(filters)
-          .filter(([, v]) => v !== undefined && v !== null && v !== "")
-          .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
-          .join("&")
-      : "";
-    return api<Case[]>(`/cases${qs}`);
-  },
+  list: (filters?: Record<string, string>) => api<Case[]>(`/cases${buildQuery(filters)}`),
   create: (body: Omit<Case, "id" | "status" | "created_at">) =>
     api<Case>("/cases", { method: "POST", body: JSON.stringify(body) }),
   delete: (id: number) => api("/cases/" + id, { method: "DELETE" }),
+  // F4 CSV 导出（带当前筛选参数，Blob 下载）
+  exportCsv: async (filters?: Record<string, string>): Promise<string> => {
+    const res = await fetch(`/api/v1/cases/export${buildQuery(filters)}`, {
+      headers: authHeaders(),
+    });
+    if (!res.ok) throw new Error("导出失败");
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `cases_export_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    return "ok";
+  },
 };
 
 // ── 预设库（法院/案由）─────────────────────────────────────────────────

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Trash2, Zap, Eye, Search, X } from "lucide-react";
+import { Plus, Trash2, Zap, Eye, Search, X, Download } from "lucide-react";
 import { caseApi, companyApi, agentApi, generateApi, Case } from "../lib/api";
 import { useDebounced } from "../hooks/useDebounced";
 import PdfPreviewModal from "../components/PdfPreviewModal";
@@ -38,6 +38,7 @@ export default function CasesPage() {
   const debouncedSearch = useDebounced(filters.search, 300);
   const activeFilters = { ...filters, search: debouncedSearch };
   const hasFilters = Object.entries(activeFilters).some(([, v]) => v !== "");
+  const [exporting, setExporting] = useState(false);
 
   const { data: cases = [], isLoading } = useQuery({
     queryKey: ["cases", activeFilters],
@@ -236,6 +237,19 @@ export default function CasesPage() {
               <X size={12} /> 清除
             </button>
           )}
+          <button
+            className="btn" style={{ padding: "6px 12px" }}
+            disabled={exporting}
+            onClick={() => {
+              setExporting(true);
+              caseApi.exportCsv(activeFilters)
+                .catch(() => alert("导出失败"))
+                .finally(() => setExporting(false));
+            }}
+            title="导出当前筛选结果为 CSV（Excel 可直接打开）"
+          >
+            <Download size={12} /> {exporting ? "导出中..." : "导出 CSV"}
+          </button>
         </div>
         {isLoading ? <div className="empty">加载中...</div>
           : cases.length === 0 ? <div className="empty"><div className="empty-icon">📋</div>暂无案件</div>

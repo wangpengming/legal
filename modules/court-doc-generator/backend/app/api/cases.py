@@ -31,6 +31,28 @@ class CaseOut(BaseModel):
     created_at: str | None = None
 
 
+# 案件列表/导出的公共过滤条件（动态兼容各 schema 列）。
+def _build_case_where(cols: set, search: str, status: str, hearing_from: str, hearing_to: str):
+    cause_col = "case_cause" if "case_cause" in cols else "cause"
+    status_col = "status" if "status" in cols else None
+    where, args = [], []
+    if search:
+        where.append(f"(case_number LIKE ? OR court LIKE ? OR {cause_col} LIKE ?)")
+        kw = f"%{search}%"
+        args.extend([kw, kw, kw])
+    if status and status_col:
+        where.append(f"{status_col} = ?")
+        args.append(status)
+    if hearing_from:
+        where.append("hearing_date >= ?")
+        args.append(hearing_from)
+    if hearing_to:
+        where.append("hearing_date != '' AND hearing_date <= ?")
+        args.append(hearing_to)
+    where_sql = (" WHERE " + " AND ".join(where)) if where else ""
+    return where_sql, args, cause_col, status_col
+
+
 @router.get("", response_model=list[CaseOut])
 def list_cases(
     search: str = "",
@@ -55,21 +77,9 @@ def list_cases(
             sel_cols += f", {status_col} as status"
         order_col = created_col or "id"
         # 搜索/筛选（全参数可选，不传 = 全部）
-        where, args = [], []
-        if search:
-            where.append(f"(case_number LIKE ? OR court LIKE ? OR {cause_col} LIKE ?)")
-            kw = f"%{search}%"
-            args.extend([kw, kw, kw])
-        if status and status_col:
-            where.append(f"{status_col} = ?")
-            args.append(status)
-        if hearing_from:
-            where.append("hearing_date >= ?")
-            args.append(hearing_from)
-        if hearing_to:
-            where.append("hearing_date != '' AND hearing_date <= ?")
-            args.append(hearing_to)
-        where_sql = (" WHERE " + " AND ".join(where)) if where else ""
+        where_sql, args, _, _ = _build_case_where(
+            cols, search, status, hearing_from, hearing_to
+        )
         rows = conn.execute(
             f"SELECT {sel_cols} FROM cases{where_sql} ORDER BY {order_col} DESC", args
         ).fetchall()
@@ -134,3 +144,73 @@ def delete_case(case_id: int, x_workspace_id: str = Header(alias="X-Workspace-Id
     from app.api.audit import log_action
     log_action(x_workspace_id, "case_delete", f"case {case_id} {case_number}")
     return {"ok": True}
+
+
+# ── F4 CSV 导出 ───────────────────────────────────────────────────────────
+_CSV_COLUMNS = [
+    "case_number", "court", "cause", "hearing_date", "opposing_party",
+    "our_role", "status", "created_at", "company_name", "agent_name",
+]
+
+
+def _csv_safe(row: list) -> list:
+    """CSV 注入防护：首字符 = + - @ 时前缀 '。"""
+    dangerous = ("=", "+", "-", "@")
+    return [f"'{v}" if v.startswith(dangerous) else v for v in row]
+
+
+@router.get("/export")
+def export_cases(
+    search: str = "",
+    status: str = "",
+    hearing_from: str = "",
+    hearing_to: str = "",
+    x_workspace_id: str = Header(alias="X-Workspace-Id"),
+):
+    import csv
+    import io
+    import sqlite3
+
+    from fastapi.responses import Response
+    from app.core.database import get_conn
+    from app.api.audit import log_action
+
+    with get_conn(x_workspace_id) as conn:
+        conn.row_factory = sqlite3.Row
+        cols = {r[1] for r in conn.execute("PRAGMA table_info(cases)")}
+        cause_col = "case_cause" if "case_cause" in cols else "cause"
+        status_col = "status" if "status" in cols else None
+        created_col = "created_at" if "created_at" in cols else ("updated_at" if "updated_at" in cols else None)
+        where_sql, args, _, _ = _build_case_where(
+            cols, search, status, hearing_from, hearing_to
+        )
+        created_expr = f"cases.{created_col}" if created_col else "''"
+        status_expr = status_col or "''"
+        sel = (
+            f"cases.id, case_number, court, {cause_col} as cause, hearing_date, "
+            f"opposing_party, our_role, {status_expr} as status, "
+            f"{created_expr} as created_at, "
+            "COALESCE(c.name, '') as company_name, COALESCE(a.name, '') as agent_name"
+        )
+        from_sql = (
+            "FROM cases LEFT JOIN companies c ON c.id = cases.company_id "
+            "LEFT JOIN agents a ON a.id = cases.agent_id"
+        )
+        order_col = created_col or "id"
+        rows = conn.execute(
+            f"SELECT {sel} {from_sql}{where_sql} ORDER BY {order_col} DESC", args
+        ).fetchall()
+
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(_CSV_COLUMNS)
+    for r in rows:
+        d = dict(r)
+        writer.writerow(_csv_safe([str(d.get(c) or "") for c in _CSV_COLUMNS]))
+
+    log_action(x_workspace_id, "export", f"cases {len(rows)} 条")
+    return Response(
+        content="\ufeff" + buf.getvalue(),
+        media_type="text/csv; charset=utf-8-bom",
+        headers={"Content-Disposition": 'attachment; filename="cases_export.csv"'},
+    )
