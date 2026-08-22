@@ -116,10 +116,35 @@ export interface Case {
 }
 
 export const caseApi = {
-  list: () => api<Case[]>("/cases"),
+  list: (filters?: Record<string, string>) => {
+    const qs = filters
+      ? "?" + Object.entries(filters)
+          .filter(([, v]) => v !== undefined && v !== null && v !== "")
+          .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
+          .join("&")
+      : "";
+    return api<Case[]>(`/cases${qs}`);
+  },
   create: (body: Omit<Case, "id" | "status" | "created_at">) =>
     api<Case>("/cases", { method: "POST", body: JSON.stringify(body) }),
   delete: (id: number) => api("/cases/" + id, { method: "DELETE" }),
+};
+
+// ── 预设库（法院/案由）─────────────────────────────────────────────────
+export interface Preset {
+  id: number;
+  kind: string;
+  value: string;
+  usage_count: number;
+  created_at: string;
+}
+
+export const presetApi = {
+  list: (kind: string) => api<Preset[]>(`/presets?kind=${kind}`),
+  create: (kind: string, value: string) =>
+    api<Preset>("/presets", { method: "POST", body: JSON.stringify({ kind, value }) }),
+  bump: (id: number) => api("/presets/" + id + "/bump", { method: "POST" }),
+  delete: (id: number) => api("/presets/" + id, { method: "DELETE" }),
 };
 
 // ── 生成 ────────────────────────────────────────────────────────────────

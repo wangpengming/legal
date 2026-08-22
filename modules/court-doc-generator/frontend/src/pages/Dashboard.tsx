@@ -7,7 +7,7 @@ import { caseApi } from "../lib/api";
 export default function Dashboard() {
   const { data: companies } = useQuery({ queryKey: ["companies"], queryFn: companyApi.list });
   const { data: agents } = useQuery({ queryKey: ["agents"], queryFn: agentApi.list });
-  const { data: cases } = useQuery({ queryKey: ["cases"], queryFn: caseApi.list });
+  const { data: cases } = useQuery({ queryKey: ["cases"], queryFn: () => caseApi.list() });
 
   const stats = [
     { icon: Building2, label: "公司", value: companies?.length ?? 0, color: "#1677ff" },

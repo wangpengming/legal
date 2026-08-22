@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Trash2, Zap, Eye } from "lucide-react";
+import { Plus, Trash2, Zap, Eye, Search, X } from "lucide-react";
 import { caseApi, companyApi, agentApi, generateApi, Case } from "../lib/api";
+import { useDebounced } from "../hooks/useDebounced";
 import PdfPreviewModal from "../components/PdfPreviewModal";
 import CaseDetailModal from "../components/CaseDetailModal";
 import ConfirmDialog from "../components/ConfirmDialog";
+import PresetInput from "../components/PresetInput";
 
 export default function CasesPage() {
   const qc = useQueryClient();
@@ -29,7 +31,18 @@ export default function CasesPage() {
     company_id: null as number | null, agent_id: null as number | null,
   });
 
-  const { data: cases = [], isLoading } = useQuery({ queryKey: ["cases"], queryFn: caseApi.list });
+  // 搜索/筛选（防抖搜索词 300ms）
+  const [filters, setFilters] = useState({
+    search: "", status: "", hearing_from: "", hearing_to: "",
+  });
+  const debouncedSearch = useDebounced(filters.search, 300);
+  const activeFilters = { ...filters, search: debouncedSearch };
+  const hasFilters = Object.entries(activeFilters).some(([, v]) => v !== "");
+
+  const { data: cases = [], isLoading } = useQuery({
+    queryKey: ["cases", activeFilters],
+    queryFn: () => caseApi.list(activeFilters),
+  });
   const { data: companies = [] } = useQuery({ queryKey: ["companies"], queryFn: companyApi.list });
   const { data: agents = [] } = useQuery({ queryKey: ["agents"], queryFn: agentApi.list });
 
@@ -146,13 +159,13 @@ export default function CasesPage() {
               </div>
               <div className="form-group">
                 <label className="form-label">案由</label>
-                <input className="form-input" value={form.cause} onChange={e => setForm({ ...form, cause: e.target.value })} placeholder="如：合同" />
+                <PresetInput kind="cause" value={form.cause} onChange={v => setForm({ ...form, cause: v })} placeholder="如：合同" />
               </div>
             </div>
             <div className="form-row">
               <div className="form-group">
                 <label className="form-label">审理法院</label>
-                <input className="form-input" value={form.court} onChange={e => setForm({ ...form, court: e.target.value })} placeholder="如：北京市朝阳区人民法院" />
+                <PresetInput kind="court" value={form.court} onChange={v => setForm({ ...form, court: v })} placeholder="如：北京市朝阳区人民法院" />
               </div>
               <div className="form-group">
                 <label className="form-label">开庭日期</label>
@@ -180,6 +193,50 @@ export default function CasesPage() {
       )}
 
       <div className="card">
+        <div className="filter-bar" style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 12 }}>
+          <div style={{ position: "relative", flex: 1, minWidth: 200 }}>
+            <Search size={14} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--text-muted, #999)" }} />
+            <input
+              className="form-input"
+              style={{ paddingLeft: 30 }}
+              placeholder="搜索案号 / 法院 / 案由..."
+              value={filters.search}
+              onChange={e => setFilters({ ...filters, search: e.target.value })}
+            />
+          </div>
+          <select
+            className="form-input" style={{ width: "auto" }}
+            value={filters.status}
+            onChange={e => setFilters({ ...filters, status: e.target.value })}
+          >
+            <option value="">全部状态</option>
+            <option value="pending">待处理</option>
+            <option value="generated">已生成</option>
+            <option value="submitted">已提交</option>
+            <option value="closed">已结案</option>
+          </select>
+          <input
+            className="form-input" type="date" style={{ width: "auto" }}
+            value={filters.hearing_from}
+            onChange={e => setFilters({ ...filters, hearing_from: e.target.value })}
+            title="开庭日期起"
+          />
+          <span className="text-muted text-sm">至</span>
+          <input
+            className="form-input" type="date" style={{ width: "auto" }}
+            value={filters.hearing_to}
+            onChange={e => setFilters({ ...filters, hearing_to: e.target.value })}
+            title="开庭日期止"
+          />
+          {hasFilters && (
+            <button
+              className="btn" style={{ padding: "6px 12px" }}
+              onClick={() => setFilters({ search: "", status: "", hearing_from: "", hearing_to: "" })}
+            >
+              <X size={12} /> 清除
+            </button>
+          )}
+        </div>
         {isLoading ? <div className="empty">加载中...</div>
           : cases.length === 0 ? <div className="empty"><div className="empty-icon">📋</div>暂无案件</div>
           : (

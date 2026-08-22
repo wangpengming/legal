@@ -32,7 +32,13 @@ class CaseOut(BaseModel):
 
 
 @router.get("", response_model=list[CaseOut])
-def list_cases(x_workspace_id: str = Header(alias="X-Workspace-Id")):
+def list_cases(
+    search: str = "",
+    status: str = "",
+    hearing_from: str = "",
+    hearing_to: str = "",
+    x_workspace_id: str = Header(alias="X-Workspace-Id"),
+):
     from app.core.database import get_conn
     import sqlite3
     with get_conn(x_workspace_id) as conn:
@@ -48,7 +54,25 @@ def list_cases(x_workspace_id: str = Header(alias="X-Workspace-Id")):
         if status_col:
             sel_cols += f", {status_col} as status"
         order_col = created_col or "id"
-        rows = conn.execute(f"SELECT {sel_cols} FROM cases ORDER BY {order_col} DESC").fetchall()
+        # 搜索/筛选（全参数可选，不传 = 全部）
+        where, args = [], []
+        if search:
+            where.append(f"(case_number LIKE ? OR court LIKE ? OR {cause_col} LIKE ?)")
+            kw = f"%{search}%"
+            args.extend([kw, kw, kw])
+        if status and status_col:
+            where.append(f"{status_col} = ?")
+            args.append(status)
+        if hearing_from:
+            where.append("hearing_date >= ?")
+            args.append(hearing_from)
+        if hearing_to:
+            where.append("hearing_date != '' AND hearing_date <= ?")
+            args.append(hearing_to)
+        where_sql = (" WHERE " + " AND ".join(where)) if where else ""
+        rows = conn.execute(
+            f"SELECT {sel_cols} FROM cases{where_sql} ORDER BY {order_col} DESC", args
+        ).fetchall()
         results = []
         for r in rows:
             d = dict(r)
