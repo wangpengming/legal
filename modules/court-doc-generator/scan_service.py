@@ -124,13 +124,14 @@ def extract_fields(text: str) -> Dict[str, Optional[str]]:
     if court_match:
         result["法院"] = court_match.group(1)
 
-    # 案由：XX纠纷
+    # 案由：XX纠纷（清洗「本案/本案系/系/属/因/为」等常见前缀，防污染表单案由）
     cause_match = re.search(
         r'([\u4e00-\u9fa5]{2,8}纠纷)',
         text
     )
     if cause_match:
-        result["案由"] = cause_match.group(1)
+        cause = re.sub(r'^(本案系|本案|系|属|因|为)', '', cause_match.group(1))
+        result["案由"] = cause if len(cause) >= 4 else cause_match.group(1)
 
     # 原告：原告：XX / 原告 XX
     plaintiff_match = re.search(

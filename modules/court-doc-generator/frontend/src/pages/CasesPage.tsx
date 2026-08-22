@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Trash2, Zap, Eye, Search, X, Download } from "lucide-react";
+import { Plus, Trash2, Zap, Eye, Search, X, Download, Camera } from "lucide-react";
 import { caseApi, companyApi, agentApi, generateApi, Case } from "../lib/api";
 import { useDebounced } from "../hooks/useDebounced";
 import { useFormDraft, draftKey, loadDraft, clearDraft } from "../hooks/useFormDraft";
@@ -9,6 +9,7 @@ import PdfPreviewModal from "../components/PdfPreviewModal";
 import CaseDetailModal from "../components/CaseDetailModal";
 import ConfirmDialog from "../components/ConfirmDialog";
 import PresetInput from "../components/PresetInput";
+import ScanModal from "../components/ScanModal";
 
 const EMPTY_FORM = {
   case_number: "", court: "", cause: "",
@@ -31,6 +32,8 @@ export default function CasesPage() {
   const [confirm, setConfirm] = useState<{ type: "delete" | "generate"; caseId: number } | null>(null);
   // 案件详情弹窗
   const [detailCase, setDetailCase] = useState<Case | null>(null);
+  // 扫描起诉状弹窗
+  const [scanOpen, setScanOpen] = useState(false);
 
   // 选择态
   const [selCompany, setSelCompany] = useState<number | null>(null);
@@ -121,6 +124,20 @@ export default function CasesPage() {
           onClose={() => setPreviewFile(null)}
         />
       )}
+      {scanOpen && (
+        <ScanModal
+          open={scanOpen}
+          onClose={() => setScanOpen(false)}
+          onApply={m => {
+            // 扫描结果直接覆盖草稿，避免刚填充完又被旧草稿恢复弹窗打断
+            clearDraft(draftKeyStr);
+            setDraftPending(null);
+            setForm({ ...EMPTY_FORM, ...m });
+            setShowForm(true);
+            setScanOpen(false);
+          }}
+        />
+      )}
       {detailCase && (
         <CaseDetailModal caseItem={detailCase} onClose={() => setDetailCase(null)} />
       )}
@@ -164,6 +181,9 @@ export default function CasesPage() {
       <div className="page-header">
         <h1 className="page-title">📋 案件管理</h1>
         <div className="page-actions">
+          <button className="btn btn-outline" onClick={() => setScanOpen(true)}>
+            <Camera size={14} /> 扫描起诉状
+          </button>
           <button className="btn btn-primary" onClick={() => setShowForm(!showForm)}>
             <Plus size={14} /> 新建案件
           </button>
@@ -210,7 +230,7 @@ export default function CasesPage() {
               <div className="form-group">
                 <label className="form-label">我方角色</label>
                 <select className="form-input" value={form.our_role} onChange={e => setForm({ ...form, our_role: e.target.value })}>
-                  <option>原告</option><option>被告</option><option>第三人</option>
+                  <option>原告</option><option>被告</option><option>第三人</option><option>法院</option>
                 </select>
               </div>
             </div>

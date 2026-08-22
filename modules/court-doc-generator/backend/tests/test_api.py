@@ -140,6 +140,25 @@ class TestCRUD:
         assert r.status_code == 200
 
 
+    def test_case_our_role_court(self, ws_id):
+        # 我方角色支持「法院」（拍照扫描起诉状建档场景）
+        r = client.post("/api/v1/cases", json={
+            "case_number": f"(2026)京0101民初{randint(10000, 99999)}号",
+            "court": "北京朝阳法院", "cause": "合同", "hearing_date": "2026-09-01",
+            "opposing_party": "对方公司", "our_role": "法院",
+            "company_id": None, "agent_id": None
+        }, headers=self.headers(ws_id))
+        assert r.status_code == 200
+        assert r.json()["our_role"] == "法院"
+        case_id = r.json()["id"]
+        # 列表回读验证
+        r = client.get("/api/v1/cases", headers=self.headers(ws_id))
+        assert r.status_code == 200
+        created = next(c for c in r.json() if c["id"] == case_id)
+        assert created["our_role"] == "法院"
+        client.delete(f"/api/v1/cases/{case_id}", headers=self.headers(ws_id))
+
+
 class TestGenerate:
     @pytest.fixture
     def ws_setup(self):

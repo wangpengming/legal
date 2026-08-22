@@ -3,7 +3,7 @@ import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuthStore } from "../stores/authStore";
 import { useThemeStore, applyTheme, ThemeMode } from "../stores/themeStore";
 import {
-  LayoutDashboard, Building2, Users, FileText, History, LogOut, Camera, ScrollText, Sun, Moon, Monitor,
+  LayoutDashboard, Building2, Users, FileText, History, LogOut, ScrollText, Sun, Moon, Monitor,
 } from "lucide-react";
 
 const NAV = [
@@ -12,7 +12,6 @@ const NAV = [
   { to: "/agents", icon: Users, label: "代理人" },
   { to: "/cases", icon: FileText, label: "案件" },
   { to: "/history", icon: History, label: "历史记录" },
-  { to: "/scan", icon: Camera, label: "拍照扫描" },
   { to: "/audit-logs", icon: ScrollText, label: "操作日志" },
 ];
 

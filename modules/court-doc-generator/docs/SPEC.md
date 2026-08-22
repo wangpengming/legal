@@ -1176,6 +1176,7 @@ def mask_id_card(id_card: str) -> str:
 
 | 日期 | 版本 | 变更摘要 |
 |------|------|---------|
-| 2026-08-22 | v2.1 | 七项体验增强（dev 分支 TDD）：F5 预设库（presets 表 + 自动注册 + 频次排序 + workspace 隔离）；F1 案件搜索/筛选（search/status/hearing 区间服务端过滤，前端防抖 300ms）；F6 操作日志（audit_logs 表 + mask_pii 遮罩 + 4 接入点含失败记录 + 列表页）；F4 CSV 导出（UTF-8 BOM + 注入防护 + JOIN 公司/代理人）；F2 草稿自动保存（localStorage 1s 防抖 + 恢复弹窗）；F3 开庭提醒（7 天窗口 + Dashboard 横幅 + 浏览器通知）；F7 暗色模式（三态 + CSS 变量 + 记忆）。细节见 SPEC-enhancements-v2.1.md。pytest 35 passed（模块根 51）+ tsc 零错误 + 浏览器 E2E 验证通过 |
+| 2026-08-22 | v2.2 | 拍照扫描集成到新建案件（dev 分支自主完成）：扫描入口收敛至案件页（新建按钮旁「扫描起诉状」+ ScanModal 上传/URL 双方式）；字段映射纯函数 lib/scan.ts（案号/法院/案由/开庭日期归一化/对方当事人智能推断/空格噪音清洗）；我方角色扩展 原告/被告/第三人/法院；移除 /scan 独立路由导航；scan_service 案由前缀清洗；补 chi_sim 语言包。细节见 SPEC-enhancements-v2.2.md。pytest 40 passed + tsc 零错误 + 浏览器 E2E 全链路通过 |
+| 2026-08-22 | v2.1 | 七项体验增强（dev 分支 TDD）：F5 预设库（presets 表 + 自动注册 + 频次排序 + workspace 隔离）；F1 案件搜索/筛选（search/status/hearing 区间服务端过滤，前端防抖 300ms）；F6 操作日志（audit_logs 表 + mask_pii 遮罩 + 4 接 入点含失败记录 + 列表页）；F4 CSV 导出（UTF-8 BOM + 注入防护 + JOIN 公司/代理人 ）；F2 草稿自动保存（localStorage 1s 防抖 + 恢复弹窗）；F3 开庭提醒（7 天窗口 + Dashboard 横幅 + 浏览器通知）；F7 暗色模式（三态 + CSS 变量 + 记忆）。细节见 SPEC-enhancements-v2.1.md。pytest 35 passed（模块根 51）+ tsc 零错误 + 浏览器 E2E  验证通过 |
 | 2026-08-21 | v2.0 | React+FastAPI 全栈重构完成：Streamlit → React+Vite 前端 + FastAPI 后端；bin/ 一键启动双服务；README/module.yaml/SPEC 同步更新至 v2.0；清除 Streamlit 遗骸 8 文件 |
 | 2026-08-17 | v1.0 | 首次从 docs/ + qoder-raw 全量反推整合，确立技术规格 |
