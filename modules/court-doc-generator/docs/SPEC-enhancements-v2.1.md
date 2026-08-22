@@ -238,11 +238,13 @@ CSV 注入防护：单元格首字符为 `=` `+` `-` `@` 时，前缀 `'`。
 
 ## 9. 验收标准（总）
 
-- [ ] F1：案件页搜索/筛选可用，后端 pytest 覆盖
-- [ ] F2：草稿自动保存/恢复/放弃/清除全链路，Vitest 覆盖
-- [ ] F3：7 天窗口计算 + Dashboard 横幅，Vitest 覆盖
-- [ ] F4：CSV 导出含 BOM + 注入防护，pytest 覆盖
-- [ ] F5：预设 CRUD + 频次排序 + workspace 隔离，pytest 覆盖
-- [ ] F6：操作日志写入 + 查询 + PII 遮罩，pytest 覆盖
-- [ ] F7：明暗切换 + 记忆 + 系统跟随，Vitest 覆盖
-- [ ] 后端全量 pytest 通过；前端 vitest 全绿、`npx tsc --noEmit` 零错误
+> 注：前端 Vitest 因依赖安装受阻，经用户确认跳过前端 TDD（2026-08-22），改以 `npx tsc --noEmit` 零错误 + 浏览器 E2E 全链路验证代替。后端 pytest TDD 照常执行。
+
+- [x] F1：案件页搜索/筛选可用，后端 pytest 覆盖（7 用例）
+- [x] F2：草稿自动保存/恢复/放弃/清除全链路，浏览器 E2E 验证（保存→刷新→弹窗→恢复→放弃）
+- [x] F3：7 天窗口计算 + Dashboard 横幅 + 通知按钮，浏览器 E2E 验证（含”今天开庭”高亮）
+- [x] F4：CSV 导出含 BOM + 注入防护，pytest 覆盖（6 用例）+ 浏览器点击下载验证
+- [x] F5：预设 CRUD + 频次排序 + workspace 隔离，pytest 覆盖（6 用例）
+- [x] F6：操作日志写入 + 查询 + PII 遮罩，pytest 覆盖（7 用例）+ 列表页展示验证
+- [x] F7：明暗切换 + 记忆 + 系统跟随，浏览器 E2E 验证（dark/light 往返 + localStorage 持久化）
+- [x] 后端全量 pytest 通过（35 passed）；前端 `npx tsc --noEmit` 零错误 + 生产构建成功

@@ -1,7 +1,7 @@
 name: court-doc-generator
-version: 2.0.0
+version: 2.1.0
 status: active
-description: 出庭手续文档生成器（React+FastAPI 全栈，7份材料 + 多代理人动态绑定 + 用户注册/登录 + workspace 数据隔离 + PDF合并预览 + 在线打印）
+description: 出庭手续文档生成器（React+FastAPI 全栈，7份材料 + 多代理人动态绑定 + 用户注册/登录 + workspace 数据隔离 + PDF合并预览 + 在线打印 + 搜索筛选/预设库/操作日志/CSV导出/草稿/开庭提醒/暗色模式）
 entry: backend/app/main.py
 port:
   backend: 8001       # FastAPI Python 后端
@@ -9,7 +9,7 @@ port:
   fallback: 19000     # 默认端口被占用时备选
 deps: [] # 直接依赖的其他模块（当前无）
 created: 2026-08-17
-updated: 2026-08-21
+updated: 2026-08-22
 tech_stack:
   - Python 3.12
   - FastAPI + Uvicorn
@@ -32,4 +32,11 @@ features:
   - 拍照扫描（OCR）：上传起诉状/传票图片，Tesseract 识别后自动回填案件表单
   - 案件管理：查看/编辑/删除/二次确认
   - 生成记录查看与文件预览
+  - 案件搜索与筛选（v2.1.0 F1）：案号/法院/案由关键词 + 状态 + 开庭日期区间（防抖 300ms）
+  - 法院/案由预设库（v2.1.0 F5）：datalist 建议 + 手输自动注册 + 频次排序 + workspace 隔离 + 删除管理
+  - 操作日志（v2.1.0 F6）：登录/案件创建删除/生成/导出审计 + PII 遮罩 + 分页列表页
+  - CSV 导出（v2.1.0 F4）：当前筛选结果导出，UTF-8 BOM + 注入防护 + 公司/代理人列
+  - 表单草稿自动保存（v2.1.0 F2）：localStorage 1s 防抖 + 打开恢复弹窗
+  - 开庭日期提醒（v2.1.0 F3）：7 天窗口 Dashboard 横幅 + 浏览器通知（每日去重）
+  - 暗色模式（v2.1.0 F7）：浅色/深色/跟随系统三态切换 + 记忆 + 全页面适配
 readme: README.md
