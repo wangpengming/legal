@@ -41,6 +41,6 @@ allocations:
 
 # 端口冲突解决策略
 conflict_resolution:
-  - "默认端口被占用 → 自动切 fallback"
-  - "fallback 也被占用 → 报错并提示手动释放"
-  - "不要默默换端口（避免配置漂移，违反 §10.4.2）"
+  - "固定端口，不换端口"
+  - "端口被占用 → 强制终止占用进程（kill_port_owner）→ 重新绑定"
+  - "清理失败 → 报错退出，提示手动 python3 bin/stop.py"

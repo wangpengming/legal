@@ -16,7 +16,6 @@ RUN_DIR.mkdir(exist_ok=True)
 PID_FILE = RUN_DIR / "frontend.pid"
 LOG_FILE = RUN_DIR / "frontend.log"
 PORT = 18502
-FALLBACK_PORT = 18503
 
 MAX_LOG_SIZE = 5 * 1024 * 1024   # 超过 5MB 触发轮转
 KEEP_LOGS = 5                    # 保留 N 份归档（.1 最新 → .N 最旧）
@@ -42,6 +41,36 @@ def port_in_use(port):
         return s.connect_ex(("localhost", port)) == 0
 
 
+def kill_port_owner(port: int):
+    """强制释放端口：找占用进程 PID → SIGKILL。"""
+    import subprocess as sp
+    try:
+        # macOS / Linux: lsof -ti :PORT
+        result = sp.run(["lsof", "-ti", f":{port}"], capture_output=True, text=True)
+        if result.returncode == 0 and result.stdout.strip():
+            for pid_str in result.stdout.strip().split("\n"):
+                pid = int(pid_str)
+                os.kill(pid, 9)
+                print(f"🛑 已终止占用端口 {port} 的进程 {pid}")
+            time.sleep(1)
+            return True
+    except Exception:
+        pass
+    # Windows fallback: netstat
+    try:
+        result = sp.run(["netstat", "-ano"], capture_output=True, text=True)
+        for line in result.stdout.split("\n"):
+            if f":{port}" in line and "LISTENING" in line:
+                pid = int(line.strip().split()[-1])
+                sp.run(["taskkill", "/F", "/PID", str(pid)], capture_output=True)
+                print(f"🛑 已终止占用端口 {port} 的进程 {pid}")
+                time.sleep(1)
+                return True
+    except Exception:
+        pass
+    return False
+
+
 # 检查 node_modules
 if not (ROOT / "node_modules").exists():
     print("📦 首次运行，安装前端依赖...")
@@ -60,22 +89,25 @@ if PID_FILE.exists():
         pass
     time.sleep(1)
 
-# 端口冲突处理
-active_port = PORT
+# 端口冲突处理：强制释放，不换端口
 if port_in_use(PORT):
-    print(f"⚠️  端口 {PORT} 已被占用，尝试 fallback {FALLBACK_PORT}")
-    if port_in_use(FALLBACK_PORT):
-        print(f"❌ 端口 {FALLBACK_PORT} 也被占用，请先释放端口")
+    print(f"⚠️  端口 {PORT} 已被占用，正在清理...")
+    if kill_port_owner(PORT):
+        if port_in_use(PORT):
+            print(f"❌ 端口 {PORT} 清理失败，请手动处理")
+            print(f"   运行: python3 bin/stop.py")
+            sys.exit(1)
+    else:
+        print(f"❌ 无法自动清理端口 {PORT}，请手动处理")
         print(f"   运行: python3 bin/stop.py")
         sys.exit(1)
-    active_port = FALLBACK_PORT
 
 # 后台启动（subprocess.Popen，跨平台兼容）
 rollover_log(LOG_FILE)
 
 log_f = open(LOG_FILE, "w")
 proc = subprocess.Popen(
-    ["npx", "vite", "--port", str(active_port), "--host"],
+    ["npx", "vite", "--port", str(PORT), "--host"],
     cwd=str(ROOT),
     stdout=log_f,
     stderr=subprocess.STDOUT,
@@ -83,13 +115,13 @@ proc = subprocess.Popen(
 )
 
 PID_FILE.write_text(str(proc.pid))
-print(f"🚀 启动前端 (PID {proc.pid}) 端口 {active_port}")
-print(f"   访问 http://localhost:{active_port}")
+print(f"🚀 启动前端 (PID {proc.pid}) 端口 {PORT}")
+print(f"   访问 http://localhost:{PORT}")
 
 # 等待端口就绪
 for i in range(20):
-    if port_in_use(active_port):
-        print(f"✅ 前端就绪 http://localhost:{active_port}")
+    if port_in_use(PORT):
+        print(f"✅ 前端就绪 http://localhost:{PORT}")
         break
     time.sleep(1)
 else:

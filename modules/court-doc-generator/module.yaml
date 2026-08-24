@@ -4,11 +4,8 @@ status: active
 description: 出庭手续文档生成器（React+FastAPI 全栈，7份材料 + 多代理人动态绑定 + 用户注册/登录 + workspace 数据隔离 + PDF合并预览 + 在线打印 + 搜索筛选/预设库/操作日志/CSV导出/草稿/开庭提醒/暗色模式/拍照扫描建档（多图合并识别））
 entry: backend/app/main.py
 port:
-  backend: 8001       # FastAPI Python 后端
-  frontend: 18502     # React/Vite 前端（dev server）
-  fallback:
-    backend: 8002     # 后端端口被占用时备选
-    frontend: 18503   # 前端端口被占用时备选
+  backend: 8001       # FastAPI Python 后端（固定端口，冲突时杀旧进程）
+  frontend: 18502     # React/Vite 前端 dev server（固定端口，冲突时杀旧进程）
 deps: [] # 直接依赖的其他模块（当前无）
 created: 2026-08-17
 updated: 2026-08-22
