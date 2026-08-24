@@ -71,9 +71,20 @@ def kill_port_owner(port: int):
     return False
 
 
-# 检查 node_modules
-if not (ROOT / "node_modules").exists():
-    print("📦 首次运行，安装前端依赖...")
+# 检查 node_modules 完整性（比较锁文件时间戳，避免目录存在但过期）
+node_modules = ROOT / "node_modules"
+lock_file = ROOT / "package-lock.json"
+node_lock = node_modules / ".package-lock.json"
+need_install = True
+if node_modules.exists() and node_lock.exists() and lock_file.exists():
+    if lock_file.stat().st_mtime <= node_lock.stat().st_mtime:
+        need_install = False
+
+if need_install:
+    if not node_modules.exists():
+        print("📦 首次运行，安装前端依赖...")
+    else:
+        print("📦 node_modules 已过期，更新前端依赖...")
     result = subprocess.run(["npm", "install"], cwd=str(ROOT), check=False)
     if result.returncode != 0:
         print("❌ npm install 失败，请检查网络或手动执行: cd frontend && npm install")

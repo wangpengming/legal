@@ -158,9 +158,15 @@ def install_frontend_deps():
         warn("未找到 frontend/package.json，跳过")
         return True
 
-    if (FRONTEND_DIR / "node_modules").exists():
-        ok("node_modules 已存在，跳过 npm install")
-        return True
+    lock_file = FRONTEND_DIR / "package-lock.json"
+    node_lock = FRONTEND_DIR / "node_modules" / ".package-lock.json"
+    if (FRONTEND_DIR / "node_modules").exists() and node_lock.exists():
+        # 比较锁文件时间：如果 package-lock.json 比 node_modules 快照新，说明依赖有变更
+        if lock_file.exists() and lock_file.stat().st_mtime <= node_lock.stat().st_mtime:
+            ok("node_modules 已是最新，跳过 npm install")
+            return True
+        else:
+            warn("node_modules 存在但可能过期（package-lock.json 有更新）")
 
     if not run(["npm", "install"], cwd=str(FRONTEND_DIR)):
         fail("npm install 失败")
