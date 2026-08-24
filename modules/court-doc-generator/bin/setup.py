@@ -174,11 +174,12 @@ def check_env_file():
     env_example = MODULE_ROOT / "backend" / ".env.example"
     env_file = MODULE_ROOT / "backend" / ".env"
     if env_file.exists():
-        ok(".env 已配置")
+        ok(".env 已配置（默认值即可运行，生产环境按需修改）")
         return True
+    # .env 已在仓库中，此分支仅用于意外删除后的恢复
     if env_example.exists():
         shutil.copy(env_example, env_file)
-        ok(f"已从 .env.example 创建 .env（默认值即可运行）")
+        ok(f"已从 .env.example 恢复 .env")
         return True
     warn("未找到 .env.example，跳过")
     return True
