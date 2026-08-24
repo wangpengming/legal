@@ -116,7 +116,7 @@ if port_in_use(PORT):
 # 后台启动（subprocess.Popen，跨平台兼容）
 rollover_log(LOG_FILE)
 
-log_f = open(LOG_FILE, "w")
+log_f = open(LOG_FILE, "a")
 proc = subprocess.Popen(
     ["npx", "vite", "--port", str(PORT), "--host"],
     cwd=str(ROOT),

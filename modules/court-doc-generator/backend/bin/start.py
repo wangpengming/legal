@@ -93,7 +93,8 @@ def is_running(pid):
 
 def find_python():
     """查找虚拟环境 Python，fallback 到当前 Python。"""
-    venv_python = ROOT / ".venv" / "bin" / "python"
+    # .venv 在模块根目录，不在 backend/ 下
+    venv_python = ROOT.parent / ".venv" / "bin" / "python"
     if venv_python.exists():
         return str(venv_python)
     # 如果通过 bin/start.py 调用，sys.executable 已是虚拟环境 Python
@@ -129,7 +130,7 @@ if __name__ == "__main__":
     rollover_log(LOG_FILE)
 
     # 后台启动（subprocess.Popen，跨平台兼容）
-    log_f = open(LOG_FILE, "w")
+    log_f = open(LOG_FILE, "a")
     proc = subprocess.Popen(
         [python, "-m", "uvicorn", "app.main:app",
          "--host", "0.0.0.0", "--port", str(PORT)],

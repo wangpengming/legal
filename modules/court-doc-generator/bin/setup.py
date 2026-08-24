@@ -73,9 +73,26 @@ def check_python():
     ver = sys.version_info[:2]
     if ver >= PYTHON_MIN:
         ok(f"Python {ver[0]}.{ver[1]}")
-        return True
-    fail(f"需要 Python {PYTHON_MIN[0]}.{PYTHON_MIN[1]}+，当前 {ver[0]}.{ver[1]}")
-    return False
+    else:
+        fail(f"需要 Python {PYTHON_MIN[0]}.{PYTHON_MIN[1]}+，当前 {ver[0]}.{ver[1]}")
+        return False
+
+    # Linux 上检查 python3-venv 是否安装（缺少则 venv 创建失败）
+    if sys.platform == "linux" and not shutil.which("dpkg"):
+        pass  # 非 Debian 系，跳过
+    elif sys.platform == "linux":
+        try:
+            result = subprocess.run(
+                ["dpkg", "-s", "python3-venv"],
+                capture_output=True, text=True
+            )
+            if "install ok" not in result.stdout:
+                warn("未安装 python3-venv（venv 创建将失败）")
+                print("   Ubuntu/Debian: sudo apt install python3-venv")
+        except Exception:
+            pass
+
+    return True
 
 def check_node():
     step("检查 Node.js / npm")
@@ -129,8 +146,9 @@ def install_python_deps():
         fail("虚拟环境不完整，请重新运行")
         return False
 
-    # 升级 pip
-    run_pip(["install", "--upgrade", "pip"])
+    # 升级 pip（失败不阻塞，但给出警告）
+    if not run_pip(["install", "--upgrade", "pip"]):
+        warn("pip 升级失败，使用当前版本继续")
 
     # 共享依赖
     if REQ_SHARED.exists():

@@ -10,6 +10,7 @@
 首次部署：
     python3 bin/setup.py          # 一键环境部署
 """
+import shutil
 import subprocess
 import sys
 import time
@@ -64,8 +65,7 @@ if is_prod:
 
 # 检查 npm
 if target in ("all", "frontend"):
-    npm_check = subprocess.run(["which", "npm"], capture_output=True)
-    if npm_check.returncode != 0:
+    if not shutil.which("npm"):
         print("❌ 未找到 npm，请安装 Node.js 18+")
         print("   https://nodejs.org/ 或 brew install node")
         sys.exit(1)
