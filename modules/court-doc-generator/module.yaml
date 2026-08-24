@@ -6,7 +6,9 @@ entry: backend/app/main.py
 port:
   backend: 8001       # FastAPI Python 后端
   frontend: 18502     # React/Vite 前端（dev server）
-  fallback: 19000     # 默认端口被占用时备选
+  fallback:
+    backend: 8002     # 后端端口被占用时备选
+    frontend: 18503   # 前端端口被占用时备选
 deps: [] # 直接依赖的其他模块（当前无）
 created: 2026-08-17
 updated: 2026-08-22

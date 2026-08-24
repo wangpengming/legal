@@ -48,16 +48,14 @@
 ```bash
 cd modules/court-doc-generator
 
-# 1. 创建虚拟环境 + 安装依赖（首次）
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt -r backend/requirements.txt
+# 首次部署：一键完成环境安装（.venv + pip + npm）
+python3 bin/setup.py
 
-# 2. 安装前端依赖（首次）
-cd frontend && npm install && cd ..
-
-# 3. 一键启动
+# 一键启动（开发模式）
 python3 bin/start.py
+
+# macOS 双击启动
+open 启动.command
 ```
 
 启动后：
@@ -77,6 +75,8 @@ python3 frontend/bin/start.py
 ### 服务管理
 
 ```bash
+python3 bin/setup.py       # 一键部署（环境安装）
+python3 bin/start.py       # 启动全部
 python3 bin/status.py      # 查看状态
 python3 bin/stop.py        # 停止全部
 python3 bin/restart.py     # 重启全部
@@ -117,7 +117,8 @@ pytest tests/ -v
 
 ```
 court-doc-generator/
-├── bin/                    # 一键启动/停止/状态/重启
+├── bin/                    # 一键部署/启动/停止/状态/重启
+│   ├── setup.py            # 一键环境部署
 │   ├── start.py
 │   ├── stop.py
 │   ├── status.py

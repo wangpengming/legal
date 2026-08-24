@@ -3,6 +3,9 @@
 # macOS 双击启动入口
 # 逻辑：检查服务状态 → 缺失则启动 → 弹出浏览器
 # 适用：macOS 双击运行，Terminal 窗口自动打开
+#
+# 注意：若双击后被编辑器打开（非终端），请右键本文件
+#       → 打开方式 → 终端 → 勾选"始终以此方式打开"
 # =============================================
 set -e
 cd "$(dirname "$0")"
@@ -26,6 +29,22 @@ if [ -z "$PY" ]; then
     echo "按任意键关闭此窗口..."
     read -r -n 1
     exit 1
+fi
+
+# 首次部署：检查虚拟环境，缺失则引导 setup
+if [ ! -x ".venv/bin/python" ]; then
+    echo "⚠️  未找到虚拟环境 .venv，需要先部署环境"
+    echo
+    if [ -x "$PY" ]; then
+        echo "🔧 正在一键部署..."
+        "$PY" bin/setup.py
+        echo
+    else
+        echo "❌ 未找到可用 Python，请安装 Python 3.10+"
+        echo "按任意键关闭此窗口..."
+        read -r -n 1
+        exit 1
+    fi
 fi
 
 # 检查端口是否监听（返回 0=在监听）

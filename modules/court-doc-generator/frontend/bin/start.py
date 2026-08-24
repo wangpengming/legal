@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""前端启动脚本（Vite dev server）。"""
+"""前端启动脚本（Vite dev server）。
+
+跨平台兼容：使用 subprocess.Popen 替代 os.fork()。
+自动检测 node_modules 缺失并 npm install。
+"""
 import os
 import subprocess
 import sys
@@ -12,6 +16,7 @@ RUN_DIR.mkdir(exist_ok=True)
 PID_FILE = RUN_DIR / "frontend.pid"
 LOG_FILE = RUN_DIR / "frontend.log"
 PORT = 18502
+FALLBACK_PORT = 18503
 
 MAX_LOG_SIZE = 5 * 1024 * 1024   # 超过 5MB 触发轮转
 KEEP_LOGS = 5                    # 保留 N 份归档（.1 最新 → .N 最旧）
@@ -40,7 +45,10 @@ def port_in_use(port):
 # 检查 node_modules
 if not (ROOT / "node_modules").exists():
     print("📦 首次运行，安装前端依赖...")
-    subprocess.run(["npm", "install"], cwd=str(ROOT), check=True)
+    result = subprocess.run(["npm", "install"], cwd=str(ROOT), check=False)
+    if result.returncode != 0:
+        print("❌ npm install 失败，请检查网络或手动执行: cd frontend && npm install")
+        sys.exit(1)
 
 # 停止旧进程
 if PID_FILE.exists():
@@ -52,33 +60,39 @@ if PID_FILE.exists():
         pass
     time.sleep(1)
 
+# 端口冲突处理
+active_port = PORT
 if port_in_use(PORT):
-    print(f"❌ 端口 {PORT} 已被占用，请先释放")
-    sys.exit(1)
+    print(f"⚠️  端口 {PORT} 已被占用，尝试 fallback {FALLBACK_PORT}")
+    if port_in_use(FALLBACK_PORT):
+        print(f"❌ 端口 {FALLBACK_PORT} 也被占用，请先释放端口")
+        print(f"   运行: python3 bin/stop.py")
+        sys.exit(1)
+    active_port = FALLBACK_PORT
 
-# 后台启动（stdout/stderr 重定向到日志文件；stdin 置 /dev/null，
-# 避免父进程 pty 关闭后 vite readline 读 stdin 抛 EIO 崩溃）
-rollover_log(LOG_FILE)  # 覆盖写前先轮转归档
+# 后台启动（subprocess.Popen，跨平台兼容）
+rollover_log(LOG_FILE)
 
-pid = os.fork()
-if pid == 0:
-    with open(LOG_FILE, "w") as log:
-        os.dup2(log.fileno(), sys.stdout.fileno())
-        os.dup2(log.fileno(), sys.stderr.fileno())
-    devnull = os.open(os.devnull, os.O_RDONLY)
-    os.dup2(devnull, sys.stdin.fileno())
-    os.chdir(str(ROOT))
-    os.execvp("npx", ["npx", "vite", "--port", str(PORT), "--host"])
+log_f = open(LOG_FILE, "w")
+proc = subprocess.Popen(
+    ["npx", "vite", "--port", str(active_port), "--host"],
+    cwd=str(ROOT),
+    stdout=log_f,
+    stderr=subprocess.STDOUT,
+    stdin=subprocess.DEVNULL,
+)
 
-PID_FILE.write_text(str(pid))
-print(f"🚀 启动前端 (PID {pid}) 端口 {PORT}")
-print(f"   访问 http://localhost:{PORT}")
+PID_FILE.write_text(str(proc.pid))
+print(f"🚀 启动前端 (PID {proc.pid}) 端口 {active_port}")
+print(f"   访问 http://localhost:{active_port}")
 
 # 等待端口就绪
 for i in range(20):
-    if port_in_use(PORT):
-        print(f"✅ 前端就绪 http://localhost:{PORT}")
+    if port_in_use(active_port):
+        print(f"✅ 前端就绪 http://localhost:{active_port}")
         break
     time.sleep(1)
 else:
-    print(f"⚠️  前端启动超时，请检查日志")
+    print(f"⚠️  前端启动超时，请检查日志: {LOG_FILE}")
+
+log_f.close()

@@ -7,7 +7,7 @@ from pathlib import Path
 MODULE_ROOT = Path(__file__).parent.parent
 python = sys.executable
 
-print("⚖️  出庭手续生成器 v2.0.0 · 服务状态")
+print("⚖️  出庭手续生成器 v2.2.5 · 服务状态")
 print("=" * 50)
 
 for svc in ["backend", "frontend"]:

@@ -6,6 +6,9 @@
     python3 bin/start.py --prod   # 生产模式：单进程后端托管前端 build 产物（仅 8001）
     python3 bin/start.py backend  # 仅启动后端
     python3 bin/start.py frontend # 仅启动前端
+
+首次部署：
+    python3 bin/setup.py          # 一键环境部署
 """
 import subprocess
 import sys
@@ -15,7 +18,10 @@ from pathlib import Path
 MODULE_ROOT = Path(__file__).parent.parent
 BACKEND_BIN = MODULE_ROOT / "backend" / "bin"
 FRONTEND_BIN = MODULE_ROOT / "frontend" / "bin"
-VENV_PYTHON = MODULE_ROOT / ".venv" / "bin" / "python"
+VENV_DIR = MODULE_ROOT / ".venv"
+VENV_PYTHON = VENV_DIR / "bin" / "python"
+
+VERSION = "2.2.5"
 
 target_args = [a for a in sys.argv[1:] if a != "--prod"]
 is_prod = "--prod" in sys.argv[1:]
@@ -23,7 +29,7 @@ target = target_args[0] if target_args else ("backend" if is_prod else "all")
 
 
 def find_python():
-    """查找可用 Python。"""
+    """查找可用 Python：优先虚拟环境，fallback 到当前 Python。"""
     if VENV_PYTHON.exists():
         return str(VENV_PYTHON)
     return sys.executable
@@ -31,14 +37,20 @@ def find_python():
 
 python = find_python()
 
-print("⚖️  出庭手续生成器 v2.2.5")
+print(f"⚖️  出庭手续生成器 v{VERSION}")
 print("=" * 50)
 
 # 检查虚拟环境
 if not VENV_PYTHON.exists():
-    print("⚠️  未找到 .venv 虚拟环境")
-    print("   创建: python3 -m venv .venv")
-    print("   安装: .venv/bin/pip install -r requirements.txt -r backend/requirements.txt")
+    print("⚠️  未找到虚拟环境 .venv")
+    print()
+    print("   🔧 一键部署（推荐）:")
+    print(f"      python3 bin/setup.py")
+    print()
+    print("   或手动创建:")
+    print(f"      python3 -m venv .venv")
+    print(f"      .venv/bin/pip install -r requirements.txt -r backend/requirements.txt")
+    print(f"      cd frontend && npm install")
     sys.exit(1)
 
 # 生产模式：前端必须已 build，由后端统一托管（单端口）
@@ -51,10 +63,12 @@ if is_prod:
     print("🏭 生产模式：前端由后端统一托管（单端口 8001）")
 
 # 检查 npm
-npm_check = subprocess.run(["which", "npm"], capture_output=True)
-if npm_check.returncode != 0:
-    print("❌ 未找到 npm，请安装 Node.js")
-    sys.exit(1)
+if target in ("all", "frontend"):
+    npm_check = subprocess.run(["which", "npm"], capture_output=True)
+    if npm_check.returncode != 0:
+        print("❌ 未找到 npm，请安装 Node.js 18+")
+        print("   https://nodejs.org/ 或 brew install node")
+        sys.exit(1)
 
 errors = []
 
