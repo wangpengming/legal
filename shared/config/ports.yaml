@@ -40,6 +40,11 @@ allocations:
     tika: 8093              # Apache Tika（备用 OCR）
     ui: 18503               # Streamlit Web UI
 
+  # 雷盒控制台（Thunderbox MCP 可视化管理系统）
+  thunderbox-console:
+    backend: 8002       # FastAPI 网关（MCP 13 工具 → REST）
+    frontend: 18503     # React/Vite dev server（生产形态后端托管 dist 单端口）
+
 # 端口冲突解决策略
 conflict_resolution:
   - "固定端口，不换端口"

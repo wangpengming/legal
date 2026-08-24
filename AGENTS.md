@@ -533,12 +533,51 @@ allocations:
 
 ---
 
+## 10.5 Thunderbox 部署红线（强制）
+
+> 完整排查指南见 [`docs/DEPLOYMENT-THUNDERBOX.md`](file:///Users/zhangyang/Desktop/code/legal/docs/DEPLOYMENT-THUNDERBOX.md)。
+
+### 10.5.1 源码仓库
+
+| 规则 | 说明 |
+|------|------|
+| 🔴 **仅 GitHub / GitLab** | Thunderbox 不支持 Gitee（解析 URL 为 `owner/repo` 丢弃域名） |
+| 🔴 **公开仓库不传 `git_token`** | Thunderbox 将 token 当作 GitLab CI token（`gitlab-ci-token:<TOKEN>`），GitHub/Gitee 不认 |
+| ✅ URL 格式 | `https://github.com/<owner>/<repo>`（不带 `.git` 也可） |
+
+### 10.5.2 Dockerfile
+
+| 规则 | 说明 |
+|------|------|
+| 🔴 **系统依赖必须完整** | `scan_service.py` 模块加载时调 `shutil.which("tesseract")`，缺失则 `TypeError: NoneType` 崩溃 |
+| 🔴 **PyPI 用清华镜像** | `files.pythonhosted.org` 下载大包（PyMuPDF 25MB）超时 → `-i https://pypi.tuna.tsinghua.edu.cn/simple` |
+| ✅ **apt 用默认源** | 不要换阿里云/清华 apt 源，Thunderbox 可能无法访问 |
+| ✅ 端口一致 | `EXPOSE` + `CMD --port` + `thunderbox_create port` 三者一致 |
+
+### 10.5.3 调试铁律
+
+| 场景 | 动作 |
+|------|------|
+| 构建失败 | **先查 `build_logs=true`**，不要盲目删代码 |
+| 容器崩溃 | `thunderbox_control(action="start")` 重启后**立刻拉 `logs=true`** |
+| 外部 503 | 检查 `access_mode` 是否为 `public` |
+| 轮询 | **sleep ≤ 30 秒**，多次短轮询 |
+
+### 10.5.4 部署后必做
+
+- [ ] `thunderbox_config(access_mode="public")` — 否则外部 `no available server`
+- [ ] `curl https://<domain>/health` — 外部验证 200
+- [ ] `curl https://<domain>/` — 前端 SPA 200
+
+---
+
 ## 11. 关联文档速查
 
 | 文档 | 何时读 |
 |------|--------|
 | `README.md` | 首次进入工程 |
 | `docs/SPEC.md` | 架构 / 模块 / 接口 / 安全 / 版本问题 |
+| `docs/DEPLOYMENT-THUNDERBOX.md` | Thunderbox 部署 / 排查（§10.5） |
 | `docs/requirements/backlog.md` | 需求查询 / 新增 |
 | `docs/requirements/CHANGELOG.md` | 版本历史 |
 | `modules/index.yaml` | 模块注册表 |

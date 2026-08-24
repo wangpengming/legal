@@ -1603,3 +1603,89 @@ pytest 直连真实 FastAPI 应用，累计产生 434 个测试 workspace（Test
 - [ ] 生产模式：npm run build 一次 → 仅启动后端 → http://server:8001 完整可用
 - [ ] 日志文件不无限增长（保留最近 N 份）
 - [ ] docs/README.md 与当前 React+FastAPI 架构一致，无 Streamlit 残留
+
+---
+
+## 2026-08-24 court-doc-generator Thunderbox 云部署（容器化）
+
+**类型**: feat
+**模块**: court-doc-generator
+**状态**: proposed
+**优先级**: P1（用户计划部署到 Thunderbox PaaS，评估已完成待确认）
+
+### 描述
+
+用户拟将出庭生成器部署到公司 PaaS Thunderbox（MCP 已接入，域名体系 `<前缀>.tbox.ktvsky.com`），倾向镜像部署确保环境统一。已完成评估（docs/DEPLOYMENT-THUNDERBOX.md）：本地架构高度适配容器化（React+FastAPI 单端口 8001 同源、SQLite 文件存储、无外部中间件），代码改动≈0，纯工程件缺口（Dockerfile、镜像推送通道、git HTTPS+token、双数据卷、容器内 Tesseract/中文字体）。
+
+### 实现方案（用户裁决 D1-D5 后）
+
+- [ ] dkr01 仓库根 Dockerfile（多阶段：node 构建前端 → python:3.12-slim 运行时）+ .dockerignore（排除 node_modules/dist/.venv/data/outputs/.run/.git 等）
+- [ ] dkr02 运行时补齐：apt 安装 tesseract-ocr / tesseract-ocr-chi-sim / fonts-noto-cjk（防 CID 伪字体打印空白复发）
+- [ ] dkr03 启动参数：CWD=模块根 + PYTHONPATH 含 backend（generator/docx_to_pdf 经 sys.path 引用）+ uvicorn 单 worker（进程内互斥锁语义）
+- [ ] dkr04 数据双卷：court-data:/app/data + court-output:/app/outputs；env_vars 注入 DEBUG=false/HOST/PORT
+- [ ] dep01 部署路径二选一：A. git_repo+dockerfile（需 Gitee HTTPS token read_repository）/ B. docker_image 推 registry.tbox.ktvsky.com（凭证待平台确认）
+- [ ] dep02 域名 legal-court.tbox.ktvsky.com（实测可用）；访问模式 internal（SSO，推荐）
+- [ ] tst01 容器内 pytest tests/ 全量回归（字体/PDF/OCR 链路 Linux 验证）
+- [ ] tst02 e2e 冒烟：专用验证账号（verify_*）建案→生成 7 份材料→合并预览→清理
+
+### 验收标准
+
+- [ ] docker build 通过，容器内 pytest 全量通过
+- [ ] 平台部署后 /health 返回 version，同源前端可访问
+- [ ] OCR 中文识别正常（chi_sim），DOCX→PDF 中文真嵌入不打印空白
+- [ ] 数据库与生成结果持久化（重启容器不丢）
+- [ ] 部署文档与评估文档一致，docs/DEPLOYMENT.md 增补容器章节
+
+---
+
+## 2026-08-24 thunderbox-console 雷盒控制台（Thunderbox MCP 可视化管理系统）
+
+**类型**: feature
+**模块**: thunderbox-console（新模块）
+**状态**: proposed
+**优先级**: P1（Thunderbox MCP 已接入，无可视化操作入口）
+
+### 描述
+
+公司内部 PaaS 部署平台 Thunderbox（底层 Coolify，`*.tbox.ktvsky.com`）已通过 MCP 协议接入（HTTP streamable，13 个工具，覆盖：应用创建/部署/回滚/启停、配置与环境变量、数据库 SQL/迁移、日志查询、域名探测）。当前能力全部隐藏在 MCP 协议后面，对小白用户不友好。
+
+本需求：在 legal monorepo 下新建子模块 **thunderbox-console（雷盒控制台）**——把 13 个 MCP 工具全部可视化，提供一个网页版管理控制台：应用全生命周期（创建→部署→监控→回滚）、数据库工作台（SQL 执行/迁移/schema）、日志查看、域名探测等，纯页面操作、零命令行、零 MCP 知识要求。
+
+**四层能力**（对应 MCP 工具分组）：
+1. 应用部署层：create / deploy / rollback（含组建包 4 模式向导：dockerfile / nixpacks / static / spa）
+2. 监控查询层：query（列表/详情/日志/构建日志/健康）+ check（域名/资源）
+3. 生命周期控制层：control（start/stop/cancel）+ config（env/访问模式/协管/卷）
+4. 数据库层：db_add / sql（ro-rw 双模式）/ apply_migration / describe_schema / list_tables
+
+**开发流程**（用户明确要求）：分析 → SPEC → 原型图 → 用户评估 → 原型通过后才制定实现 SPEC + goal 开始编码。
+
+### 子任务（当前阶段 = 分析 + 原型）
+
+- [x] backlog 登记（本条目）
+- [x] requirements/01-原始需求.md 用户诉求留档
+- [x] docs/ANALYSIS.md 详细分析（定位/用户画像/功能矩阵/架构/安全/演进）
+- [x] docs/SPEC.md 方案设计（架构/API/数据模型/页面结构/验收清单）
+- [x] prototype.html 高保真交互原型（深色科技风，浏览器自测零报错）
+- [x] module.yaml + 模块注册（index.yaml / ports.yaml 端口申请）
+- [ ] **用户评估原型 → 通过**
+- [ ] 制定实现 SPEC（详细技术规格）与 goal
+- [ ] backend/：FastAPI + MCP 客户端封装 + REST API + /health
+- [ ] frontend/：React + Vite + TS 正式实现
+- [ ] bin/ 4 件套 + 测试（TDD）+ 文档三件套补全
+- [ ] 上线登记（backlog done + CHANGELOG）
+
+### 验收标准（原型评估阶段）
+
+- [ ] 分析文档覆盖：定位/用户画像/功能矩阵/架构决策/安全/演进
+- [ ] SPEC 覆盖：架构拓扑/API 设计/状态机/页面结构/验收清单
+- [ ] 原型图为单文件 HTML，深色科技风，四层能力全部可视化可操作
+- [ ] 原型浏览器自测：控制台零报错、状态机切换、向导流程完整
+- [ ] 用户评估通过（后续进入实现阶段）
+
+### 待澄清
+
+- 模块名确认：thunderbox-console（中文：雷盒控制台）；备选：tbox-console / deploy-dashboard
+- 认证：本地内网工具，v0.1 无登录 or 简单 PIN？（建议无登录，与 portal 一致，后续统一认证）
+- 是否纳入 portal 统一门户（注册表追加条目，远期）
+
+---

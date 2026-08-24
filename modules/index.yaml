@@ -58,3 +58,12 @@ modules:
       status: planned
     created: 2026-08-17
     integrated: 2026-08-17
+
+  - name: thunderbox-console
+    path: modules/thunderbox-console
+    status: planning
+    version: 0.0.1
+    description: 雷盒控制台（Thunderbox PaaS 的 MCP 可视化管理系统：应用全生命周期/数据库工作台/日志/域名探测，原型评估阶段）
+    entry: none
+    created: 2026-08-24
+    integrated: 2026-08-24
