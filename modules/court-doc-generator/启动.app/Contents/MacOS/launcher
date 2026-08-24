@@ -1,0 +1,26 @@
+#!/usr/bin/env python3
+"""出庭手续生成器启动器"""
+import subprocess
+from pathlib import Path
+
+SCRIPT_DIR = Path(__file__).parent
+MODULE_DIR = SCRIPT_DIR.parent.parent
+
+osascript_code = """
+on run argv
+    set modulePath to item 1 of argv
+    set cmd to "cd " & quoted form of modulePath & " && python3 bin/start.py"
+    tell application "Terminal"
+        activate
+        do script cmd
+    end tell
+end run
+"""
+
+script_file = "/tmp/launch_court_doc.scpt"
+with open(script_file, "w") as f:
+    f.write(osascript_code)
+
+subprocess.run([
+    "osascript", script_file, str(MODULE_DIR)
+])
