@@ -1,8 +1,8 @@
 FROM node:20-alpine AS fe
 WORKDIR /build
-COPY frontend/package*.json ./
+COPY modules/court-doc-generator/frontend/package*.json ./
 RUN npm ci
-COPY frontend/ ./
+COPY modules/court-doc-generator/frontend/ ./
 RUN npm run build
 
 FROM python:3.12-slim-bookworm
