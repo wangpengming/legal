@@ -1,9 +1,8 @@
 import { useEffect } from "react";
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { useAuthStore } from "../stores/authStore";
+import { NavLink, Outlet } from "react-router-dom";
 import { useThemeStore, applyTheme, ThemeMode } from "../stores/themeStore";
 import {
-  LayoutDashboard, Building2, Users, FileText, History, LogOut, ScrollText, Sun, Moon, Monitor,
+  LayoutDashboard, Building2, Users, FileText, History, ScrollText, Sun, Moon, Monitor,
 } from "lucide-react";
 
 const NAV = [
@@ -22,10 +21,8 @@ const THEME_OPTIONS: { value: ThemeMode; label: string; icon: typeof Sun }[] = [
 ];
 
 export default function Layout() {
-  const { workspaceName, logout } = useAuthStore();
   const themeMode = useThemeStore(s => s.mode);
   const setThemeMode = useThemeStore(s => s.setMode);
-  const navigate = useNavigate();
 
   // F7：主题变更即应用；system 模式跟随系统偏好实时切换
   useEffect(() => {
@@ -37,11 +34,6 @@ export default function Layout() {
     mq.addEventListener("change", onSystemChange);
     return () => mq.removeEventListener("change", onSystemChange);
   }, [themeMode]);
-
-  function handleLogout() {
-    logout();
-    navigate("/login");
-  }
 
   return (
     <div className="layout">
@@ -63,7 +55,7 @@ export default function Layout() {
           ))}
         </nav>
         <div className="sidebar-footer">
-          <div className="theme-switch" style={{ marginBottom: 8 }}>
+          <div className="theme-switch">
             {THEME_OPTIONS.map(({ value, label, icon: Icon }) => (
               <button
                 key={value}
@@ -75,12 +67,6 @@ export default function Layout() {
               </button>
             ))}
           </div>
-          <div style={{ marginBottom: 8, fontSize: 13, color: "var(--text)" }}>
-            👤 {workspaceName || "未登录"}
-          </div>
-          <button className="btn" onClick={handleLogout}>
-            <LogOut size={14} /> 退出登录
-          </button>
         </div>
       </aside>
       <main className="main-content">

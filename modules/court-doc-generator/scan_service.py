@@ -10,6 +10,7 @@
 - scan_documents(image_paths) -> dict：一站式扫描+抽取
 - download_and_scan_url(url) -> dict：URL → 下载 → OCR（绕过 file_uploader 限制）
 """
+import os
 import re
 import shutil
 import subprocess
@@ -23,14 +24,23 @@ from typing import List, Dict, Optional
 # Tesseract 命令路径
 _TESSERACT = shutil.which("tesseract") or "/opt/homebrew/bin/tesseract"
 
-# 自动检测中文语言包是否可用（tessdata 目录）
+# 自动检测中文语言包是否可用（多路径兼容：Debian vs macOS Homebrew）
 def _detect_lang() -> str:
-    tessdata_dir = Path(shutil.which(_TESSERACT)).parent.parent / "share" / "tessdata"
-    if not tessdata_dir.exists():
+    tess_bin = shutil.which(_TESSERACT)
+    if not tess_bin:
         return "eng"
-    available = {p.stem for p in tessdata_dir.glob("*.traineddata")}
-    if "chi_sim" in available:
-        return "chi_sim+eng"
+    candidates = [
+        Path(tess_bin).parent.parent / "share" / "tessdata",          # macOS Homebrew
+        Path(tess_bin).parent.parent / "tesseract-ocr" / "5" / "tessdata",  # Debian Bookworm
+        Path(tess_bin).parent.parent / "tesseract-ocr" / "4" / "tessdata",  # Debian Bullseye
+        Path(os.environ.get("TESSDATA_PREFIX", "")) / "tessdata",      # TESSDATA_PREFIX env
+        Path("/usr/share/tesseract-ocr/5/tessdata"),                  # Debian absolute
+    ]
+    for tessdata_dir in candidates:
+        if tessdata_dir.exists():
+            available = {p.stem for p in tessdata_dir.glob("*.traineddata")}
+            if "chi_sim" in available:
+                return "chi_sim+eng"
     return "eng"
 
 _LANG = _detect_lang()
@@ -236,13 +246,16 @@ def extract_fields(text: str) -> Dict[str, Optional[str]]:
         "标的金额": None,
     }
 
-    # 案号：（2024）京01民初123号 之类
+    # 案号：支持 (2026)沪0112民初18398号 和 (2026) 沪 0112 民初 18398 号（OCR 产生空格）
+    # 也支持 案号: (2026)沪0112民初18398号（标签行格式）
     case_no_match = re.search(
-        r'[（(]\s*(\d{4})\s*[）)]\s*([\u4e00-\u9fa5\d]+民初\d+号)',
+        r'(?:案号[：:\s]*)?[（(]\s*(\d{4})\s*[）)]\s*([\u4e00-\u9fa5][\s\d\u4e00-\u9fa5]*民初\s*\d+\s*号)',
         text
     )
     if case_no_match:
-        result["案号"] = f"（{case_no_match.group(1)}）{case_no_match.group(2)}"
+        # 去掉中间多余空格：规范化案号格式
+        raw = f"({case_no_match.group(1)}){case_no_match.group(2)}"
+        result["案号"] = re.sub(r'\s+', '', raw)
 
     # 法院：XX人民法院（形近字模糊匹配，候选最长优先）
     result["法院"] = _extract_court(text)

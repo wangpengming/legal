@@ -1,6 +1,7 @@
-"""单租户初始化脚本：创建 shared workspace 注册表 + 业务库 schema（幂等）。"""
+"""单租户迁移脚本：将多 workspace 数据合并到 shared workspace。"""
 import hashlib
 import os
+import shutil
 import sqlite3
 from pathlib import Path
 
@@ -12,6 +13,55 @@ def _hash_password(password: str) -> str:
     salt = os.urandom(32)
     dk = hashlib.pbkdf2_hmac("sha256", password.encode(), salt, 600_000)
     return f"{salt.hex()}${dk.hex()}"
+
+
+def _copy_file(src_path: str, dst_dir: Path, filename: str, data_dir: Path) -> str | None:
+    """根据数据库中存储的路径格式复制文件，返回新路径或 None。
+
+    数据库存储的路径格式为 data/workspaces/<ws_id>/agents/<id>/<file>，
+    volume 根为 /app/data。实际文件在：
+    /app/data/workspaces/<ws_id>/agents/<id>/<file>
+    """
+    if not src_path:
+        return None
+    src = Path(src_path)
+
+    candidates = []
+
+    # 格式1: data/workspaces/<ws>/agents/<id>/<file>
+    #         → 去掉 data/ 前缀: workspaces/<ws>/agents/<id>/<file>
+    #         → /app/data/workspaces/<ws>/agents/<id>/<file>
+    if src.parts[0] == "data" and "workspaces" in src.parts:
+        candidates.append(Path(*src.parts[1:]))
+
+    # 格式2: data/workspaces/<ws>/agents/<id>/<file> 但文件实际在 data/<ws>/agents/<id>/
+    #         → data/<ws>/agents/<id>/<file>
+    if src.parts[0] == "data" and "workspaces" in src.parts:
+        idx = src.parts.index("workspaces")
+        if idx >= 1:
+            ws_part = src.parts[idx + 1] if idx + 1 < len(src.parts) else None
+            if ws_part and "agents" in src.parts:
+                agents_idx = src.parts.index("agents")
+                rest = "/".join(src.parts[agents_idx:])
+                candidates.append(Path("data") / ws_part / rest)
+
+    # 格式3: agents/<id>/<file> → 直接使用
+    if src.parts[0] == "agents":
+        candidates.append(src)
+
+    # 格式4: 直接使用原始路径
+    candidates.append(Path(src_path))
+
+    for cand in candidates:
+        abs_path = data_dir / cand if not cand.is_absolute() else cand
+        print(f"    [_copy_file] trying: {abs_path} (exists={abs_path.exists()})")
+        if abs_path.exists():
+            dst = dst_dir / filename
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(abs_path, dst)
+            return str(dst)
+
+    return None
 
 
 def run_migration(data_dir: Path) -> dict:
@@ -37,7 +87,7 @@ def run_migration(data_dir: Path) -> dict:
         print(f"[migration] shared workspace already exists: {SHARED_WS_ID}")
     conn.close()
 
-    # 2. 初始化 shared workspace 业务库 schema
+    # 2. 初始化 shared workspace 业务库（使用 database.py 的 schema，保持与 API 一致）
     shared_ws_dir = data_dir / "workspaces" / SHARED_WS_ID
     shared_ws_dir.mkdir(parents=True, exist_ok=True)
     shared_db = shared_ws_dir / "court_matters.db"
@@ -45,6 +95,7 @@ def run_migration(data_dir: Path) -> dict:
     conn = sqlite3.connect(str(shared_db))
     conn.row_factory = sqlite3.Row
 
+    # 使用与 database.py 相同的 schema（CREATE TABLE IF NOT EXISTS 是幂等的）
     conn.executescript("""
         CREATE TABLE IF NOT EXISTS companies (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -122,21 +173,270 @@ def run_migration(data_dir: Path) -> dict:
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
     """)
+    # 补建索引
+    try:
+        conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_companies_name ON companies(name)")
+    except: pass
+    try:
+        conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_agents_name_company ON agents(name, company_id)")
+    except: pass
 
-    for idx_sql in [
-        "CREATE UNIQUE INDEX IF NOT EXISTS idx_companies_name ON companies(name)",
-        "CREATE UNIQUE INDEX IF NOT EXISTS idx_agents_name_company ON agents(name, company_id)",
-        "CREATE UNIQUE INDEX IF NOT EXISTS idx_cases_case_number ON cases(case_number)",
-    ]:
-        try:
-            conn.execute(idx_sql)
-        except Exception:
-            pass
+    conn.commit()
+
+    leishi_name = "北京雷石天地电子技术股份有限公司"
+
+    # 幂等保护：完全迁移过则跳过
+    existing_agent_count = conn.execute("SELECT COUNT(*) FROM agents").fetchone()[0]
+    cases_existing = conn.execute("SELECT COUNT(*) FROM cases").fetchone()[0]
+
+    # 检查是否已完成公司文件迁移（通过判断雷石公司是否有文件路径）
+    leishi_check = conn.execute(
+        "SELECT business_license_path FROM companies WHERE name = ?",
+        (leishi_name,)).fetchone()
+    company_files_done = leishi_check and leishi_check[0]
+
+    print(f"[migration] shared db: {existing_agent_count} agents, {cases_existing} cases, company_files={bool(company_files_done)}")
+
+    if existing_agent_count > 0 and cases_existing > 0 and company_files_done:
+        conn.close()
+        return {
+            "shared_ws_id": SHARED_WS_ID,
+            "agents_migrated": 0,
+            "agents_skipped": 0,
+            "cases_migrated": 0,
+            "cases_skipped": cases_existing,
+            "note": "fully migrated, skipping",
+        }
+
+    leishi_name = "北京雷石天地电子技术股份有限公司"
+    existing_leishi = conn.execute("SELECT id FROM companies WHERE name = ?", (leishi_name,)).fetchone()
+    if not existing_leishi:
+        conn.execute("""
+            INSERT INTO companies
+              (name, credit_code, legal_rep_name, legal_rep_position, address, phone,
+               is_default)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (
+            leishi_name, "91110108MA01234X7Y",
+            "马杰", "总经理",
+            "北京市朝阳区望京东园四区1号楼29层2901号10",
+            "010-84488000",
+            1
+        ))
+        conn.commit()
+        print(f"[migration] inserted company: {leishi_name}")
+
+    leishi = conn.execute("SELECT id, business_license_path FROM companies WHERE name = ?", (leishi_name,)).fetchone()
+    leishi_id = leishi[0] if leishi else None
+
+    # 迁移公司文件（营业执照/法人身份证/法人代表证明）：从代码 static/ 目录复制到 volume
+    # 模板文件（授权委托书/推荐信）在 templates/，由 files.py 端点直接读取代码目录，无需迁移
+    if leishi_id and (not leishi[1] if leishi else True):
+        module_root = data_dir.parent  # /app/ (Docker: /app/backend/ 的 parent)
+        static_src = module_root / "static"
+        company_files_dst = shared_ws_dir / "companies" / str(leishi_id)
+        company_files_dst.mkdir(parents=True, exist_ok=True)
+
+        company_file_map = {
+            "business_license_path": "1.营业执照复印件.pdf",
+            "legal_rep_cert_path":    "2.法定代表人证明.pdf",
+            "legal_rep_id_card_path": "法人身份证.pdf",
+        }
+
+        migrated_paths = {}
+        for db_field, filename in company_file_map.items():
+            src_file = static_src / filename
+            if src_file.exists():
+                dst_file = company_files_dst / src_file.name
+                shutil.copy2(src_file, dst_file)
+                migrated_paths[db_field] = str(dst_file)
+                print(f"  [company file] {filename} -> {dst_file} copied")
+            else:
+                print(f"  [company file] NOT FOUND: {src_file}")
+
+        if migrated_paths:
+            set_clause = ", ".join(f"{k}=?" for k in migrated_paths)
+            vals = list(migrated_paths.values()) + [leishi_id]
+            conn.execute(f"UPDATE companies SET {set_clause} WHERE id=?", vals)
+            conn.commit()
+            print(f"  [company files] updated in DB")
+
+    # 3. 合并 agents（含文件）
+    agents_migrated = 0
+    agents_skipped = 0
+    existing_agents = {r[0] for r in conn.execute("SELECT name FROM agents").fetchall()}
+    migrated_agent_ids = {}  # old_key -> new_id
+
+    seen_dbs = set()
+    search_dirs = list(data_dir.iterdir())
+    if (data_dir / "workspaces").exists():
+        search_dirs += list((data_dir / "workspaces").iterdir())
+
+    for ws_dir in search_dirs:
+        if not ws_dir.is_dir():
+            continue
+        if ws_dir.name in ("workspaces", SHARED_WS_ID, "shared"):
+            continue
+        ws_id = ws_dir.name
+
+        for db_name in ("court.db", "court_matters.db"):
+            db_path = ws_dir / db_name
+            if not db_path.exists() or str(db_path) in seen_dbs:
+                continue
+            seen_dbs.add(str(db_path))
+            print(f"[migration] reading {db_path}")
+
+            try:
+                src = sqlite3.connect(str(db_path))
+                src.row_factory = sqlite3.Row
+                tables = {r[0] for r in src.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name='agents'")}
+                if "agents" not in tables:
+                    src.close()
+                    continue
+                agents = src.execute("SELECT * FROM agents ORDER BY id").fetchall()
+                src.close()
+
+                for agent in agents:
+                    a = dict(agent)
+                    name = a.get("name", "")
+                    if name in existing_agents:
+                        # 记录旧ID→新ID映射（用于案件关联）
+                        old_id = a.get("id")
+                        # 尝试找到新ID
+                        new_row = conn.execute(
+                            "SELECT id FROM agents WHERE name = ? AND company_id = ?",
+                            (name, leishi_id)).fetchone()
+                        if new_row and old_id:
+                            migrated_agent_ids[f"{ws_id}:{old_id}"] = new_row[0]
+                        agents_skipped += 1
+                        continue
+
+                    # 先插入获取 new_id（再复制文件到 agent 专属目录）
+                    cursor = conn.execute("""
+                        INSERT INTO agents
+                          (name, position, phone, id_card, gender, company_id,
+                           is_default, id_card_pdf_path, contract_pdf_path)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, (
+                        name or "",
+                        a.get("position") or "",
+                        a.get("phone") or "",
+                        a.get("id_card") or "",
+                        a.get("gender") or "",
+                        leishi_id,
+                        a.get("is_default") or 0,
+                        a.get("id_card_pdf_path") or "",
+                        a.get("contract_pdf_path") or "",
+                    ))
+                    old_id = a.get("id")
+                    new_id = cursor.lastrowid
+
+                    # 复制文件到 agent 专属子目录（避免多人文件互相覆盖）
+                    agent_dir = shared_ws_dir / "agents" / str(new_id)
+                    print(f"  [copy for {name}] src_id_card={a.get('id_card_pdf_path')}")
+                    new_id_card = _copy_file(
+                        a.get("id_card_pdf_path"), agent_dir, "id_card.pdf", data_dir)
+                    print(f"  [copy for {name}] src_contract={a.get('contract_pdf_path')}")
+                    new_contract = _copy_file(
+                        a.get("contract_pdf_path"), agent_dir, "labor_contract.pdf", data_dir)
+                    print(f"  [copy result] id_card={new_id_card}, contract={new_contract}")
+
+                    # 回写实际文件路径
+                    if new_id_card or new_contract:
+                        conn.execute(
+                            "UPDATE agents SET id_card_pdf_path=?, contract_pdf_path=? WHERE id=?",
+                            (new_id_card or "", new_contract or "", new_id)
+                        )
+
+                    if old_id:
+                        migrated_agent_ids[f"{ws_id}:{old_id}"] = new_id
+                    existing_agents.add(name)
+                    agents_migrated += 1
+                    print(f"  [migrated agent] {name} -> id={new_id}")
+            except Exception as e:
+                print(f"[migration] error reading agents from {db_path}: {e}")
+
+    conn.commit()
+
+    # 4. 合并 cases
+    cases_migrated = 0
+    cases_skipped = 0
+
+    seen_dbs2 = set()
+    for ws_dir in search_dirs:
+        if not ws_dir.is_dir():
+            continue
+        if ws_dir.name in ("workspaces", SHARED_WS_ID, "shared"):
+            continue
+        ws_id = ws_dir.name
+
+        for db_name in ("court.db", "court_matters.db"):
+            db_path = ws_dir / db_name
+            if not db_path.exists() or str(db_path) in seen_dbs2:
+                continue
+            seen_dbs2.add(str(db_path))
+
+            try:
+                src = sqlite3.connect(str(db_path))
+                src.row_factory = sqlite3.Row
+                tables = {r[0] for r in src.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name='cases'")}
+                if "cases" not in tables:
+                    src.close()
+                    continue
+                cases_rows = src.execute("SELECT * FROM cases ORDER BY id").fetchall()
+                src.close()
+
+                for case_row in cases_rows:
+                    c = dict(case_row)
+                    case_num = c.get("case_number")
+                    if not case_num:
+                        cases_skipped += 1
+                        continue
+
+                    # 映射旧 agent_id → 新 agent_id
+                    old_agent_id = c.get("agent_id")
+                    new_agent_id = None
+                    if old_agent_id:
+                        key = f"{ws_id}:{old_agent_id}"
+                        new_agent_id = migrated_agent_ids.get(key)
+
+                    # 兼容新旧字段名
+                    opposite = c.get("opposite_party") or c.get("opposing_party") or ""
+                    filing_date = c.get("filing_date") or c.get("hearing_date") or ""
+
+                    try:
+                        conn.execute("""
+                            INSERT INTO cases
+                              (case_number, court, cause, hearing_date, opposing_party,
+                               agent_id, status)
+                            VALUES (?, ?, ?, ?, ?, ?, ?)
+                        """, (
+                            case_num,
+                            c.get("court") or "",
+                            c.get("cause") or "",
+                            filing_date,
+                            opposite,
+                            new_agent_id,
+                            c.get("status") or "pending",
+                        ))
+                        cases_migrated += 1
+                    except Exception as e:
+                        if "UNIQUE" in str(e):
+                            cases_skipped += 1
+                        else:
+                            print(f"[migration] error inserting case {case_num}: {e}")
+            except Exception as e:
+                print(f"[migration] error reading cases from {db_path}: {e}")
 
     conn.commit()
     conn.close()
 
     return {
         "shared_ws_id": SHARED_WS_ID,
-        "note": "schema initialized",
+        "agents_migrated": agents_migrated,
+        "agents_skipped": agents_skipped,
+        "cases_migrated": cases_migrated,
+        "cases_skipped": cases_skipped,
     }

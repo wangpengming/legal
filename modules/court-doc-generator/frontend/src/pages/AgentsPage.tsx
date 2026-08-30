@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Trash2, Eye, CheckCircle } from "lucide-react";
 import { agentApi, companyApi } from "../lib/api";
+import ConfirmDialog from "../components/ConfirmDialog";
 
 export default function AgentsPage() {
   const navigate = useNavigate();
@@ -11,15 +12,16 @@ export default function AgentsPage() {
   const { data: companies = [] } = useQuery({ queryKey: ["companies"], queryFn: companyApi.list });
 
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ name: "", position: "", phone: "", company_id: null as number | null, is_default: false });
+  const [form, setForm] = useState({ name: "", position: "", phone: "", id_card: "", gender: "", company_id: null as number | null, is_default: false });
   const [error, setError] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
 
   const create = useMutation({
-    mutationFn: (body: typeof form) => agentApi.create({ ...body, is_default: body.is_default ? 1 : 0 }),
+    mutationFn: (body: typeof form) => agentApi.create({ ...body, is_default: body.is_default ? 1 : 0, id_card: body.id_card, gender: body.gender }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["agents"] });
       setShowForm(false);
-      setForm({ name: "", position: "", phone: "", company_id: null, is_default: false });
+      setForm({ name: "", position: "", phone: "", id_card: "", gender: "", company_id: null, is_default: false });
       setError("");
     },
     onError: (err: unknown) => {
@@ -35,6 +37,17 @@ export default function AgentsPage() {
 
   return (
     <div>
+      {confirmDelete !== null && (
+        <ConfirmDialog
+          title="删除代理人"
+          message={`确定删除代理人「${agents.find(a => a.id === confirmDelete)?.name || ""}」吗？\n删除后不可恢复。`}
+          confirmText="删除"
+          danger={true}
+          onCancel={() => setConfirmDelete(null)}
+          onConfirm={() => { remove.mutate(confirmDelete); setConfirmDelete(null); }}
+        />
+      )}
+
       <div className="page-header">
         <h1 className="page-title">👤 代理人管理</h1>
         <div className="page-actions">
@@ -156,7 +169,7 @@ export default function AgentsPage() {
                         <button
                           className="btn btn-danger"
                           style={{ padding: "4px 10px", fontSize: 12 }}
-                          onClick={() => remove.mutate(a.id)}
+                          onClick={() => setConfirmDelete(a.id)}
                         >
                           <Trash2 size={12} />
                         </button>

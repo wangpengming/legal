@@ -359,7 +359,7 @@ def values_for_power_of_attorney(case: dict, company: dict, agent: dict) -> list
 
 
 def values_for_recommendation(case: dict, company: dict, agent: dict) -> list:
-    """推荐信模板（11 个【】，按文档出现顺序，F-038 调整）：
+    """推荐信模板（13 个【】，按文档出现顺序，F-038/F-066 调整）：
 
       【】人民法院：                       → 1. 法院（case.court）
       兹推荐本公司员工【】                 → 2. 代理人姓名（agent.name）
@@ -370,9 +370,11 @@ def values_for_recommendation(case: dict, company: dict, agent: dict) -> list:
       【】纠纷（案号：【】）                  → 7. 案由（case.case_cause）
       （案号：【】）                        → 8. 案号（case.case_number）
       【】年【】月【】日                    → 9-11. 年、月、日
+      【】                                  → 12. 公司名称（company.name，右下角，F-066 新增）
 
     F-038 调整：模板已改回"员工【】/性别【】/身份证号【】/职务【】"。
     案由描述不再拼装，改为独立【】对方 + 【】案由。
+    F-066 调整：右下角加公司名称占位符，动态填充当前选中公司全称。
     """
     court = case.get("court", "")
     agent_name = (agent.get("name") or "").strip()
@@ -384,6 +386,7 @@ def values_for_recommendation(case: dict, company: dict, agent: dict) -> list:
     cause = (case.get("case_cause") or "").strip()
     case_number = case.get("case_number", "")
     parts = parse_hearing_date(case.get("hearing_date"))
+    company_name = (company.get("name") or "").strip()  # F-066 新增
     return [
         court,              # 1. 【】人民法院
         agent_name,         # 2. 兹推荐本公司员工【】
@@ -397,6 +400,7 @@ def values_for_recommendation(case: dict, company: dict, agent: dict) -> list:
         parts["年"],        # 10. 【】年
         parts["月"],        # 11. 【】月
         parts["日"],        # 12. 【】日
+        company_name,       # 13. 【】公司名称（F-066 新增）
     ]
 
 
@@ -404,11 +408,73 @@ def values_for_recommendation(case: dict, company: dict, agent: dict) -> list:
 # 生成与打包
 # ============================================================
 
-def generate_dynamic_docx(template_key: str, values: list, output_path: Path) -> int:
-    """根据模板生成填充后的 docx，返回替换的占位符数量。"""
+def _replace_fixed_text_in_doc(doc, replacements: dict):
+    """在文档中做纯文本替换（用于无【】的固定文本标签）。
+
+    replacements: {"标签文本：": "替换值", ...}
+    清除 label 之后到下一个 label 之前的所有 run 文本，再用 label run 追加替换值。
+    解决模板中 label 和值在相邻 run 里的重复问题。
+    """
+    for p in doc.paragraphs:
+        all_runs = list(p.runs)
+        full_text = "".join(r.text for r in all_runs)
+        for label, value in replacements.items():
+            if label not in full_text:
+                continue
+            # 找到 label 所在 run 的索引
+            label_idx = None
+            for i, run in enumerate(all_runs):
+                if label in run.text:
+                    label_idx = i
+                    break
+            if label_idx is None:
+                continue
+            # 找到下一个 label（如果有）的位置
+            after_label = full_text[full_text.index(label) + len(label):]
+            next_label_idx = None
+            for other_label in replacements:
+                if other_label == label:
+                    continue
+                pos = after_label.find(other_label)
+                if pos != -1:
+                    if next_label_idx is None or pos < next_label_idx:
+                        next_label_idx = pos
+            # 替换：label run 变成 label+value，清除中间所有 run，保留后续 label 后的文本
+            label_run = all_runs[label_idx]
+            label_run.text = label + value
+            # 清除 label 之后、next_label 之前的中间 run
+            if next_label_idx is not None:
+                chars_before_next = len(after_label) - next_label_idx
+            else:
+                chars_before_next = len(after_label)
+            chars_to_clear = chars_before_next
+            for i in range(label_idx + 1, len(all_runs)):
+                if chars_to_clear <= 0:
+                    break
+                if len(all_runs[i].text) <= chars_to_clear:
+                    all_runs[i].text = ""
+                    chars_to_clear -= len(all_runs[i].text)
+                else:
+                    all_runs[i].text = all_runs[i].text[chars_to_clear:]
+                    chars_to_clear = 0
+            break
+
+
+def generate_dynamic_docx(
+    template_key: str,
+    values: list,
+    output_path: Path,
+    extra_replacements: dict | None = None,
+) -> int:
+    """根据模板生成填充后的 docx，返回替换的占位符数量。
+
+    extra_replacements: {"标签文本：": "替换值"}，用于填充无【】的固定文本标签。
+    """
     template_path = get_template_path(template_key)
     doc = Document(str(template_path))
     count = replace_placeholders_in_doc(doc, values)
+    if extra_replacements:
+        _replace_fixed_text_in_doc(doc, extra_replacements)
     doc.save(str(output_path))
     return count
 
@@ -494,15 +560,29 @@ def _generate_to_dir_unlocked(case: dict, company: dict, agent: dict, output_dir
 
     # === 动态生成 2 份 docx + PDF（F-036 调整：02 法定代表人证明改为静态复制）===
     dynamic_templates = [
-        ("power_of_attorney", values_for_power_of_attorney(case, company, agent), "04_授权委托书"),
+        (
+            "power_of_attorney",
+            values_for_power_of_attorney(case, company, agent),
+            "04_授权委托书",
+            {
+                "委托单位：": (company.get("name") or "").strip(),
+                "法定代表人：": (company.get("legal_rep_name") or "").strip(),
+            },
+        ),
         ("recommendation", values_for_recommendation(case, company, agent), "05_推荐信"),
     ]
-    for template_key, values, base_name in dynamic_templates:
+    for item in dynamic_templates:
+        if len(item) == 3:
+            template_key, values, base_name, extra = item[0], item[1], item[2], {}
+        else:
+            template_key, values, base_name, extra = item[0], item[1], item[2], item[3]
         docx_path = output_dir / f"{base_name}_{safe_case}.docx"
         pdf_path = output_dir / f"{base_name}_{safe_case}.pdf"
         template_path = get_template_path(template_key)
         doc = Document(str(template_path))
         replace_placeholders_in_doc(doc, values)
+        if extra:
+            _replace_fixed_text_in_doc(doc, extra)
         doc.save(str(docx_path))
         # DOCX → PDF（鲁棒降级：失败仅警告，不阻塞）
         try:

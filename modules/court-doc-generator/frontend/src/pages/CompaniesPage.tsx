@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Trash2, Eye, FileText, CheckCircle2 } from "lucide-react";
 import { companyApi, Company } from "../lib/api";
+import ConfirmDialog from "../components/ConfirmDialog";
 
 // 文件配置（用于显示状态）
 const FILE_CONFIGS = [
@@ -25,6 +26,7 @@ export default function CompaniesPage() {
 
   const [showForm, setShowForm] = useState(false);
   const [error, setError] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
   const [form, setForm] = useState<Omit<Company, "id">>({
     name: "", credit_code: "", legal_rep_name: "",
     legal_rep_position: "", legal_rep_id_card: "", address: "", phone: "",
@@ -72,6 +74,17 @@ export default function CompaniesPage() {
 
   return (
     <div>
+      {confirmDelete !== null && (
+        <ConfirmDialog
+          title="删除公司"
+          message={`确定删除公司「${companies.find(c => c.id === confirmDelete)?.name || ""}」吗？\n删除后不可恢复，且使用该公司的案件可能受影响。`}
+          confirmText="删除"
+          danger={true}
+          onCancel={() => setConfirmDelete(null)}
+          onConfirm={() => { remove.mutate(confirmDelete); setConfirmDelete(null); }}
+        />
+      )}
+
       <div className="page-header">
         <h1 className="page-title">🏢 公司管理</h1>
         <div className="page-actions">
@@ -193,7 +206,7 @@ export default function CompaniesPage() {
                         <button
                           className="btn btn-danger"
                           style={{ padding: "4px 10px", fontSize: 12 }}
-                          onClick={() => remove.mutate(c.id)}
+                          onClick={() => setConfirmDelete(c.id)}
                         >
                           <Trash2 size={12} />
                         </button>

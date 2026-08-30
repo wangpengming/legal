@@ -157,14 +157,21 @@ export default function AgentDetailPage() {
 
   const agent = agents.find(a => a.id === agentId);
 
+  const isNew = agentId === 0;
+
   const saveMutation = useMutation({
-    mutationFn: (data: Partial<Agent>) => agentApi.create({
-      name: data.name || "",
-      position: data.position || "",
-      phone: data.phone || "",
-      company_id: data.company_id || null,
-      is_default: data.is_default ? 1 : 0,
-    }),
+    mutationFn: (data: Partial<Agent>) => {
+      const body = {
+        name: data.name || "",
+        position: data.position || "",
+        phone: data.phone || "",
+        id_card: data.id_card || "",
+        gender: data.gender || "",
+        company_id: data.company_id || null,
+        is_default: data.is_default ? 1 : 0,
+      };
+      return isNew ? agentApi.create(body) : agentApi.update(agentId, body);
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["agents"] });
       setIsEditing(false);
@@ -225,7 +232,13 @@ export default function AgentDetailPage() {
 
   function getFilePath(fileKey: string): string {
     if (!agent) return "";
-    return (agent as any)[fileKey] || "";
+    // id_card 键对应 id_card_pdf_path（PDF路径），labor_contract 键直接对应
+    const keyMap: Record<string, keyof Agent> = {
+      id_card: "id_card_pdf_path",
+      labor_contract: "labor_contract",
+    };
+    const actualKey = keyMap[fileKey] || fileKey;
+    return (agent as any)[actualKey] || "";
   }
 
   function startEditing() {
@@ -336,6 +349,29 @@ export default function AgentDetailPage() {
                 />
               </div>
               <div className="form-group">
+                <label className="form-label">性别</label>
+                <select
+                  className="form-input"
+                  value={form.gender || ""}
+                  onChange={e => setForm({ ...form, gender: e.target.value })}
+                >
+                  <option value="">请选择</option>
+                  <option value="男">男</option>
+                  <option value="女">女</option>
+                </select>
+              </div>
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">身份证号</label>
+                <input
+                  className="form-input"
+                  value={form.id_card || ""}
+                  onChange={e => setForm({ ...form, id_card: e.target.value })}
+                  placeholder="代理人身份证号（用于推荐信）"
+                />
+              </div>
+              <div className="form-group">
                 <label className="form-label">所属公司</label>
                 <select
                   className="form-input"
@@ -380,6 +416,14 @@ export default function AgentDetailPage() {
             <div>
               <div style={{ fontSize: 12, color: "#6c757d", marginBottom: 4 }}>电话</div>
               <div>{agent.phone || "—"}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 12, color: "#6c757d", marginBottom: 4 }}>性别</div>
+              <div>{(agent as any).gender || "—"}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 12, color: "#6c757d", marginBottom: 4 }}>身份证号</div>
+              <div>{(agent as any).id_card || "—"}</div>
             </div>
             <div>
               <div style={{ fontSize: 12, color: "#6c757d", marginBottom: 4 }}>所属公司</div>

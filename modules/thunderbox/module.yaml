@@ -1,0 +1,39 @@
+name: thunderbox-console
+version: 0.0.2
+status: planning
+description: 雷盒控制台（Thunderbox Console）— Thunderbox PaaS 部署平台的 MCP 可视化管理系统（应用全生命周期/数据库工作台/日志/域名探测，纯页面操作零命令行）
+entry: none
+deps: []
+  # 依赖 Thunderbox MCP 端点（https://api-box.tbox.ktvsky.com/mcp，Bearer Token 走 .env）
+  # 不直接 import 其他模块代码（AGENTS.md §10.4.3）
+created: 2026-08-24
+integrated: 2026-08-24
+updated: 2026-08-26  # v0.0.2: 原型 v1.1 增强（跳转链接/模板库/⌘K/通知/成功页）
+port:
+  backend: 18504     # FastAPI（REST 网关，封装 MCP 13 工具）
+  frontend: 18503    # 单文件 HTML SPA（FastAPI 直接 serve，无需独立前端服务）
+tech_stack:
+  - backend: FastAPI + httpx（MCP streamable HTTP 客户端封装，token 仅后端持有）
+  - frontend: React 18 + Vite + TypeScript（复用 litigation-system / court-doc-generator 前端栈）
+  - 存储: SQLite（审计日志 + 部署状态本地缓存，可选）
+  - 深色科技风设计系统（Vercel/Railway 系，与 portal 商务浅色差异化）
+features:
+  - 总览 Dashboard（应用统计/状态分布/最近部署活动/平台资源/快捷入口卡）
+  - 应用列表（卡片/表格双视图、搜索筛选、状态徽章、「打开」跳转链接、一键部署）
+  - 创建应用四步向导（来源 Git/Docker → 构建配置 → 环境变量/数据库/卷 → 域名权限确认）
+  - 创建成功页（祝贺 + 访问链接 + 三卡片操作引导）
+  - 应用详情（状态机：building/deploying/running/failed、部署历史时间线、回滚、启停、取消构建）
+  - 详情页实时状态条（健康检查/运行时长/当前版本/内存占用）
+  - 配置中心（环境变量增量管理、访问模式 + 白名单、协管员、ref、卷（破坏性警告））
+  - 数据库工作台（表列表/schema/表数据预览/SQL 执行器 ro-rw 切换/历史记录/迁移）
+  - 日志控制台（构建日志/运行日志，终端风格，自动滚动 + 复制）
+  - 域名与资源探测（thunderbox_check 可视化）
+  - 审计日志（写操作全记录，风险操作二次确认）
+  - 模板库（4 个精选模板一键预填向导：出庭文书/案件看板/静态文档/API 骨架）
+  - ⌘K 命令面板（全局搜索应用 + 页面跳转 + 快捷操作，⌘K 唤起/↑↓ 选择/↵ 确认）
+  - 通知中心（顶部铃铛，部署成功/失败/进行中推送，点击跳转应用详情）
+  - 新手三步引导条（Dashboard 顶部，可关闭）
+  - 返回法务门户入口（侧栏底部）
+  - 应用跳转链接全家桶（详情页域名可点/「打开应用」按钮/部署成功 toast 带链接）
+readme: README.md
+spec: docs/SPEC.md

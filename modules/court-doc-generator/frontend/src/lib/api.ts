@@ -66,6 +66,10 @@ export const companyApi = {
     method: "POST",
     body: JSON.stringify(body),
   }),
+  update: (id: number, body: Partial<Company>) => api<Company>("/companies/" + id, {
+    method: "PUT",
+    body: JSON.stringify(body),
+  }),
   delete: (id: number) => api("/companies/" + id, { method: "DELETE" }),
   uploadFiles: async (companyId: number, formData: FormData): Promise<{ ok: boolean; updated: string[] }> => {
     const wsId = sessionStorage.getItem("_ws_id") || "";
@@ -86,17 +90,21 @@ export interface Agent {
   name: string;
   position: string;
   phone: string;
-  id_card: string;
-  labor_contract: string;
+  id_card: string;           // 身份证号
+  id_card_pdf_path: string | null;  // 身份证 PDF 路径（F-066 修复）
+  labor_contract: string;     // 劳动合同 PDF 路径
   company_id: number | null;
   is_default: number;
   company_name: string | null;
+  gender: string | null;
 }
 
 export const agentApi = {
   list: () => api<Agent[]>("/agents"),
-  create: (body: Omit<Agent, "id" | "id_card" | "labor_contract" | "company_name">) =>
+  create: (body: Omit<Agent, "id" | "id_card_pdf_path" | "labor_contract" | "company_name">) =>
     api<Agent>("/agents", { method: "POST", body: JSON.stringify(body) }),
+  update: (id: number, body: Omit<Agent, "id" | "id_card_pdf_path" | "labor_contract" | "company_name">) =>
+    api<Agent>(`/agents/${id}`, { method: "PUT", body: JSON.stringify(body) }),
   delete: (id: number) => api("/agents/" + id, { method: "DELETE" }),
 };
 
@@ -128,6 +136,8 @@ export const caseApi = {
   list: (filters?: Record<string, string>) => api<Case[]>(`/cases${buildQuery(filters)}`),
   create: (body: Omit<Case, "id" | "status" | "created_at">) =>
     api<Case>("/cases", { method: "POST", body: JSON.stringify(body) }),
+  update: (id: number, body: Omit<Case, "id" | "status" | "created_at">) =>
+    api<Case>("/cases/" + id, { method: "PUT", body: JSON.stringify(body) }),
   delete: (id: number) => api("/cases/" + id, { method: "DELETE" }),
   // F4 CSV 导出（带当前筛选参数，Blob 下载）
   exportCsv: async (filters?: Record<string, string>): Promise<string> => {

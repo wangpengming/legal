@@ -172,20 +172,23 @@ export default function CompanyDetailPage() {
   const company = companies.find(c => c.id === companyId);
 
   const saveMutation = useMutation({
-    mutationFn: (data: Partial<Company>) => companyApi.create({
-      name: data.name || "",
-      credit_code: data.credit_code || "",
-      legal_rep_name: data.legal_rep_name || "",
-      legal_rep_position: data.legal_rep_position || "",
-      legal_rep_id_card: data.legal_rep_id_card || "",
-      address: data.address || "",
-      phone: data.phone || "",
-      business_license_path: data.business_license_path || "",
-      legal_rep_id_card_path: data.legal_rep_id_card_path || "",
-      legal_rep_cert_path: data.legal_rep_cert_path || "",
-      power_of_attorney_path: data.power_of_attorney_path || "",
-      recommendation_path: data.recommendation_path || "",
-    }),
+    mutationFn: (data: Partial<Company>) =>
+      companyId > 0
+        ? companyApi.update(companyId, data)
+        : companyApi.create({
+            name: data.name || "",
+            credit_code: data.credit_code || "",
+            legal_rep_name: data.legal_rep_name || "",
+            legal_rep_position: data.legal_rep_position || "",
+            legal_rep_id_card: data.legal_rep_id_card || "",
+            address: data.address || "",
+            phone: data.phone || "",
+            business_license_path: data.business_license_path || "",
+            legal_rep_id_card_path: data.legal_rep_id_card_path || "",
+            legal_rep_cert_path: data.legal_rep_cert_path || "",
+            power_of_attorney_path: data.power_of_attorney_path || "",
+            recommendation_path: data.recommendation_path || "",
+          }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["companies"] });
       setIsEditing(false);

@@ -134,14 +134,14 @@ def test_power_of_attorney_template_has_nine_placeholders():
 
 
 def test_recommendation_template_has_twelve_placeholders():
-    """F-051: templates/5.推荐信.docx 含 12 个【】占位符（加 agent.phone）。"""
+    """F-066: templates/5.推荐信.docx 含 13 个【】占位符（加 company.name 右下角）。"""
     from docx import Document
     from pathlib import Path
 
     template_path = Path(__file__).resolve().parent.parent / "templates" / "5.推荐信.docx"
     doc = Document(str(template_path))
     total = sum(p.text.count("【】") for p in doc.paragraphs)
-    assert total == 12, f"模板应有 12 个【】占位符，实际 {total} 个"
+    assert total == 13, f"模板应有 13 个【】占位符，实际 {total} 个"
 
 
 # ============================================================

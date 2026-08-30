@@ -72,22 +72,79 @@ def list_companies(x_workspace_id: str = Header(alias="X-Workspace-Id")):
 @router.post("", response_model=CompanyOut)
 def upsert_company(body: CompanyIn, x_workspace_id: str = Header(alias="X-Workspace-Id")):
     from app.core.database import get_conn
+    import sqlite3
     with get_conn(x_workspace_id) as conn:
         conn.execute(
             """INSERT INTO companies
                (name, credit_code, legal_rep_name, legal_rep_position,
                 legal_rep_id_card, address, phone)
-               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+               VALUES (?, ?, ?, ?, ?, ?, ?)
+               ON CONFLICT(name) DO UPDATE SET
+                   credit_code = excluded.credit_code,
+                   legal_rep_name = excluded.legal_rep_name,
+                   legal_rep_position = excluded.legal_rep_position,
+                   legal_rep_id_card = excluded.legal_rep_id_card,
+                   address = excluded.address,
+                   phone = excluded.phone""",
             (body.name, body.credit_code, body.legal_rep_name,
              body.legal_rep_position, body.legal_rep_id_card,
              body.address, body.phone),
         )
         conn.commit()
-        row = conn.execute(
-            "SELECT * FROM companies WHERE id = last_insert_rowid()"
-        ).fetchone()
-        import sqlite3
         conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            "SELECT * FROM companies WHERE name = ?", (body.name,)
+        ).fetchone()
+        return CompanyOut(**dict(row))
+
+
+class CompanyUpdate(BaseModel):
+    name: Optional[str] = None
+    credit_code: Optional[str] = None
+    legal_rep_name: Optional[str] = None
+    legal_rep_position: Optional[str] = None
+    legal_rep_id_card: Optional[str] = None
+    address: Optional[str] = None
+    phone: Optional[str] = None
+    business_license_path: Optional[str] = None
+    legal_rep_cert_path: Optional[str] = None
+    legal_rep_id_card_path: Optional[str] = None
+    power_of_attorney_path: Optional[str] = None
+    recommendation_path: Optional[str] = None
+
+
+@router.put("/{company_id}", response_model=CompanyOut)
+def update_company(
+    company_id: int,
+    body: CompanyUpdate,
+    x_workspace_id: str = Header(alias="X-Workspace-Id"),
+):
+    """按 ID 更新公司信息（字段不传则不更新）"""
+    from app.core.database import get_conn
+    import sqlite3
+
+    fields = {}
+    for k, v in body.model_dump().items():
+        if v is not None:
+            fields[k] = v
+
+    if not fields:
+        raise HTTPException(400, "没有要更新的字段")
+
+    set_clause = ", ".join(f"{k} = ?" for k in fields)
+    values = list(fields.values()) + [company_id]
+    with get_conn(x_workspace_id) as conn:
+        conn.execute(
+            f"UPDATE companies SET {set_clause} WHERE id = ?",
+            values,
+        )
+        conn.commit()
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            "SELECT * FROM companies WHERE id = ?", (company_id,)
+        ).fetchone()
+        if not row:
+            raise HTTPException(404, "公司不存在")
         return CompanyOut(**dict(row))
 
 

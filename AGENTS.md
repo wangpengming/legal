@@ -551,8 +551,10 @@ allocations:
 |------|------|
 | 🔴 **系统依赖必须完整** | `scan_service.py` 模块加载时调 `shutil.which("tesseract")`，缺失则 `TypeError: NoneType` 崩溃 |
 | 🔴 **PyPI 用清华镜像** | `files.pythonhosted.org` 下载大包（PyMuPDF 25MB）超时 → `-i https://pypi.tuna.tsinghua.edu.cn/simple` |
+| 🔴 **必须挂载 volumes** | Thunderbox 容器文件系统 ephemeral，不挂载 volumes 每次重部署数据清零。`thunderbox_create` 必须传 `volumes=["court-data:/app/data", "court-outputs:/app/outputs"]` |
 | ✅ **apt 用默认源** | 不要换阿里云/清华 apt 源，Thunderbox 可能无法访问 |
 | ✅ 端口一致 | `EXPOSE` + `CMD --port` + `thunderbox_create port` 三者一致 |
+| 🔴 **Monorepo 和 Standalone Dockerfile 同步** | 修改 `/legal/Dockerfile`（monorepo）后必须同步 `~/code/work/me/court-generator/Dockerfile`（standalone），反之亦然。两者仅 COPY 路径不同，功能必须等价 |
 
 ### 10.5.3 调试铁律
 
@@ -568,6 +570,35 @@ allocations:
 - [ ] `thunderbox_config(access_mode="public")` — 否则外部 `no available server`
 - [ ] `curl https://<domain>/health` — 外部验证 200
 - [ ] `curl https://<domain>/` — 前端 SPA 200
+- [ ] `volumes` 必须挂载（`["court-data:/app/data", "court-outputs:/app/outputs"]`）— Thunderbox 容器文件系统 ephemeral，不挂载则每次重部署数据清零
+
+### 10.5.5 代码级安全（容器运行时）
+
+| 规则 | 说明 |
+|------|------|
+| 🔴 **模块级初始化禁止依赖外部二进制** | `scan_service.py` 的 `_LANG = _detect_lang()` 在 `import` 时执行，`shutil.which("tesseract")` 返回 `None` 则容器崩溃。应改为惰性求值 + try/except fallback |
+| 🔴 **禁止硬编码 macOS 路径** | `_TESSERACT = shutil.which("tesseract") or "/opt/homebrew/bin/tesseract"` 在 Linux 容器中无效 |
+| ✅ **Dockerfile 自包含所有系统依赖** | 不假设基础镜像已安装任何工具，`apt-get install` 必须在 Dockerfile 中显式声明 |
+
+**`scan_service.py` 已知缺陷**（待修复）：
+
+```python
+# ❌ 当前：模块导入时立即执行，无容错
+_TESSERACT = shutil.which("tesseract") or "/opt/homebrew/bin/tesseract"
+_LANG = _detect_lang()  # 第 36 行，崩溃点
+
+# ✅ 应改为惰性求值 + fallback
+_LANG: Optional[str] = None
+
+def get_lang() -> str:
+    global _LANG
+    if _LANG is None:
+        try:
+            _LANG = _detect_lang()
+        except Exception:
+            _LANG = "chi_sim"
+    return _LANG
+```
 
 ---
 

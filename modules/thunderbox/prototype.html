@@ -1,0 +1,2172 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="data:,">
+<title>雷盒控制台 Thunderbox Console · 高保真原型</title>
+<style>
+/* ============================================================
+   雷盒控制台 · 设计系统
+   三层 Token 架构：Primitive → Semantic → Component
+   Theme: dark（默认）/ light（商务白）/ system（跟随 OS）
+   ============================================================ */
+
+/* ── TIER 1: Primitive（原子值）────────────────────────── */
+:root,[data-theme="dark"]{
+  --p-bg-0:#070B14;--p-bg-1:#0B111E;--p-bg-2:#0F1728;
+  --p-bg-card:#121B2D;--p-bg-c2:#0E1523;--p-bg-c3:#182338;
+  --p-line:#1D2A42;--p-line2:#28384F;
+  --p-txt:#E6ECF5;--p-txt2:#93A3BC;--p-txt3:#5B6B85;
+  --p-blue:#3B82F6;--p-blue2:#60A5FA;--p-cyan:#22D3EE;
+  --p-green:#10B981;--p-amber:#F59E0B;--p-red:#EF4444;--p-violet:#8B5CF6;
+  --p-term-bg:#090E1A;--p-term-txt:#B8C6DC;--p-term-ln:#4B5C76;
+  --p-shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.35);
+  --p-glow:0 0 0 1px rgba(59,130,246,.35),0 8px 30px rgba(59,130,246,.18);
+}
+
+/* ── TIER 2: Semantic（主题感）────────────────────────── */
+:root,[data-theme="dark"]{
+  --bg-base:var(--p-bg-0);--bg-base2:var(--p-bg-1);--bg-base3:var(--p-bg-2);
+  --bg-surface:var(--p-bg-card);--bg-surface2:var(--p-bg-c2);--bg-surface3:var(--p-bg-c3);
+  --border:var(--p-line);--border2:var(--p-line2);
+  --text:var(--p-txt);--text2:var(--p-txt2);--text3:var(--p-txt3);
+  --accent:var(--p-blue);--accent2:var(--p-blue2);--accent3:var(--p-cyan);
+  --grad:linear-gradient(135deg,#3B82F6 0%,#22D3EE 100%);
+  --grad-soft:linear-gradient(135deg,rgba(59,130,246,.16),rgba(34,211,238,.10));
+  --shadow:var(--p-shadow);--shadow-glow:var(--p-glow);
+  --term-bg:var(--p-term-bg);--term-txt:var(--p-term-txt);--term-ln:var(--p-term-ln);
+  --green:#10B981;--amber:#F59E0B;--red:#EF4444;--violet:#8B5CF6;
+}
+
+/* ── LIGHT 主题：覆盖 semantic 层 ─────────────────────── */
+[data-theme="light"]{
+  --p-bg-0:#FFFFFF;--p-bg-1:#F8FAFC;--p-bg-2:#F1F5F9;
+  --p-bg-card:#FFFFFF;--p-bg-c2:#F8FAFC;--p-bg-c3:#EEF2FF;
+  --p-line:#E2E8F0;--p-line2:#CBD5E1;
+  --p-txt:#0F172A;--p-txt2:#475569;--p-txt3:#94A3B8;
+  --p-shadow:0 1px 2px rgba(0,0,0,.08),0 4px 16px rgba(0,0,0,.08);
+  --p-glow:0 0 0 1px rgba(59,130,246,.3),0 4px 20px rgba(59,130,246,.12);
+  --p-term-bg:#F8FAFC;--p-term-txt:#334155;--p-term-ln:#94A3B8;
+  --bg-base:#FFFFFF;--bg-base2:#F8FAFC;--bg-base3:#F1F5F9;
+  --bg-surface:#FFFFFF;--bg-surface2:#F8FAFC;--bg-surface3:#EEF2FF;
+  --border:#E2E8F0;--border2:#CBD5E1;
+  --text:#0F172A;--text2:#475569;--text3:#94A3B8;
+  --accent:#3B82F6;--accent2:#2563EB;--accent3:#0EA5E9;
+  --shadow:0 1px 2px rgba(0,0,0,.08),0 4px 16px rgba(0,0,0,.08);
+  --shadow-glow:0 0 0 1px rgba(59,130,246,.3),0 4px 20px rgba(59,130,246,.12);
+  --grad:linear-gradient(135deg,#3B82F6 0%,#2563EB 100%);
+  --grad-soft:linear-gradient(135deg,rgba(59,130,246,.1),rgba(37,99,235,.06));
+  --term-bg:#F8FAFC;--term-txt:#334155;--term-ln:#94A3B8;
+}
+
+/* ── COMPONENT 层 ─────────────────────────────────────── */
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Source Han Sans SC","Microsoft YaHei",sans-serif;background:var(--bg-base);color:var(--text);-webkit-font-smoothing:antialiased;font-size:14px;overflow:hidden}
+::selection{background:rgba(59,130,246,.3)}
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:8px;border:2px solid var(--bg-base)}
+::-webkit-scrollbar-thumb:hover{background:var(--accent)}
+
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit;font-size:14px}
+.btn{display:inline-flex;align-items:center;gap:7px;padding:9px 16px;border-radius:var(--radius-sm);font-weight:600;transition:all .18s;white-space:nowrap}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn-primary{background:var(--grad);color:#fff;box-shadow:0 2px 10px rgba(59,130,246,.35)}
+.btn-primary:hover:not(:disabled){filter:brightness(1.12);box-shadow:0 4px 16px rgba(59,130,246,.5);transform:translateY(-1px)}
+.btn-cyan{background:linear-gradient(135deg,#22D3EE,#0EA5E9);color:#04121d;box-shadow:0 2px 10px rgba(34,211,238,.3)}
+.btn-ghost{border:1px solid var(--border2);color:var(--text2);background:var(--bg-surface)}
+.btn-ghost:hover:not(:disabled){border-color:var(--accent);color:var(--accent2);background:rgba(59,130,246,.07)}
+.btn-danger{background:linear-gradient(135deg,#F87171,#DC2626);color:#fff;box-shadow:0 2px 10px rgba(239,68,68,.3)}
+.btn-danger:hover:not(:disabled){filter:brightness(1.1)}
+.btn-sm{padding:5px 11px;font-size:12.5px;border-radius:7px}
+.btn-lg{padding:12px 26px;font-size:15px}
+.icon{width:16px;height:16px;flex:none;vertical-align:-3px}
+
+.badge{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:600;font-family:var(--mono);letter-spacing:.2px}
+.badge .dot{width:7px;height:7px;border-radius:50%;background:currentColor}
+.badge-running{color:#34D399;background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.3)}
+.badge-running .dot{animation:breathe 2.2s infinite}
+.badge-building,.badge-deploying{color:#FBBF24;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3)}
+.badge-building .dot{animation:pulse .8s infinite}
+.badge-failed{color:#F87171;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.32)}
+.badge-stopped,.badge-cancelled{color:#8A9AB5;background:rgba(100,116,139,.12);border:1px solid rgba(100,116,139,.3)}
+.badge-unknown{color:#8A9AB5;background:rgba(100,116,139,.08);border:1px dashed rgba(100,116,139,.3)}
+.badge-access{color:var(--text2);background:transparent;border:1px solid var(--border2);font-weight:500}
+
+.card{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow)}
+.card-hover{transition:all .2s}
+.card-hover:hover{transform:translateY(-2px);border-color:var(--border2);box-shadow:0 10px 30px rgba(0,0,0,.45)}
+.page{padding:24px 28px 48px;max-width:1400px;margin:0 auto}
+.page-title{font-size:22px;font-weight:800;letter-spacing:.5px;display:flex;align-items:center;gap:12px}
+.page-sub{font-size:13px;color:var(--text3);margin-top:5px}
+
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin:20px 0}
+.stat{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;position:relative;overflow:hidden}
+.stat::before{content:"";position:absolute;inset:0 0 auto 0;height:2px;background:var(--stat-c,var(--grad))}
+.stat .k{font-size:12px;color:var(--text3);display:flex;align-items:center;gap:6px}
+.stat .v{font-size:30px;font-weight:800;font-family:var(--mono);margin-top:8px;color:var(--stat-txt,var(--text))}
+.stat .v small{font-size:13px;color:var(--text3);font-weight:500;margin-left:4px;font-family:inherit}
+.stat .d{font-size:12px;color:var(--text3);margin-top:5px;display:flex;align-items:center;gap:5px}
+.stat .trend-up{color:var(--green)}.stat .trend-down{color:var(--red)}.stat .trend-mid{color:var(--amber)}
+
+.tbl{width:100%;border-collapse:collapse;font-size:13.5px}
+.tbl th{font-size:11.5px;color:var(--text3);text-align:left;padding:10px 14px;border-bottom:1px solid var(--border);font-weight:600;letter-spacing:.6px}
+.tbl td{padding:12px 14px;border-bottom:1px solid rgba(29,42,66,.6);vertical-align:middle}
+.tbl tr:hover td{background:rgba(59,130,246,.04)}
+.tbl .mono{font-family:var(--mono)}
+.tbl-actions{display:flex;gap:6px;justify-content:flex-end}
+
+.field{margin-bottom:16px}
+.field label{display:block;font-size:12.5px;font-weight:600;color:var(--text2);margin-bottom:7px;letter-spacing:.3px}
+.field label .req{color:var(--red);margin-left:2px}
+.field .hint{font-size:12px;color:var(--text3);margin-top:5px;line-height:1.6}
+input[type=text],input[type=password],input[type=email],input[type=url],input[type=number],select,textarea{
+  width:100%;background:var(--bg-base3);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);
+  padding:9px 12px;font-size:13.5px;font-family:inherit;transition:all .18s;outline:none}
+input:focus,select:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(59,130,246,.15)}
+input::placeholder{color:var(--text3)}
+textarea{font-family:var(--mono);line-height:1.55;resize:vertical;min-height:70px}
+.inp-group{display:flex;gap:8px;align-items:center}
+.inp-group .prefix{font-family:var(--mono);font-size:13px;color:var(--text3);background:var(--bg-surface3);border:1px solid var(--border2);padding:9px 12px;border-radius:var(--radius-sm)}
+.row-2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.check-card{display:flex;align-items:flex-start;gap:12px;padding:16px;border:1px solid var(--border2);border-radius:var(--radius);cursor:pointer;transition:all .18s;background:var(--bg-surface2)}
+.check-card:hover{border-color:var(--accent)}
+.check-card.sel{border-color:var(--accent);background:var(--grad-soft);box-shadow:var(--shadow-glow)}
+.check-card .c-ico{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;background:var(--bg-surface3);border:1px solid var(--border2);flex:none}
+.check-card.sel .c-ico{background:var(--grad);border-color:transparent;box-shadow:0 4px 14px rgba(59,130,246,.4)}
+.check-card h4{font-size:14.5px;font-weight:700}
+.check-card p{font-size:12.5px;color:var(--text3);margin-top:4px;line-height:1.6}
+.check-card .c-tag{margin-top:8px;display:inline-flex;font-family:var(--mono);font-size:11px;color:var(--accent2);background:rgba(59,130,246,.1);padding:2px 8px;border-radius:5px;border:1px solid rgba(59,130,246,.25)}
+
+.tip{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:50%;font-size:10px;font-weight:700;color:var(--text3);border:1px solid var(--border2);cursor:help;vertical-align:1px;margin-left:5px;position:relative}
+.tip:hover::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);white-space:normal;width:230px;background:var(--bg-surface3);border:1px solid var(--border2);border-radius:8px;padding:9px 11px;font-size:12px;font-weight:400;color:var(--text2);line-height:1.65;z-index:60;box-shadow:var(--shadow);font-family:inherit;text-align:left}
+.tip:hover::before{content:"";position:absolute;bottom:calc(100% + 2px);left:50%;transform:translateX(-50%);border:6px solid transparent;border-top-color:var(--bg-surface3);z-index:61}
+
+.modal-mask{position:fixed;inset:0;background:rgba(4,8,16,.72);backdrop-filter:blur(5px);display:none;align-items:center;justify-content:center;z-index:100}
+.modal-mask.show{display:flex;animation:fadeIn .2s}
+.modal{width:min(520px,92vw);background:var(--bg-surface);border:1px solid var(--border2);border-radius:14px;box-shadow:0 24px 70px rgba(0,0,0,.6);animation:popIn .22s;overflow:hidden}
+.modal-head{padding:18px 22px 0;display:flex;align-items:flex-start;gap:12px}
+.modal-ico{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:19px;flex:none}
+.modal-ico.danger{background:rgba(239,68,68,.13);border:1px solid rgba(239,68,68,.35)}
+.modal-ico.info{background:rgba(59,130,246,.13);border:1px solid rgba(59,130,246,.35)}
+.modal-title{font-size:16px;font-weight:700}
+.modal-desc{font-size:13px;color:var(--text2);margin-top:6px;line-height:1.7}
+.modal-body{padding:14px 22px 20px}
+.modal-foot{padding:14px 22px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px;background:var(--bg-surface2)}
+
+.toast-wrap{position:fixed;top:20px;right:22px;z-index:200;display:flex;flex-direction:column;gap:10px}
+.toast{background:var(--bg-surface);border:1px solid var(--border2);border-left:3px solid var(--accent);border-radius:10px;padding:12px 16px;min-width:280px;max-width:420px;box-shadow:var(--shadow);font-size:13.5px;display:flex;gap:10px;align-items:flex-start;animation:slideIn .25s}
+.toast.ok{border-left-color:var(--green)}.toast.err{border-left-color:var(--red)}.toast.warn{border-left-color:var(--amber)}
+.toast .t-ico{font-size:15px}
+.toast .t-msg{color:var(--text2);line-height:1.6}.toast .t-msg b{color:var(--text)}
+
+.sidebar{width:224px;flex:none;background:var(--bg-base2);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:18px 12px 14px}
+.logo{display:flex;align-items:center;gap:11px;padding:4px 10px 18px;border-bottom:1px solid var(--border);margin-bottom:14px}
+.logo-svg{width:34px;height:34px;flex:none;filter:drop-shadow(0 3px 10px rgba(59,130,246,.5))}
+.logo h1{font-size:15.5px;font-weight:800;letter-spacing:1px;background:var(--grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;line-height:1.2}
+.logo .en{font-size:10px;color:var(--text3);letter-spacing:1.5px;margin-top:2px;font-family:var(--mono)}
+.nav-cap{font-size:10.5px;color:var(--text3);letter-spacing:2px;padding:12px 12px 7px;font-weight:600}
+.nav-item{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:9px;font-size:13.5px;color:var(--text2);margin-bottom:3px;transition:all .16s;cursor:pointer;font-weight:500;position:relative}
+.nav-item:hover{background:var(--bg-surface);color:var(--text)}
+.nav-item.active{background:var(--grad-soft);color:#fff;font-weight:700;box-shadow:inset 0 0 0 1px rgba(59,130,246,.3)}
+.nav-item.active::before{content:"";position:absolute;left:-12px;top:9px;bottom:9px;width:3px;border-radius:2px;background:var(--grad)}
+.nav-item .nv{font-size:17px;width:20px;text-align:center;flex:none}
+.nav-item .cnt{margin-left:auto;font-size:11px;font-family:var(--mono);background:var(--bg-surface3);border:1px solid var(--border2);padding:1px 8px;border-radius:999px;color:var(--text2)}
+.nav-foot{margin-top:auto;padding:12px 8px 2px;border-top:1px solid var(--border)}
+.conn{display:flex;align-items:center;gap:9px;padding:9px 10px;border-radius:9px;background:rgba(16,185,129,.07);border:1px solid rgba(16,185,129,.22)}
+.conn .dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 8px rgba(16,185,129,.8);animation:breathe 2.4s infinite}
+.conn b{font-size:12.5px;color:#6EE7B7}
+.conn small{display:block;font-size:10.5px;color:var(--text3);font-family:var(--mono)}
+
+.topbar{height:56px;flex:none;background:rgba(11,17,30,.88);backdrop-filter:blur(10px);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:16px;padding:0 24px;position:sticky;top:0;z-index:40}
+.tb-search{flex:1;max-width:420px;position:relative}
+.tb-search input{background:var(--bg-base3);padding-left:36px;border-radius:9px}
+.tb-search .ico{position:absolute;left:12px;top:9px;opacity:.6}
+.tb-right{margin-left:auto;display:flex;align-items:center;gap:12px}
+.tb-chip{font-family:var(--mono);font-size:12px;color:var(--text2);background:var(--bg-surface);border:1px solid var(--border2);padding:6px 12px;border-radius:8px;display:flex;align-items:center;gap:7px}
+.tb-chip .dot{width:7px;height:7px;border-radius:50%;background:var(--green)}
+.tb-avatar{width:32px;height:32px;border-radius:8px;background:var(--grad);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:#04121d}
+.tb-theme{display:flex;align-items:center;gap:2px;background:var(--bg-surface);border:1px solid var(--border2);border-radius:9px;padding:3px}
+.tb-theme-btn{width:30px;height:28px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:13px;transition:all .15s;color:var(--text3);cursor:pointer;background:none;border:none}
+.tb-theme-btn:hover{background:var(--bg-surface3);color:var(--text)}
+.tb-theme-btn.active{background:var(--grad);color:#fff;box-shadow:0 1px 6px rgba(59,130,246,.35)}
+
+.app{display:flex;height:100vh}
+.main{flex:1;display:flex;flex-direction:column;min-width:0}
+.content{flex:1;overflow-y:auto}
+.view{display:none}
+.view.show{display:block;animation:fadeUp .25s}
+
+.app-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px;margin-top:20px}
+.app-card{padding:18px;display:flex;flex-direction:column;gap:13px;position:relative;overflow:hidden}
+.app-card::after{content:"";position:absolute;top:-40px;right:-40px;width:110px;height:110px;border-radius:50%;background:radial-gradient(circle,rgba(59,130,246,.1),transparent 70%);pointer-events:none}
+.app-card .ac-top{display:flex;align-items:center;gap:11px}
+.app-ico{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:800;color:#fff;flex:none;font-family:var(--mono)}
+.app-ico.c1{background:linear-gradient(135deg,#3B82F6,#2563EB)}.app-ico.c2{background:linear-gradient(135deg,#8B5CF6,#6366F1)}
+.app-ico.c3{background:linear-gradient(135deg,#F59E0B,#F97316)}.app-ico.c4{background:linear-gradient(135deg,#10B981,#0EA5E9)}
+.app-name{font-size:15.5px;font-weight:700;letter-spacing:.3px}
+.app-domain{font-size:12px;color:var(--text3);font-family:var(--mono);margin-top:2px;display:flex;align-items:center;gap:5px}
+.app-domain a{color:var(--accent2);text-decoration:none}
+.app-domain a:hover{text-decoration:underline}
+.app-meta{display:flex;flex-wrap:wrap;gap:6px;font-size:11.5px;font-family:var(--mono);color:var(--text2)}
+.app-meta .m{background:var(--bg-surface2);border:1px solid var(--border);padding:2px 8px;border-radius:6px}
+.app-foot{display:flex;align-items:center;gap:8px;border-top:1px solid var(--border);padding-top:13px}
+.app-foot .ago{font-size:11.5px;color:var(--text3);margin-right:auto;font-family:var(--mono)}
+
+.filter-bar{display:flex;align-items:center;gap:10px;margin-top:18px;flex-wrap:wrap}
+.f-chip{padding:6px 14px;border-radius:999px;font-size:12.5px;font-weight:600;color:var(--text2);border:1px solid var(--border2);cursor:pointer;transition:all .15s;background:var(--bg-surface)}
+.f-chip:hover{color:var(--text)}
+.f-chip.on{background:var(--grad);border-color:transparent;color:#fff;box-shadow:0 2px 10px rgba(59,130,246,.35)}
+.view-toggle{margin-left:auto;display:flex;border:1px solid var(--border2);border-radius:8px;overflow:hidden}
+.view-toggle button{padding:6px 14px;font-size:12.5px;color:var(--text2);background:var(--bg-surface)}
+.view-toggle button.on{background:var(--bg-surface3);color:var(--text);font-weight:700}
+
+.stepper{display:flex;align-items:center;gap:0;margin:24px 0 26px;max-width:760px}
+.step{display:flex;align-items:center;gap:10px;flex:1;position:relative}
+.step .s-num{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;font-family:var(--mono);background:var(--bg-surface3);border:1px solid var(--border2);color:var(--text3);flex:none;transition:all .2s;z-index:1}
+.step .s-name{font-size:13px;color:var(--text3);font-weight:600;white-space:nowrap}
+.step.done .s-num{background:rgba(16,185,129,.15);border-color:rgba(16,185,129,.4);color:#34D399}
+.step.done .s-name{color:var(--text2)}
+.step.cur .s-num{background:var(--grad);border-color:transparent;color:#04121d;box-shadow:0 0 0 4px rgba(59,130,246,.2),0 4px 14px rgba(59,130,246,.4)}
+.step.cur .s-name{color:#fff}
+.step::after{content:"";position:absolute;left:30px;right:0;top:15px;height:2px;background:var(--border);z-index:0}
+.step.done::after{background:linear-gradient(90deg,rgba(16,185,129,.5),var(--border))}
+.step:last-child::after{display:none}
+.wizard{max-width:820px}
+.wz-foot{display:flex;justify-content:space-between;gap:12px;margin-top:28px;padding-top:20px;border-top:1px solid var(--border)}
+
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin:18px 0 0}
+.tab{padding:11px 18px;font-size:13.5px;font-weight:600;color:var(--text3);border-bottom:2px solid transparent;margin-bottom:-1px;cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:7px}
+.tab:hover{color:var(--text2)}
+.tab.on{color:#fff;border-bottom-color:var(--accent)}
+.tab .dot{width:6px;height:6px;border-radius:50%;background:currentColor}
+
+.detail-head{display:flex;align-items:center;gap:18px;padding:22px 0 4px;flex-wrap:wrap}
+.detail-actions{margin-left:auto;display:flex;gap:9px;flex-wrap:wrap}
+.info-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px}
+.info-cell{background:var(--bg-surface2);border:1px solid var(--border);border-radius:10px;padding:13px 15px}
+.info-cell .k{font-size:11px;color:var(--text3);letter-spacing:.5px;display:flex;align-items:center}
+.info-cell .v{font-size:13.5px;font-weight:600;margin-top:6px;font-family:var(--mono);word-break:break-all}
+.info-cell .v.plain{font-family:inherit;font-weight:700}
+.info-cell .v.warn{color:var(--amber)}
+
+.timeline{position:relative;padding-left:26px}
+.timeline::before{content:"";position:absolute;left:8px;top:6px;bottom:6px;width:2px;background:var(--border)}
+.tl-item{position:relative;padding:0 0 22px}
+.tl-item:last-child{padding-bottom:4px}
+.tl-item::before{content:"";position:absolute;left:-24px;top:4px;width:12px;height:12px;border-radius:50%;background:var(--bg-surface3);border:2px solid var(--border2)}
+.tl-item.ok::before{background:var(--green);border-color:rgba(16,185,129,.5);box-shadow:0 0 8px rgba(16,185,129,.5)}
+.tl-item.fail::before{background:var(--red);border-color:rgba(239,68,68,.5)}
+.tl-item.cur::before{background:var(--accent);border-color:rgba(59,130,246,.5);box-shadow:0 0 10px rgba(59,130,246,.6);animation:pulse 1s infinite}
+.tl-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.tl-title{font-weight:700;font-size:13.5px}
+.tl-time{font-size:11.5px;color:var(--text3);font-family:var(--mono)}
+.tl-desc{font-size:12.5px;color:var(--text2);margin-top:4px;line-height:1.6}
+.tl-desc .mono{font-family:var(--mono);color:var(--text3)}
+.tl-act{margin-top:8px}
+
+.terminal{background:var(--term-bg);border:1px solid var(--border2);border-radius:11px;overflow:hidden;font-family:var(--mono);font-size:12.5px;line-height:1.75}
+.term-head{display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--bg-surface3);border-bottom:1px solid var(--border)}
+.term-head .tcircle{width:10px;height:10px;border-radius:50%;background:#F87171}
+.term-head .tcircle:nth-child(2){background:#FBBF24}.term-head .tcircle:nth-child(3){background:#34D399}
+.term-head .t-title{margin-left:8px;font-size:11.5px;color:var(--text3);letter-spacing:.5px}
+.term-head .t-actions{margin-left:auto;display:flex;gap:6px}
+.term-body{padding:14px 16px;height:320px;overflow-y:auto}
+.term-body pre{white-space:pre-wrap;word-break:break-all;color:var(--term-txt)}
+.term-body .ln{display:block}
+.term-body .ln .ts{color:var(--term-ln);margin-right:10px;user-select:none}
+.term-body .ln.ok{color:#6EE7B7}.term-body .ln.err{color:#FCA5A5}.term-body .ln.warn{color:#FCD34D}
+.term-body .ln.info{color:#93C5FD}.term-body .ln.dim{color:#64748B}
+.term-body .cursor::after{content:"▋";color:var(--accent3);animation:blink 1s infinite}
+
+.progress{height:8px;background:var(--bg-base3);border-radius:99px;overflow:hidden;border:1px solid var(--border)}
+.progress .bar{height:100%;background:var(--grad);border-radius:99px;transition:width .6s ease;position:relative;overflow:hidden}
+.progress .bar::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.35),transparent);animation:shimmer 1.6s infinite}
+.progress .bar.done{background:linear-gradient(90deg,#10B981,#34D399)}
+.progress .bar.fail{background:linear-gradient(90deg,#EF4444,#F87171)}
+
+.sql-toolbar{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border)}
+.mode-switch{display:flex;border:1px solid var(--border2);border-radius:8px;overflow:hidden}
+.mode-switch button{padding:6px 14px;font-size:12px;font-weight:700;font-family:var(--mono);color:var(--text3);background:var(--bg-surface2)}
+.mode-switch button.on-ro{background:rgba(16,185,129,.15);color:#34D399}
+.mode-switch button.on-rw{background:rgba(239,68,68,.15);color:#F87171}
+.sql-editor{background:var(--bg-base2);border:none;line-height:1.7;font-size:13px;padding:16px;width:100%;min-height:150px;resize:vertical;color:var(--text);font-family:var(--mono);border-bottom:1px solid var(--border)}
+.sql-results{padding:8px 0 16px}
+.rows-badge{font-size:11.5px;color:var(--text3);font-family:var(--mono);padding:0 16px 8px;display:flex;gap:8px;align-items:center}
+
+.empty{padding:70px 20px;text-align:center;color:var(--text3)}
+.empty .e-ico{font-size:44px;margin-bottom:14px;opacity:.7}
+.empty h3{font-size:16px;color:var(--text2);font-weight:700;margin-bottom:7px}
+.empty p{font-size:13px;line-height:1.7}
+
+.mig-item{display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid var(--border)}
+.mig-item:last-child{border-bottom:none}
+.mig-item .m-name{font-family:var(--mono);font-size:13px;font-weight:600}
+.mig-item .m-time{font-size:11.5px;color:var(--text3);font-family:var(--mono)}
+.mig-item .m-status{margin-left:auto}
+
+.audit-filters{display:flex;gap:10px;align-items:center;margin:18px 0}
+.audit-filters select{width:auto;min-width:140px}
+
+.res-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.res-item{padding:14px 16px}
+.res-item .rk{font-size:12px;color:var(--text3);display:flex;justify-content:space-between;margin-bottom:9px}
+.res-item .rk b{font-family:var(--mono);color:var(--text)}
+
+.act-item{display:flex;gap:13px;padding:13px 4px;border-bottom:1px solid rgba(29,42,66,.5);align-items:flex-start}
+.act-item:last-child{border-bottom:none}
+.act-ico{width:32px;height:32px;border-radius:8px;flex:none;display:flex;align-items:center;justify-content:center;font-size:14px;background:var(--bg-surface3);border:1px solid var(--border2)}
+.act-ico.ok{background:rgba(16,185,129,.1);border-color:rgba(16,185,129,.3)}
+.act-ico.fail{background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.3)}
+.act-ico.busy{background:rgba(59,130,246,.12);border-color:rgba(59,130,246,.35)}
+.act-body{flex:1;min-width:0}
+.act-title{font-size:13px;font-weight:600}
+.act-title .mono{font-family:var(--mono);color:var(--accent2);font-weight:500}
+.act-desc{font-size:12px;color:var(--text3);margin-top:3px}
+.act-time{font-size:11px;color:var(--text3);font-family:var(--mono);white-space:nowrap;padding-top:2px}
+
+@keyframes breathe{0%{box-shadow:0 0 0 0 rgba(16,185,129,.5)}70%{box-shadow:0 0 0 7px rgba(16,185,129,0)}100%{box-shadow:0 0 0 0 rgba(16,185,129,0)}}
+@keyframes pulse{0%{transform:scale(1)}50%{transform:scale(1.15)}100%{transform:scale(1)}}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+@keyframes shimmer{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes popIn{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:scale(1)}}
+@keyframes slideIn{from{opacity:0;transform:translateX(30px)}to{opacity:1;transform:none}}
+@keyframes spin{to{transform:rotate(360deg)}}
+.spin{animation:spin 1s linear infinite;display:inline-block}
+
+.proto-flag{position:fixed;left:50%;bottom:10px;transform:translateX(-50%);z-index:300;font-size:10.5px;font-family:var(--mono);color:var(--text3);background:rgba(11,17,30,.88);border:1px dashed var(--border2);padding:4px 14px;border-radius:99px;letter-spacing:1px;pointer-events:none}
+
+.hidden{display:none!important}
+.mt8{margin-top:8px}.mt14{margin-top:14px}.mt20{margin-top:20px}.mt26{margin-top:26px}
+.mb8{margin-bottom:8px}.mb14{margin-bottom:14px}
+.flex{display:flex;align-items:center;gap:10px}
+.spacer{flex:1}
+.mono{font-family:var(--mono)}
+.txt2{color:var(--text2)}.txt3{color:var(--text3)}
+.green{color:#34D399}.red{color:#F87171}.amber{color:#FBBF24}.blue2{color:var(--accent2)}
+.js-tag{font-size:10.5px;font-family:var(--mono);color:var(--amber);border:1px dashed rgba(245,158,11,.4);background:rgba(245,158,11,.07);padding:1px 8px;border-radius:5px;letter-spacing:.5px}
+
+.open-link{color:var(--accent2);text-decoration:none;font-family:var(--mono);border-bottom:1px dashed rgba(96,165,250,.4);transition:all .15s}
+.open-link:hover{color:#fff;border-bottom-color:#fff;text-shadow:0 0 12px rgba(59,130,246,.6)}
+.kbd{font-family:var(--mono);font-size:11px;background:var(--bg-surface3);border:1px solid var(--border2);border-bottom-width:2px;border-radius:5px;padding:1px 6px;color:var(--text2)}
+.tb-bell{position:relative}
+.notif-badge{position:absolute;top:2px;right:2px;min-width:15px;height:15px;border-radius:99px;background:linear-gradient(135deg,#F87171,#DC2626);color:#fff;font-size:9.5px;font-weight:800;display:flex;align-items:center;justify-content:center;padding:0 4px;font-family:var(--mono)}
+.panel-mask{position:fixed;inset:0;z-index:90;display:none}
+.panel-mask.show{display:block}
+.notif-panel{position:absolute;top:52px;right:18px;width:365px;max-width:92vw;background:var(--bg-surface);border:1px solid var(--border2);border-radius:13px;box-shadow:var(--shadow);overflow:hidden;animation:popIn .18s}
+.notif-head{display:flex;align-items:center;gap:10px;padding:13px 16px;border-bottom:1px solid var(--border)}
+.notif-item{display:flex;gap:11px;padding:12px 16px;border-bottom:1px solid rgba(29,42,66,.5);cursor:pointer;transition:all .15s}
+.notif-item:hover{background:rgba(59,130,246,.05)}
+.notif-item.unread{background:rgba(59,130,246,.06)}
+.notif-item.unread::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--accent2);flex:none;margin-top:6px}
+.notif-ico{width:30px;height:30px;border-radius:8px;flex:none;display:flex;align-items:center;justify-content:center;font-size:13px;background:var(--bg-surface3);border:1px solid var(--border2)}
+.notif-ico.ok{background:rgba(16,185,129,.12);border-color:rgba(16,185,129,.3)}
+.notif-ico.fail{background:rgba(239,68,68,.12);border-color:rgba(239,68,68,.3)}
+.notif-t{font-size:13px;font-weight:600}
+.notif-d{font-size:12px;color:var(--text3);margin-top:2px;line-height:1.6}
+.notif-time{font-size:10.5px;color:var(--text3);font-family:var(--mono);margin-left:auto;white-space:nowrap}
+.cmdk-mask{position:fixed;inset:0;background:rgba(4,8,16,.75);backdrop-filter:blur(6px);z-index:150;display:none;align-items:flex-start;justify-content:center;padding-top:13vh}
+.cmdk-mask.show{display:flex;animation:fadeIn .15s}
+.cmdk{width:min(600px,92vw);background:var(--bg-surface);border:1px solid var(--border2);border-radius:14px;box-shadow:0 30px 90px rgba(0,0,0,.65);overflow:hidden;animation:popIn .18s}
+.cmdk-head{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--border)}
+.cmdk-head input{background:transparent;border:none;box-shadow:none;font-size:15px;padding:2px}
+.cmdk-head input:focus{box-shadow:none}
+.cmdk-list{max-height:380px;overflow-y:auto;padding:8px}
+.cmdk-group{font-size:10.5px;color:var(--text3);letter-spacing:2px;font-weight:600;padding:10px 12px 5px}
+.cmdk-item{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:9px;cursor:pointer;transition:background .1s}
+.cmdk-item:hover,.cmdk-item.sel{background:rgba(59,130,246,.1)}
+.cmdk-item .ci-ico{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;background:var(--bg-surface3);border:1px solid var(--border2);flex:none}
+.cmdk-item .ci-name{font-size:13.5px;font-weight:600}
+.cmdk-item .ci-sub{font-size:11.5px;color:var(--text3);font-family:var(--mono);margin-top:1px}
+.cmdk-item .ci-go{margin-left:auto;font-size:11px;color:var(--text3);font-family:var(--mono)}
+.cmdk-foot{padding:10px 18px;border-top:1px solid var(--border);display:flex;gap:14px;font-size:11px;color:var(--text3)}
+.guide-banner{display:flex;align-items:center;gap:14px;background:var(--grad-soft);border:1px solid rgba(59,130,246,.3);border-radius:var(--radius);padding:13px 18px;margin:16px 0 0}
+.guide-banner .g-ico{width:34px;height:34px;border-radius:9px;background:var(--grad);display:flex;align-items:center;justify-content:center;font-size:16px;flex:none}
+.guide-banner .g-title{font-size:13.5px;font-weight:700}
+.guide-steps{display:flex;gap:8px;margin-top:5px;flex-wrap:wrap}
+.guide-steps span{font-size:11.5px;color:var(--text2);background:rgba(11,17,30,.6);border:1px solid var(--border);padding:3px 10px;border-radius:99px;font-family:var(--mono)}
+.tmpl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;margin-top:20px}
+.tmpl-card{display:flex;flex-direction:column;gap:12px;padding:18px;position:relative;overflow:hidden}
+.tmpl-card::after{content:"";position:absolute;top:-44px;right:-44px;width:120px;height:120px;border-radius:50%;background:radial-gradient(circle,rgba(34,211,238,.09),transparent 70%);pointer-events:none}
+.tmpl-head{display:flex;align-items:center;gap:11px}
+.tmpl-ico{width:42px;height:42px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:19px;flex:none;background:var(--bg-surface3);border:1px solid var(--border2)}
+.tmpl-name{font-size:15px;font-weight:700}
+.tmpl-tag{font-size:10.5px;font-family:var(--mono);color:var(--accent3);background:rgba(34,211,238,.09);border:1px solid rgba(34,211,238,.25);padding:1px 8px;border-radius:5px}
+.tmpl-desc{font-size:12.5px;color:var(--text3);line-height:1.7}
+.tmpl-stack{display:flex;flex-wrap:wrap;gap:5px;margin-top:auto}
+.tmpl-stack span{font-size:10.5px;font-family:var(--mono);background:var(--bg-base3);border:1px solid var(--border);padding:2px 8px;border-radius:5px;color:var(--text2)}
+.tmpl-foot{display:flex;align-items:center;gap:8px;border-top:1px solid var(--border);padding-top:12px}
+.success-hero{display:flex;align-items:center;gap:18px;background:linear-gradient(135deg,rgba(16,185,129,.12),rgba(34,211,238,.08));border:1px solid rgba(16,185,129,.3);border-radius:var(--radius);padding:24px 26px}
+.success-hero .s-big{width:56px;height:56px;border-radius:15px;background:linear-gradient(135deg,#10B981,#34D399);display:flex;align-items:center;justify-content:center;font-size:26px;flex:none;box-shadow:0 6px 20px rgba(16,185,129,.4)}
+.success-url{display:flex;align-items:center;gap:10px;background:rgba(11,17,30,.6);border:1px solid var(--border2);border-radius:10px;padding:12px 16px;margin-top:16px}
+.success-url .url{flex:1;font-family:var(--mono);font-size:14px;color:#6EE7B7;text-decoration:none}
+.success-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:20px}
+.success-card{border:1px solid var(--border);border-radius:var(--radius);padding:18px;background:var(--bg-surface)}
+.success-card .sc-ico{font-size:22px}
+.success-card h4{font-size:14px;font-weight:700;margin:9px 0 5px}
+.success-card p{font-size:12px;color:var(--text3);line-height:1.7}
+.live-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:16px}
+.live-cell{display:flex;align-items:center;gap:10px;background:var(--bg-surface2);border:1px solid var(--border);border-radius:10px;padding:12px 15px}
+.live-cell .lc-ico{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;background:var(--bg-surface3);border:1px solid var(--border2);flex:none}
+.live-cell .lc-k{font-size:10.5px;color:var(--text3);letter-spacing:.5px}
+.live-cell .lc-v{font-size:13px;font-weight:700;margin-top:2px;font-family:var(--mono)}
+.live-cell .lc-v.green{color:#34D399}.live-cell .lc-v.red{color:#F87171}.live-cell .lc-v.amber{color:#FBBF24}
+.table-preview{margin-top:10px;border-top:1px solid var(--border);padding:12px 16px;background:rgba(11,17,30,.4)}
+.table-preview .tp-title{font-size:11px;color:var(--text3);font-family:var(--mono);letter-spacing:1px;margin-bottom:8px}
+.tbl .clickable{color:var(--accent2);cursor:pointer;font-weight:700}
+.tbl .clickable:hover{text-decoration:underline}
+.quick-item{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:9px;cursor:pointer;transition:all .15s;border:1px solid transparent;width:100%;text-align:left}
+.quick-item:hover{background:rgba(59,130,246,.06);border-color:var(--border2)}
+.quick-item .qi-ico{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;background:var(--bg-surface3);border:1px solid var(--border2);flex:none}
+.quick-item .qi-t{font-size:13px;font-weight:600}
+.quick-item .qi-d{font-size:11px;color:var(--text3);margin-top:1px}
+.portal-link{display:block;text-align:center;font-size:11.5px;color:var(--text3);padding:8px;border-radius:8px;text-decoration:none;margin-bottom:8px;border:1px dashed var(--border2)}
+.portal-link:hover{color:var(--accent2);border-color:var(--accent)}
+
+/* ── LIGHT 主题覆盖层 ──────────────────────────────────── */
+[data-theme="light"] .topbar{background:rgba(248,250,252,.9)}
+[data-theme="light"] .sidebar{background:#F8FAFC;border-color:#E2E8F0}
+[data-theme="light"] .logo{border-color:#E2E8F0}
+[data-theme="light"] .logo h1{-webkit-text-fill-color:#1D4ED8}
+[data-theme="light"] .nav-item.active{color:#1E40AF;font-weight:700}
+[data-theme="light"] .nav-foot{border-color:#E2E8F0}
+[data-theme="light"] .conn{background:rgba(16,185,129,.08);border-color:rgba(16,185,129,.3)}
+[data-theme="light"] .conn b{color:#059669}
+[data-theme="light"] .proto-flag{background:rgba(248,250,252,.95);border-color:#CBD5E1;color:#64748B}
+[data-theme="light"] .guide-banner{background:linear-gradient(135deg,rgba(59,130,246,.06),rgba(37,99,235,.04));border-color:rgba(59,130,246,.2)}
+[data-theme="light"] .table-preview{background:rgba(241,245,249,.6)}
+[data-theme="light"] .app-card::after{background:radial-gradient(circle,rgba(59,130,246,.05),transparent 70%)}
+[data-theme="light"] .success-hero{background:linear-gradient(135deg,rgba(16,185,129,.06),rgba(34,211,238,.04));border-color:rgba(16,185,129,.2)}
+
+</style>
+</head>
+<body><!-- ================= 主框架 ================= -->
+<div class="app">
+  <!-- 侧边导航 -->
+  <aside class="sidebar">
+    <div class="logo">
+      <svg class="logo-svg" viewBox="0 0 48 48" fill="none">
+        <defs><linearGradient id="lg1" x1="0" y1="0" x2="48" y2="48"><stop offset="0" stop-color="#3B82F6"/><stop offset="1" stop-color="#22D3EE"/></linearGradient></defs>
+        <path d="M26 4 L10 28 H21 L18 44 L38 18 H26 Z" fill="url(#lg1)"/>
+        <path d="M26 4 L10 28 H21 L18 44 L38 18 H26 Z" fill="none" stroke="rgba(255,255,255,.35)" stroke-width="1"/>
+      </svg>
+      <div>
+        <h1>雷盒控制台</h1>
+        <div class="en">THUNDERBOX CONSOLE</div>
+      </div>
+    </div>
+    <div class="nav-cap">控制台</div>
+    <div class="nav-item active" data-nav="dashboard"><span class="nv">📊</span> 总览</div>
+    <div class="nav-item" data-nav="apps"><span class="nv">🗂️</span> 应用 <span class="cnt" id="nav-app-cnt">4</span></div>
+    <div class="nav-item" data-nav="audit"><span class="nv">📜</span> 审计日志</div>
+    <div class="nav-cap">工具</div>
+    <div class="nav-item" data-nav="probe"><span class="nv">🔭</span> 域名探测</div>
+    <div class="nav-item" data-nav="settings"><span class="nv">⚙️</span> 系统设置</div>
+    <div class="nav-foot">
+      <a class="portal-link" href="#" onclick="toast('将返回法务门户（portal 集成，原型模拟）','ok');return false">← 返回法务门户</a>
+      <div class="conn">
+        <span class="dot"></span>
+        <div><b>Thunderbox 已连接</b><small>MCP v0.2.0 · 响应 48ms</small></div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- 主区域 -->
+  <div class="main">
+    <header class="topbar">
+      <div class="tb-search">
+        <svg class="icon" style="position:absolute;left:12px;top:10px" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="#5B6B85" stroke-width="1.6"/><path d="M11 11 L14.5 14.5" stroke="#5B6B85" stroke-width="1.6" stroke-linecap="round"/></svg>
+        <input type="text" id="global-search" placeholder="搜索应用名称 / 域名 / Git 地址…">
+      </div>
+      <div class="tb-right">
+        <div class="tb-theme" id="tb-theme-wrap">
+          <button class="tb-theme-btn active" id="tbtn-dark" title="深色主题" onclick="setTheme('dark')">🌙</button>
+          <button class="tb-theme-btn" id="tbtn-light" title="商务白主题" onclick="setTheme('light')">☀️</button>
+          <button class="tb-theme-btn" id="tbtn-system" title="跟随系统" onclick="setTheme('system')">💻</button>
+        </div>
+        <span class="tb-chip"><span class="dot"></span> 平台正常</span>
+        <button class="btn btn-ghost btn-sm" id="btn-cmdk" title="命令面板（⌘K）">⌘K</button>
+        <button class="btn btn-primary btn-sm" id="tb-new-btn"><span>＋</span> 新建应用</button>
+        <div class="tb-avatar">法</div>
+      </div>
+    </header>
+
+    <main class="content">
+      <!-- ========== 新手引导条（可关闭） ========== -->
+      <div class="guide-banner hidden" id="guide-banner" style="max-width:1400px;margin:16px auto 0">
+        <div class="g-ico">🚀</div>
+        <div style="flex:1">
+          <div class="g-title">三步把一个应用跑起来</div>
+          <div class="guide-steps">
+            <span>① 新建应用（或从模板开始）</span><span>② 点「部署」看构建进度</span><span>③ 状态变绿后「打开应用」</span>
+          </div>
+        </div>
+        <button class="btn btn-ghost btn-sm" id="guide-close">知道了 ✕</button>
+      </div>
+      <!-- ========== ① 总览 Dashboard ========== -->
+      <div class="view show" id="view-dashboard">
+        <div class="page">
+          <div class="flex" style="margin-bottom:4px">
+            <div>
+              <div class="page-title">总览</div>
+              <div class="page-sub">Thunderbox 平台一目了然：所有应用的健康状态、部署动态与资源概况</div>
+            </div>
+            <div class="spacer"></div>
+            <button class="btn btn-ghost" id="dash-refresh">⟳ 刷新</button>
+            <button class="btn btn-primary" id="dash-new">＋ 新建应用</button>
+          </div>
+          <div class="stats">
+            <div class="stat" style="--stat-c:linear-gradient(90deg,#3B82F6,#60A5FA);--stat-txt:#60A5FA">
+              <div class="k">应用总数</div>
+              <div class="v" id="st-total">4</div>
+              <div class="d">本账号管理 <b class="txt2">4</b> 个</div>
+            </div>
+            <div class="stat" style="--stat-c:linear-gradient(90deg,#10B981,#34D399);--stat-txt:#34D399">
+              <div class="k">运行中</div>
+              <div class="v" id="st-running">1</div>
+              <div class="d trend-up">▲ 全部健康</div>
+            </div>
+            <div class="stat" style="--stat-c:linear-gradient(90deg,#F59E0B,#FBBF24);--stat-txt:#FBBF24">
+              <div class="k">构建中</div>
+              <div class="v" id="st-building">1</div>
+              <div class="d trend-mid">● 正在部署</div>
+            </div>
+            <div class="stat" style="--stat-c:linear-gradient(90deg,#EF4444,#F87171);--stat-txt:#F87171">
+              <div class="k">构建失败</div>
+              <div class="v" id="st-failed">1</div>
+              <div class="d trend-down">▼ 需处理</div>
+            </div>
+          </div>
+
+          <div class="row-2" style="grid-template-columns:3fr 2fr;align-items:start">
+            <div class="card">
+              <div class="flex" style="padding:17px 20px 0">
+                <div>
+                  <div style="font-size:15px;font-weight:700">最近部署活动</div>
+                  <div style="font-size:12px;color:var(--txt3);margin-top:3px">各应用的部署、构建与回滚动态</div>
+                </div>
+                <div class="spacer"></div>
+                <a style="font-size:12.5px;color:var(--blue2);cursor:pointer;text-decoration:none" onclick="go('apps')">查看全部 →</a>
+              </div>
+              <div style="padding:8px 20px 14px" id="dash-activities"></div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:16px">
+              <div class="card" style="padding:17px 20px">
+                <div class="flex">
+                  <div>
+                    <div style="font-size:15px;font-weight:700">构建方式分布</div>
+                    <div style="font-size:12px;color:var(--txt3);margin-top:3px">Build Pack 类型统计</div>
+                  </div>
+                  <div class="spacer"></div>
+                  <span class="badge badge-running"><span class="dot"></span>healthy</span>
+                </div>
+                <div class="res-grid mt14" style="grid-template-columns:1fr 1fr">
+                  <div class="res-item">
+                    <div class="rk">Build Pack <b id="bp-dockerfile">0</b></div>
+                    <div class="rk" style="margin-top:8px">Dockerfile <span class="mono txt3" style="font-size:11px">dockerfile</span></div>
+                  </div>
+                  <div class="res-item">
+                    <div class="rk">Build Pack <b id="bp-nixpacks">0</b></div>
+                    <div class="rk" style="margin-top:8px">Nixpacks <span class="mono txt3" style="font-size:11px">nixpacks</span></div>
+                  </div>
+                </div>
+              </div>
+              <div class="card" style="padding:17px 20px">
+                <div style="font-size:15px;font-weight:700">状态分布</div>
+                <div id="dash-dist-bar" style="display:flex;height:12px;border-radius:99px;overflow:hidden;margin-top:13px;border:1px solid var(--line)"></div>
+                <div id="dash-dist-legend" class="mt14" style="display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--txt2)"></div>
+              </div>
+              <div class="card" style="padding:17px 20px">
+                <div style="font-size:15px;font-weight:700">快捷入口</div>
+                <div style="margin-top:11px;display:flex;flex-direction:column;gap:3px">
+                  <button class="quick-item" onclick="go('create')"><span class="qi-ico">🚀</span><div><div class="qi-t">新建应用</div><div class="qi-d">四步向导 · 大约 1 分钟</div></div></button>
+                  <button class="quick-item" onclick="go('templates')"><span class="qi-ico">🧩</span><div><div class="qi-t">从模板创建</div><div class="qi-d">选一个模板，自动填好配置</div></div></button>
+                  <button class="quick-item" onclick="go('probe')"><span class="qi-ico">🔭</span><div><div class="qi-t">域名探测</div><div class="qi-d">先查名字是否可用</div></div></button>
+                  <button class="quick-item" onclick="openCmdk()"><span class="qi-ico">⌘</span><div><div class="qi-t">命令面板</div><div class="qi-d">按 <span class="kbd">⌘K</span> 秒开应用</div></div></button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========== ② 应用列表 ========== -->
+      <div class="view" id="view-apps">
+        <div class="page">
+          <div class="flex">
+            <div>
+              <div class="page-title">应用</div>
+              <div class="page-sub">管理你的全部应用：部署、监控、配置、回滚，一站式完成</div>
+            </div>
+            <div class="spacer"></div>
+            <button class="btn btn-primary" id="apps-new">＋ 新建应用</button>
+          </div>
+          <div class="filter-bar">
+            <div class="f-chip on" data-f="all">全部 <span class="mono" id="fc-all">4</span></div>
+            <div class="f-chip" data-f="running">运行中 <span class="mono" id="fc-running">1</span></div>
+            <div class="f-chip" data-f="building">构建中 <span class="mono" id="fc-building">1</span></div>
+            <div class="f-chip" data-f="failed">失败 <span class="mono" id="fc-failed">1</span></div>
+            <div class="f-chip" data-f="stopped">已停止 <span class="mono" id="fc-stopped">1</span></div>
+            <div class="view-toggle">
+              <button class="on" data-v="grid" id="vt-grid">▦ 卡片</button>
+              <button data-v="list" id="vt-list">☰ 列表</button>
+            </div>
+          </div>
+          <div id="app-list"></div>
+        </div>
+      </div>
+
+      <!-- ========== ③ 创建应用向导 ========== -->
+      <div class="view" id="view-create">
+        <div class="page">
+          <div class="flex">
+            <div>
+              <div class="page-title">新建应用 <span class="js-tag">四步向导</span></div>
+              <div class="page-sub">跟着向导 4 步走，把代码变成线上应用——每一步都有说明，放心点下去</div>
+            </div>
+            <div class="spacer"></div>
+            <button class="btn btn-ghost" onclick="go('apps')">← 返回应用</button>
+          </div>
+          <div class="stepper" id="wz-stepper">
+            <div class="step cur" data-s="1"><div class="s-num">1</div><div class="s-name">来源与域名</div></div>
+            <div class="step" data-s="2"><div class="s-num">2</div><div class="s-name">构建配置</div></div>
+            <div class="step" data-s="3"><div class="s-num">3</div><div class="s-name">环境与数据</div></div>
+            <div class="step" data-s="4"><div class="s-num">4</div><div class="s-name">确认创建</div></div>
+          </div>
+          <div class="wizard" id="wz-body"></div>
+        </div>
+      </div>
+
+      <!-- ========== ④ 应用详情 ========== -->
+      <div class="view" id="view-detail">
+        <div class="page">
+          <button class="btn btn-ghost btn-sm" onclick="go('apps')">← 返回应用列表</button>
+          <div class="detail-head" id="dt-head"></div>
+          <div class="tabs" id="dt-tabs">
+            <div class="tab on" data-t="overview">概览</div>
+            <div class="tab" data-t="logs">日志</div>
+            <div class="tab" data-t="config">配置</div>
+            <div class="tab" data-t="database">数据库</div>
+          </div>
+          <div id="dt-body" style="margin-top:20px"></div>
+        </div>
+      </div>
+
+      <!-- ========== ④.5 创建成功 ========== -->
+      <div class="view" id="view-success">
+        <div class="page" style="max-width:860px">
+          <div id="success-body"></div>
+        </div>
+      </div>
+
+      <!-- ========== ⑤ 域名探测 ========== -->
+      <div class="view" id="view-probe">
+        <div class="page" style="max-width:900px">
+          <div class="page-title">域名探测 <span class="js-tag">thunderbox_check</span></div>
+          <div class="page-sub">创建应用前先查一查：心仪的名字是否可用（对应 thunderbox_check）</div>
+          <div class="card mt20" style="padding:24px">
+            <div class="field" style="margin-bottom:0">
+              <label>域名前缀 <span class="req">*</span>
+                <span class="tip" data-tip="在 thunderbox 平台下，你的应用会获得“前缀.tbox.ktvsky.com”这样的地址。前缀取 2-20 位小写字母/数字/连字符。">?</span>
+              </label>
+              <div class="inp-group">
+                <input type="text" id="probe-name" placeholder="例如：dtp、report、wiki" style="max-width:340px;font-family:var(--mono)">
+                <span class="prefix">.tbox.ktvsky.com</span>
+                <button class="btn btn-primary" id="probe-btn">🔭 探测</button>
+              </div>
+            </div>
+            <div class="probe-result" id="probe-result"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========== ⑥ 审计日志 ========== -->
+      <div class="view" id="view-audit">
+        <div class="page">
+          <div class="page-title">审计日志 <span class="js-tag">MCP 暂无此 API</span></div>
+          <div class="page-sub">所有写操作（部署/回滚/启停/配置/SQL/迁移）完整留痕，可追溯</div>
+          <div class="audit-filters">
+            <select id="audit-action">
+              <option value="">全部操作</option>
+              <option>创建应用</option><option>触发部署</option><option>回滚</option>
+              <option>启动/停止</option><option>修改配置</option><option>执行 SQL</option><option>迁移</option>
+            </select>
+            <select id="audit-result">
+              <option value="">全部结果</option><option value="成功">成功</option><option value="失败">失败</option>
+            </select>
+            <button class="btn btn-ghost btn-sm" onclick="renderAudit()">筛选</button>
+          </div>
+          <div class="card"><div id="audit-body"></div></div>
+        </div>
+      </div>
+
+      <!-- ========== ⑦ 系统设置 ========== -->
+      <div class="view" id="view-settings">
+        <div class="page" style="max-width:860px">
+          <div class="page-title">系统设置</div>
+          <div class="page-sub">控制台与上游平台的连接信息、版本与帮助</div>
+          <div class="row-2 mt20" style="align-items:start">
+            <div class="card" style="padding:20px">
+              <div style="font-size:15px;font-weight:700">上游连接</div>
+              <div class="mt14" style="display:flex;flex-direction:column;gap:12px">
+                <div class="info-cell"><div class="k">MCP 端点</div><div class="v" style="font-size:12.5px">api-box.tbox.ktvsky.com/mcp</div></div>
+                <div class="info-cell"><div class="k">SERVER 版本</div><div class="v">thunderbox v0.2.0</div></div>
+                <div class="info-cell"><div class="k">认证方式</div><div class="v">Bearer Token</div></div>
+                <div class="info-cell"><div class="k">凭据存储</div><div class="v" style="font-size:12.5px">后端 .env（浏览器不可见）</div></div>
+                <div class="info-cell"><div class="k">响应时间</div><div class="v" style="font-size:12.5px">48 ms（最近探测）</div></div>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:16px">
+              <div class="card" style="padding:20px">
+                <div style="font-size:15px;font-weight:700">关于雷盒控制台</div>
+                <div class="mt14 txt2" style="font-size:13px;line-height:1.9">
+                  版本：v0.1.0（原型评估版）<br>
+                  模块：<span class="mono">thunderbox-console</span> · legal monorepo<br>
+                  架构：React 前端 → FastAPI 网关 → Thunderbox MCP<br>
+                  定位：让每一个人都能在页面上完成应用部署
+                </div>
+              </div>
+              <div class="card" style="padding:20px">
+                <div style="font-size:15px;font-weight:700">安全边界</div>
+                <div class="mt14 txt2" style="font-size:12.5px;line-height:2">
+                  ✅ Token 仅存后端 .env，前端零凭据<br>
+                  ✅ 全部写操作二次确认 + 审计留痕<br>
+                  ✅ SQL 默认只读模式（ro）<br>
+                  ⛔ 应用/数据库删除在平台侧禁用（走管理后台）
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- 确认弹窗 -->
+<div class="modal-mask" id="confirm-mask">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-ico" id="cf-ico">⚠️</div>
+      <div>
+        <div class="modal-title" id="cf-title">确认操作</div>
+        <div class="modal-desc" id="cf-desc"></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" id="cf-cancel">取消</button>
+      <button class="btn btn-primary" id="cf-ok">确认</button>
+    </div>
+  </div>
+</div>
+
+<!-- 命令面板 ⌘K -->
+<div class="cmdk-mask" id="cmdk-mask">
+  <div class="cmdk">
+    <div class="cmdk-head">
+      <svg class="icon" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="#5B6B85" stroke-width="1.6"/><path d="M11 11 L14.5 14.5" stroke="#5B6B85" stroke-width="1.6" stroke-linecap="round"/></svg>
+      <input type="text" id="cmdk-input" placeholder="搜索应用、跳转页面或执行操作…" autocomplete="off">
+      <span class="kbd">ESC</span>
+    </div>
+    <div class="cmdk-list" id="cmdk-list"></div>
+    <div class="cmdk-foot"><span><span class="kbd">↑↓</span> 选择</span><span><span class="kbd">↵</span> 打开</span><span><span class="kbd">⌘K</span> 随时唤起</span></div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast-wrap" id="toast-wrap"></div>
+<div class="proto-flag">⚡ 雷盒控制台 · 高保真原型 v1.2（模拟数据已对齐 MCP 能力）</div>
+
+<script>/* ============================================================
+   模拟数据（原型演示用；实现版由 FastAPI 网关从 MCP 实时获取）
+   ============================================================ */
+/* APPS 数据结构（与 thunderbox_query API 返回字段完全对齐）
+   真实字段：id, app_id, name, domain, owner_email, source_type, source_url,
+             ref, is_public, build_pack, last_build_seconds, status,
+             created_at, updated_at, volumes                           */
+const APPS = [
+  {
+    id: 559, app_id: 'y11eb88rulwk1to63zune7z1',
+    name: 'legal-court', domain: 'legal-court-app.tbox.ktvsky.com',
+    owner_email: 'zhangyang@thunder.com.cn',
+    source_type: 'git_repo', source_url: 'https://github.com/wangpengming/court-generator',
+    ref: 'main', access_mode: 'public', build_pack: 'dockerfile',
+    last_build_seconds: 167, status: 'running',
+    created_at: '2026-08-24 13:08:48', updated_at: '2026-08-24 13:16:59',
+    volumes: null,
+    database: null, /* MCP: thunderbox_query() → database */
+    managers: [],   /* MCP: thunderbox_config(manager_action+manager_email) */
+    allowed_emails: [], /* MCP: thunderbox_config(add_emails/remove_emails) */
+  },
+  {
+    id: 558, app_id: 'ymcdzg4cv0alt96mvnrana7j',
+    name: 'court-doc-gh', domain: 'court-doc-gh.tbox.ktvsky.com',
+    owner_email: 'zhangyang@thunder.com.cn',
+    source_type: 'git_repo', source_url: 'https://github.com/wangpengming/court-generator',
+    ref: 'main', access_mode: 'public', build_pack: 'dockerfile',
+    last_build_seconds: 129, status: 'stopped',
+    created_at: '2026-08-24 12:37:25', updated_at: '2026-08-24 13:13:27',
+    volumes: null,
+    database: null, /* MCP: thunderbox_query() → database */
+    managers: [],   /* MCP: thunderbox_config(manager_action+manager_email) */
+    allowed_emails: [], /* MCP: thunderbox_config(add_emails/remove_emails) */
+  },
+  {
+    id: 557, app_id: 'npy8tw5rdxmqpy219q8tcqjp',
+    name: 'court-doc-v4', domain: 'court-doc-v4.tbox.ktvsky.com',
+    owner_email: 'zhangyang@thunder.com.cn',
+    source_type: 'git_repo', source_url: 'https://gitee.com/wpmdpzch/court-generator.git',
+    ref: 'main', access_mode: 'internal', build_pack: 'dockerfile',
+    last_build_seconds: null, status: 'stopped',
+    created_at: '2026-08-24 12:30:20', updated_at: '2026-08-24 13:13:27',
+    volumes: null,
+    database: null, /* MCP: thunderbox_query() → database */
+    managers: [],   /* MCP: thunderbox_config(manager_action+manager_email) */
+    allowed_emails: [], /* MCP: thunderbox_config(add_emails/remove_emails) */
+  },
+  {
+    id: 554, app_id: 'tsuop9zgxmavnb76o47fu0pc',
+    name: 'court-doc-generator', domain: 'court-doc-generator.tbox.ktvsky.com',
+    owner_email: 'zhangyang@thunder.com.cn',
+    source_type: 'git_repo', source_url: 'https://gitee.com/wpmdpzch/court-generator.git',
+    ref: 'main', access_mode: 'internal', build_pack: 'nixpacks',
+    last_build_seconds: null, status: 'stopped',
+    created_at: '2026-08-24 10:20:03', updated_at: '2026-08-24 13:13:27',
+    volumes: [{ source: 'court-data', target: '/app/data' }, { source: 'court-outputs', target: '/app/outputs' }],
+    database: null,
+    managers: [],
+    allowed_emails: [],
+  },
+  {
+    id: 553, app_id: 'h4ggg5vzgwpriy216371toio',
+    name: 'court-doc-generator', domain: 'court-doc-final.tbox.ktvsky.com',
+    owner_email: 'zhangyang@thunder.com.cn',
+    source_type: 'docker_image', source_url: '10.10.11.37:5001/court-doc-generator:latest',
+    ref: null, access_mode: 'public', build_pack: null,
+    last_build_seconds: null, status: 'stopped',
+    created_at: '2026-08-24 10:04:56', updated_at: '2026-08-24 13:13:27',
+    volumes: [{ source: 'court-data-final', target: '/app/data' }, { source: 'court-outputs-final', target: '/app/outputs' }],
+    env: [['DATABASE_URL', 'postgres://court_app_rw:••••••@pg/court'], ['SECRET_KEY', '••••••••••'], ['LOG_LEVEL', 'info']], // 本地模拟（API 需 thunderbox_config 获取）
+  },
+];
+
+/* 通知中心（Thunderbox MCP 无 webhook 推送机制；前端仅模拟 badge 计数，无真实通知来源）
+   实现版需后端轮询 thunderbox_query + SSE 推送，这里仅演示 badge UI             */
+let NOTIFS = []; // 后端支持推送前保持空，前端铃铛 badge 隐藏
+
+const STATUS_LABEL = { running:'运行中', building:'构建中', deploying:'部署中', build_failed:'构建失败', stopped:'已停止', cancelled:'已取消', unknown:'未知' };
+const STATUS_BADGE = { running:'badge-running', building:'badge-building', deploying:'badge-building', build_failed:'badge-failed', stopped:'badge-stopped', cancelled:'badge-stopped', unknown:'badge-unknown' };
+const ACCESS_LABEL = { public:'公开', internal:'内部访问', restricted:'白名单' };
+const PACK_LABEL = { dockerfile:'Dockerfile', nixpacks:'Nixpacks', static:'Static', spa:'SPA' };
+
+/* 部署历史（thunderbox_rollback API 返回结构：{app_id, history:[{id,commit_sha,ref,status,deployed_by,deployed_at}]}）
+   以下为原型模拟数据，演示回滚时间线 UI；实现版直接渲染 API 返回的 history 数组           */
+const HIST = {
+  559: [
+    { v:'main', time:'08-24 13:14', ok:'ok', desc:'deploy <span class="mono">1b545bd</span> · 构建 167s' },
+    { v:'main', time:'08-24 13:08', ok:'ok', desc:'deploy <span class="mono">1b545bd</span> · 构建 167s' },
+  ],
+  554: [
+    { v:'main', time:'08-24 10:26', ok:'fail', desc:'构建失败：npm install 超时' },
+  ],
+};
+
+/* 构建日志（thunderbox_query(app_id, build_logs:true) 返回原始日志文本）
+   以下为原型模拟数据；实现版直接渲染 API 返回的日志流                   */
+const BUILD_LOG = {
+  559:[
+    ['dim','→ Cloning repository: https://github.com/wangpengming/court-generator'],
+    ['dim','→ Checking out ref: main (commit 1b545bd)'],
+    ['info','● Building with Docker (Dockerfile found)'],
+    ['ok','  → Pulling base image…'],
+    ['ok','  → Building layers…'],
+    ['ok','  → Build complete in 167s'],
+    ['info','● Creating container on port 8000…'],
+    ['ok','✓ Container created'],
+    ['info','● Waiting for application to become ready…'],
+    ['ok','✓ Health check passed — service is live'],
+  ],
+  554:[
+    ['dim','→ Cloning repository: https://gitee.com/wpmdpzch/court-generator'],
+    ['info','● Using Nixpacks to build…'],
+    ['err','✗ npm install timeout after 300s'],
+    ['warn','! Build failed — previous deployment unchanged'],
+  ],
+};
+
+/* 运行日志（thunderbox_query(app_id, logs:true) 返回实时日志流）
+   以下为原型模拟数据；实现版通过 SSE 流式渲染                        */
+const RUN_LOG = {
+  559:[
+    ['dim','[INFO] uvicorn running on http://0.0.0.0:8000'],
+    ['dim','[INFO] Started server process [312]'],
+    ['ok','[INFO] Application startup complete.'],
+    ['info','[INFO] GET /api/health 200 3ms'],
+  ],
+  554:[['dim','[INFO] (无运行实例 — 服务未启动)']],
+};
+
+/* 数据库模拟（thunderbox_sql / thunderbox_describe_schema 返回真实数据）
+   以下为原型模拟，演示 SQL 工作台 UI；实现版直接渲染 API 返回                */
+const DB_STATE = {
+  559: {
+    tables:[
+      { name:'court_matters', cols:[['id','integer','PK'],['case_no','text',''],['court','text',''],['status','text','']] },
+      { name:'generation_history', cols:[['id','integer','PK'],['case_id','integer','FK'],['output_dir','text',''],['created_at','timestamp','']] },
+    ],
+    migrations:[
+      { name:'001_init', time:'08-20 10:00', state:'已应用' },
+      { name:'002_add_cases', time:'08-21 09:12', state:'已应用' },
+    ],
+  },
+};
+
+/* 审计日志（Thunderbox MCP 无审计查询 API；实现版需后端自行实现 SSE 推送或轮询） */
+const AUDIT = [];
+/* 原模拟数据（已清空）：
+  { time:'今天 10:24', action:'触发部署', app:'legal-court', result:'成功', detail:'main · dockerfile · 167s' }, ... */
+
+/* ============ 工具函数 ============ */
+function appIcoClass(id){ const i = APPS.findIndex(a=>a.id===id); return ['c1','c2','c3','c4'][i%4]||'c1'; }
+function setTheme(mode){
+  /* Thunderbox Console 主题切换
+     三层 Token 架构：仅替换 semantic 层（--bg-* / --text-* / --border-*）
+     切换时 component CSS 代码零改动，仅改 data-theme 属性值  */
+  const html = document.documentElement;
+  if(mode==='system'){
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    html.setAttribute('data-theme', prefersDark?'dark':'light');
+    localStorage.removeItem('tb-theme');
+  } else {
+    html.setAttribute('data-theme', mode);
+    localStorage.setItem('tb-theme', mode);
+  }
+  // 更新按钮激活态
+  ['dark','light','system'].forEach(m=>{
+    const btn = $(`tbtn-${m}`);
+    if(btn) btn.classList.toggle('active', m===mode);
+  });
+}
+// 初始化主题（localStorage > system preference）
+(function initTheme(){
+  const saved = localStorage.getItem('tb-theme');
+  if(saved) { setTheme(saved); return; }
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  setTheme(prefersDark?'dark':'dark'); // 默认深色（与 :root 默认一致）
+})();
+function $(id){ return document.getElementById(id) }
+function esc(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])) }
+function badge(s){ return `<span class="badge ${STATUS_BADGE[s]||'badge-unknown'}"><span class="dot"></span>${STATUS_LABEL[s]||s}</span>` }
+function ico(name){ return name }
+let toastSeq = 0;
+function toast(msg, type='ok'){
+  const icons = { ok:'✅', err:'⛔', warn:'⚠️' };
+  const w = $('toast-wrap'); const t = document.createElement('div');
+  t.className = 'toast '+type; t.innerHTML = `<span class="t-ico">${icons[type]||'ℹ️'}</span><div class="t-msg">${msg}</div>`;
+  w.appendChild(t); setTimeout(()=>{ t.style.opacity='0'; t.style.transition='opacity .3s'; setTimeout(()=>t.remove(),320) }, 3600);
+}
+function confirmBox({title, desc, danger, okText, onOk}){
+  $('cf-title').textContent = title;
+  $('cf-desc').innerHTML = desc;
+  $('cf-ico').innerHTML = danger ? '⚠️' : 'ℹ️';
+  $('cf-ico').className = 'modal-ico ' + (danger ? 'danger' : 'info');
+  const ok = $('cf-ok');
+  ok.textContent = okText || '确认';
+  ok.className = 'btn ' + (danger ? 'btn-danger' : 'btn-primary');
+  ok.onclick = () => { hideConfirm(); onOk && onOk(); };
+  $('confirm-mask').classList.add('show');
+}
+function hideConfirm(){ $('confirm-mask').classList.remove('show') }
+
+/* ============ 视图切换 ============ */
+const VIEWS = ['dashboard','apps','create','success','detail','probe','audit','settings'];
+let curView = 'dashboard';
+let detailId = 559; // 默认打开第一个运行中的应用
+let appFilter = 'all', appViewType = 'grid', appSearch = '';
+let guideDismissed = false;
+
+function go(v, id){
+  if (id) detailId = id;
+  VIEWS.forEach(x => $('view-'+x).classList.toggle('show', x===v));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.nav===v));
+  curView = v;
+  closeCmdk(); // hideNotif(); // 通知面板已移除
+  const g = $('guide-banner');
+  if (g) g.classList.toggle('hidden', !(v==='dashboard' && !guideDismissed));
+  if (v==='dashboard') renderDashboard();
+  if (v==='apps') renderApps();
+  if (v==='templates') return; // 模板库已移除（无 API 支持）
+  if (v==='detail') renderDetail();
+  if (v==='success') renderSuccessPage();
+  if (v==='audit') renderAudit();
+  if (v==='probe') $('probe-result').className = 'probe-result';
+  if (v==='create') renderWizardStep();
+  const contentEl = document.querySelector('.content');
+  if (contentEl) contentEl.scrollTop = 0;
+}
+
+/* ============ 🔗 打开应用（跳转链接核心） ============ */
+function openAppLink(ev, id){
+  if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+  const a = APPS.find(x=>x.id===id); if (!a) return;
+  if (a.status==='running'){
+    window.open('https://'+a.domain, '_blank', 'noopener');
+    toast(`🚀 已在新标签页打开 <b>${a.name}</b>：https://${a.domain}`, 'ok');
+  } else if (a.status==='stopped'){
+    toast(`<b>${a.name}</b> 已停止，先启动才能访问`, 'warn');
+  } else {
+    toast(`<b>${a.name}</b> 正在构建中，稍候即可访问`, 'warn');
+  }
+}
+
+/* ============ 🎉 创建成功页 ============ */
+let lastCreatedApp = null;
+function renderSuccessPage(){
+  const a = lastCreatedApp || APPS[0]; if (!a) return;
+  const url = 'https://'+a.domain;
+  $('success-body').innerHTML = `
+    <button class="btn btn-ghost btn-sm" onclick="go('apps')">← 返回应用列表</button>
+    <div class="success-hero mt20">
+      <div class="s-big">🎉</div>
+      <div>
+        <div style="font-size:19px;font-weight:800">应用「${esc(a.name)}」创建成功！</div>
+        <div style="font-size:13px;color:var(--txt2);margin-top:6px;line-height:1.8">
+          定义已保存，还没有对外服务——点一下「部署」把它变上线，<b>大约 1-3 分钟</b>。<br>
+          部署期间旧版本不存在，属首次上线。
+        </div>
+      </div>
+    </div>
+    <div class="success-url">
+      <span>🔗</span>
+      <a class="url" href="${url}" onclick="openAppLink(event,'${a.id}')">${url}</a>
+      <button class="btn btn-ghost btn-sm" onclick="copyText('${url}')">复制</button>
+    </div>
+    <div class="success-cards">
+      <div class="success-card">
+        <div class="sc-ico">🚀</div>
+        <h4>立即部署上线</h4>
+        <p>从 Git 拉取代码并构建，完成前你可以离开页面，稍后回来自动看到结果。</p>
+        <button class="btn btn-primary btn-sm mt14" onclick="go('detail','${a.id}')">→ 去部署</button>
+      </div>
+      <div class="success-card">
+        <div class="sc-ico">🧰</div>
+        <h4>配置数据库 / 环境变量</h4>
+        <p>向导里选过数据库会自动附加；之后也可在应用详情页随时增删配置。</p>
+        <button class="btn btn-ghost btn-sm mt14" onclick="go('detail','${a.id}')">配置中心</button>
+      </div>
+      <div class="success-card">
+        <div class="sc-ico">🔐</div>
+        <h4>确认谁能访问</h4>
+        <p>当前为「${ACCESS_LABEL[(a.access_mode||'internal')]}」。公开站点注意权限，内部工具推荐公司内部访问。</p>
+        <button class="btn btn-ghost btn-sm mt14" onclick="go('detail','${a.id}')">访问设置</button>
+      </div>
+    </div>
+    <div class="hint mt20" style="font-size:12.5px">💡 提示：创建成功后先部署一次，应用状态才会从「已停止」变为「运行中」。</div>`;
+}
+function copyText(txt){
+  navigator.clipboard?.writeText(txt).then(()=>toast('已复制到剪贴板 📋','ok')).catch(()=>toast('复制失败，请手动选择复制','err'));
+}
+
+/* ============ ⌘K 命令面板 ============ */
+let cmdkItems = [], cmdkSel = 0;
+function openCmdk(){
+  $('cmdk-mask').classList.add('show');
+  const inp = $('cmdk-input'); inp.value = ''; filterCmdk(); inp.focus(); cmdkSel = 0;
+}
+function closeCmdk(){ $('cmdk-mask')?.classList.remove('show') }
+function hideNotif(){ $('notif-mask')?.classList.remove('show') }
+function cmdkRun(v){
+  closeCmdk();
+  if (v.type==='app') go('detail', v.id);
+  else if (v.type==='appOpen') openAppLink(null, v.id);
+  else if (v.type==='page') go(v.page);
+  else if (v.type==='action'){
+    if (v.fn==='create') go('create');
+    if (v.fn==='probe') go('probe');
+    if (v.fn==='readall') { markAllRead(); go('dashboard'); }
+  }
+}
+function filterCmdk(){
+  const q = ($('cmdk-input').value||'').trim().toLowerCase();
+  const apps = APPS.filter(a=>!q || (a.name+a.domain+a.source_url).toLowerCase().includes(q));
+  const pages = [
+    { name:'总览', sub:'Dashboard', ico:'📊', type:'page', page:'dashboard' },
+    { name:'应用列表', sub:'apps', ico:'🗂️', type:'page', page:'apps' },
+    { name:'域名探测', sub:'thunderbox_check', ico:'🔭', type:'page', page:'probe' },
+    { name:'审计日志', sub:'Audit', ico:'📜', type:'page', page:'audit' },
+  ].filter(p=>!q || (p.name+p.sub).toLowerCase().includes(q));
+  const actions = q && ['新建','创建','new'].some(k=>k.includes(q)) ? [ { name:'新建应用', sub:'四步向导', ico:'🚀', type:'action', fn:'create' } ] : [];
+  cmdkItems = [
+    ...apps.map(a=>({ name:a.name, sub:a.domain+' · '+STATUS_LABEL[a.status], ico:a.status==='running'?'🟢':a.status==='build_failed'?'🔴':'🟡', type:'app', id:a.id, go:a.status==='running'?'打开详情':'打开详情' })),
+    ...pages, ...actions,
+  ];
+  cmdkSel = 0;
+  const html = cmdkItems.length===0
+    ? '<div class="empty" style="padding:36px"><div class="e-ico">🔍</div><h3>没有找到「'+esc(q)+'」</h3><p>试试应用名 / 域名 / 页面名</p></div>'
+    : (apps.length? '<div class="cmdk-group">应用</div>' : '')
+      + apps.map((a,i)=>cmdkItemHTML(a,i)).join('')
+      + (pages.length? '<div class="cmdk-group">页面</div>' : '')
+      + pages.map((p,i)=>cmdkItemHTML(p, apps.length+i)).join('')
+      + (actions.length? '<div class="cmdk-group">快捷操作</div>' : '')
+      + actions.map((x,i)=>cmdkItemHTML(x, apps.length+pages.length+i)).join('');
+  $('cmdk-list').innerHTML = html;
+}
+function cmdkItemHTML(it, idx){
+  return `<div class="cmdk-item ${idx===cmdkSel?'sel':''}" data-idx="${idx}" onclick="cmdkSel=${idx};cmdkRun(cmdkItems[${idx}])">
+    <span class="ci-ico">${it.ico}</span>
+    <div><div class="ci-name">${esc(it.name)}</div><div class="ci-sub">${esc(it.sub)}</div></div>
+    <span class="ci-go">↵</span>
+  </div>`;
+}
+function cmdkMove(d){
+  if (!cmdkItems.length) return;
+  cmdkSel = (cmdkSel + d + cmdkItems.length) % cmdkItems.length;
+  document.querySelectorAll('#cmdk-list .cmdk-item').forEach((el,i)=>el.classList.toggle('sel', i===cmdkSel));
+}
+
+/* ============ 🔔 通知中心（Thunderbox MCP 无 webhook 推送机制；实现版需后端 SSE 推送） ============ */
+/* 已禁用：通知按钮和面板已从 DOM 移除，NOTIFS = []
+function toggleNotif(e){ ... }  // 保留签名供未来实现
+*/
+
+/* ============ ① 总览 ============ */
+function renderDashboard(){
+  $('st-total').textContent = APPS.length;
+  $('st-running').textContent = APPS.filter(a=>a.status==='running').length;
+  $('st-building').textContent = APPS.filter(a=>a.status==='building'||a.status==='deploying').length;
+  $('st-failed').textContent = APPS.filter(a=>a.status==='build_failed').length;
+  /* Build Pack 分布（来自 thunderbox_query 返回的 build_pack 字段） */
+  $('bp-dockerfile').textContent = APPS.filter(a=>a.build_pack==='dockerfile').length;
+  $('bp-nixpacks').textContent = APPS.filter(a=>a.build_pack==='nixpacks').length;
+  /* 活动时间线（Thunderbox MCP 无全局部署历史 API；实现版需后端自行聚合 thunderbox_rollback history）
+     以下展示各应用最新回滚记录（从 HIST 数据渲染） */
+  const activities = [];
+  APPS.forEach(a => {
+    const h = HIST[a.id];
+    if (h && h.length) activities.push({ time: h[0].time, action: '最新部署', app: a.name, result: h[0].ok === 'ok' ? '成功' : '失败', detail: h[0].desc });
+  });
+  $('dash-activities').innerHTML = activities.length
+    ? activities.slice(0, 5).map(a => `<div class="act-item"><div class="act-ico ${a.result==='成功'?'ok':'fail'}">${a.result==='成功'?'✓':'✗'}</div><div class="act-body"><div class="act-title">${a.action} <span class="mono">${a.app}</span></div><div class="act-desc">${a.detail}</div></div><div class="act-time">${a.time}</div></div>`).join('')
+    : '<div class="empty" style="padding:28px 0"><div class="e-ico">📭</div><h3>暂无部署记录</h3><p>创建应用后会自动记录时间线</p></div>';
+  /* 状态分布 */
+  const dist = [['running','运行中','#10B981'],['building','构建中','#F59E0B'],['build_failed','失败','#EF4444'],['stopped','已停止','#64748B']];
+  $('dash-dist-bar').innerHTML = dist.filter(d=>APPS.some(a=>a.status===d[0])).map(d=>
+    `<div style="flex:${APPS.filter(a=>a.status===d[0]).length};background:${d[2]}"></div>`).join('') || '<div style="flex:1;background:var(--line)"></div>';
+  const legend = dist.map(d=>{ const n = APPS.filter(a=>a.status===d[0]).length; return n? `<span><span style="display:inline-block;width:9px;height:9px;border-radius:3px;background:${d[2]};margin-right:6px"></span>${d[1]} <b class="mono txt2">${n}</b></span>`:'' }).join('');
+  $('dash-dist-legend').innerHTML = legend;
+}
+
+/* ============ ② 应用列表 ============ */
+function filteredApps(){
+  /* 筛选键 → 状态映射（chip 显示键与真实状态解耦） */
+  const KEY2STATUS = { failed: ['build_failed'] };
+  return APPS.filter(a=>{
+    if (appFilter!=='all') {
+      const match = KEY2STATUS[appFilter] || [appFilter];
+      if (!match.includes(a.status)) return false;
+    }
+    if (appSearch) {
+      const q = appSearch.toLowerCase();
+      if (!(a.name+a.domain+a.source_url).toLowerCase().includes(q)) return false;
+    }
+    return true;
+  });
+}
+function renderApps(){
+  const list = filteredApps();
+  $('app-list').innerHTML = list.length===0
+    ? `<div class="card"><div class="empty"><div class="e-ico">🗂️</div><h3>没有找到符合条件的应用</h3><p>换个关键词或筛选条件试试，或直接新建一个应用</p></div></div>`
+    : (appViewType==='grid' ? appGridHTML(list) : appListHTML(list));
+}
+function appGridHTML(list){
+  return `<div class="app-grid">` + list.map(a=>`
+    <div class="card card-hover app-card">
+      <div class="ac-top">
+        <div class="app-ico ${appIcoClass(a.id)}">${a.name.slice(0,1).toUpperCase()}</div>
+        <div style="min-width:0">
+          <div class="app-name">${esc(a.name)}</div>
+          <div class="app-domain"><a href="https://${a.domain}" target="_blank" onclick="event.stopPropagation()">${a.domain}</a></div>
+        </div>
+        <div style="margin-left:auto">${badge(a.status)}</div>
+      </div>
+      <div class="app-meta">
+        <span class="m">${PACK_LABEL[a.build_pack]||a.build_pack||'—'}</span>
+        <span class="m">${ACCESS_LABEL[(a.access_mode||'internal')]}</span>
+        ${a.source_type==='docker_image'?'<span class="m">🐳 镜像</span>':'<span class="m">📦 Git</span>'}
+      </div>
+      <div class="app-foot">
+        <span class="ago">更新于 ${a.updated_at||'—'}</span>
+        ${a.status==='running' ? `<button class="btn btn-cyan btn-sm" onclick="openAppLink(event,'${a.id}')">↗ 打开</button>` : ''}
+        <button class="btn btn-ghost btn-sm" onclick="openDetail('${a.id}')">详情</button>
+        ${a.status==='stopped' ? `<button class="btn btn-primary btn-sm" onclick="simDeploy('${a.id}',true)">▶ 启动</button>`
+        : a.status==='building' ? `<button class="btn btn-ghost btn-sm" onclick="simCancel('${a.id}')">取消</button>`
+        : a.status==='build_failed' ? `<button class="btn btn-ghost btn-sm" onclick="openDetail('${a.id}')">看日志</button>`
+        : `<button class="btn btn-primary btn-sm" onclick="simDeploy('${a.id}')">部署</button>`}
+      </div>
+    </div>`).join('') + `</div>`;
+}
+function appListHTML(list){
+  return `<div class="card"><table class="tbl">
+    <thead><tr><th>应用</th><th>状态</th><th>构建</th><th>访问</th><th>数据库</th><th>更新时间</th><th></th></tr></thead>
+    <tbody>` + list.map(a=>`
+      <tr style="cursor:pointer" onclick="openDetail('${a.id}')">
+        <td><div style="font-weight:700">${esc(a.name)}</div><div class="mono txt3" style="font-size:11.5px;margin-top:2px"><a class="open-link" href="https://${a.domain}" onclick="openAppLink(event,'${a.id}')" style="font-size:11.5px">${a.domain}</a></div></td>
+        <td>${badge(a.status)}</td>
+        <td class="mono">${PACK_LABEL[a.build_pack]||a.build_pack||'—'}</td>
+        <td>${ACCESS_LABEL[(a.access_mode||'internal')]}</td>
+        <td class="txt3">—</td>
+        <td class="txt3" style="font-size:12px">${a.updated_at||'—'}</td>
+        <td class="tbl-actions" onclick="event.stopPropagation()">
+          ${a.status==='running' ? `<button class="btn btn-cyan btn-sm" onclick="openAppLink(event,'${a.id}')">↗ 打开</button>` : ''}
+          <button class="btn btn-ghost btn-sm" onclick="openDetail('${a.id}')">详情</button>
+          ${a.status==='stopped' ? `<button class="btn btn-primary btn-sm" onclick="simDeploy('${a.id}',true)">▶ 启动</button>` : `<button class="btn btn-primary btn-sm" onclick="simDeploy('${a.id}')">部署</button>`}
+        </td>
+      </tr>`).join('') + `</tbody></table></div>`;
+}
+function openDetail(id){
+  detailId = id;
+  /* 重置 tab 到概览 */
+  document.querySelectorAll('#dt-tabs .tab').forEach(t=>t.classList.toggle('on', t.dataset.t==='overview'));
+  go('detail', id);
+}
+
+/* ============ 模拟部署状态机 ============ */
+let deployTimer = null;
+function simDeploy(id, isStart){
+  const app = APPS.find(a=>a.id===id); if (!app) return;
+  const old = isStart ? 'stopped' : app.status;
+  if (!isStart && (app.status==='building'||app.status==='deploying')) return toast('该应用正在构建中，请稍候', 'warn');
+  if (isStart) toast(`正在启动应用 <b>${app.name}</b>…`);
+  else confirmBox({
+    title:`部署 ${app.name}？`,
+    desc:`将从 <span class="mono">${app.source_url}</span> 拉取最新代码并重新构建。<br>预计用时 1-3 分钟，期间旧版本继续对外服务。`,
+    okText:'开始部署',
+    onOk: ()=>{ startDeployFlow(app); }
+  });
+}
+function startDeployFlow(app){
+  const seq = [ ['building', 2.2, '正在构建…', 20], ['deploying', 2.2, '正在部署…', 55], ['running', 1, '部署成功', 100] ];
+  app.status = 'building';
+  renderAll();
+  toast(`已开始部署 <b>${app.name}</b>，可到详情页查看构建日志`, 'ok');
+  const steps = [...seq]; let i = 0;
+  clearInterval(deployTimer);
+  deployTimer = setInterval(()=>{
+    if (i >= steps.length){ clearInterval(deployTimer); return; }
+    const [st, dur, label, pct] = steps[i];
+    app.status = st;
+    app.updated_at = new Date().toLocaleString('zh-CN');
+    renderAll();
+    i++;
+  }, 2200);
+  /* 3 步走完后进入 running */
+  setTimeout(()=>{ clearInterval(deployTimer); app.status='running'; app.updated_at=new Date().toLocaleString('zh-CN');
+    addAudit('触发部署', app.name, '成功', (app.ref||'main')+' · '+(app.build_pack||'')+' · '+(app.last_build_seconds||'')+'s');
+    NOTIFS.unshift({ id:'n'+Date.now(), cls:'ok', ico:'✅', t:'部署成功', d:`<b>${esc(app.name)}</b> 新版本已上线`, app:app.id, time:'刚刚', read:false });
+    if (NOTIFS.length>6) NOTIFS.pop();
+    renderAll(); toast(`✅ <b>${app.name}</b> 部署成功，<a style="color:#60A5FA;cursor:pointer;text-decoration:underline" onclick="openAppLink(null,'${app.id}')">立即访问 ↗</a>`, 'ok'); }, 6600);
+}
+function simCancel(id){
+  const app = APPS.find(a=>a.id===id);
+  confirmBox({ title:'取消构建？', danger:true, desc:`正在进行的 <b>${app.name}</b> 构建将被终止，应用保持上一个可用版本。`,
+    okText:'取消构建',
+    onOk: ()=>{ app.status = 'cancelled'; app.updated_at=new Date().toLocaleString('zh-CN'); addAudit('启动/停止', app.name, '成功', '取消构建'); renderAll(); toast(`已取消 <b>${app.name}</b> 的构建`, 'warn'); } });
+}
+function simStop(id){
+  const app = APPS.find(a=>a.id===id);
+  confirmBox({ title:'停止应用？', danger:true,
+    desc:`<b>${app.name}</b> 将立即停止对外服务，数据不会丢失，可随时重新启动。<br>地址 <span class="mono">${app.domain}</span> 将暂时无法访问。`,
+    okText:'停止应用',
+    onOk: ()=>{ app.status='stopped'; app.updated_at=new Date().toLocaleString('zh-CN'); addAudit('启动/停止', app.name, '成功', '停止实例'); renderAll(); toast(`<b>${app.name}</b> 已停止`, 'warn'); } });
+}
+function simStart(id){
+  const app = APPS.find(a=>a.id===id);
+  toast(`正在启动 <b>${app.name}</b>…`, 'ok');
+  setTimeout(()=>{ app.status='running'; app.updated_at=new Date().toLocaleString('zh-CN'); addAudit('启动/停止', app.name, '成功', '启动实例'); renderAll(); toast(`<b>${app.name}</b> 已恢复运行 ✅`, 'ok'); }, 900);
+}
+function addAudit(action, app, result, detail){
+  AUDIT.unshift({ time:'刚刚', action, app, result, detail });
+  if (AUDIT.length > 12) AUDIT.pop();
+}
+
+/* ============ ③ 创建向导 ============ */
+const WZ = { step:1, source:'git_repo', url:'', isPrivate:false, token:'', build:'nixpacks', port:'', name:'', subdomain:'', db:'none', access:'internal', envs:[['','']], volumes:[''],
+  /* MCP: thunderbox_create(build_command / install_command / start_command / publish_directory) */
+  build_cmd:'', install_cmd:'', start_cmd:'', publish_dir:''
+};
+const PACKS = [
+  { k:'nixpacks', ico:'🧠', name:'自动识别（推荐）', desc:'系统自动识别你的代码语言（Node/Python/Go 等），自动装依赖并启动，适合大多数后端服务', tags:['Node.js','Python','Go','Rust'] },
+  { k:'dockerfile', ico:'🐳', name:'Dockerfile', desc:'项目自带 Dockerfile，按文件内容构建镜像，适合有容器化经验的团队', tags:['已有 Dockerfile'] },
+  { k:'static', ico:'📄', name:'纯静态站点', desc:'就是一堆 HTML/CSS/JS 文件，不需要任何构建，直接发布', tags:['无需构建'] },
+  { k:'spa', ico:'⚛️', name:'单页应用 SPA', desc:'Vue / React / Vite 等前端框架项目，构建后自动托管产物并支持路由', tags:['Vue','React','Vite'] },
+];
+function renderWizardStep(){
+  const s = WZ.step;
+  document.querySelectorAll('#wz-stepper .step').forEach(el=>{
+    const n = +el.dataset.s;
+    el.classList.toggle('done', n < s);
+    el.classList.toggle('cur', n === s);
+  });
+  $('wz-body').innerHTML = stepHTML(s);
+}
+function stepHTML(s){
+  if (s===1) return `
+    <div class="field"><label>应用代码从哪里来？ <span class="req">*</span></label></div>
+    <div class="row-2">
+      <div class="check-card ${WZ.source==='git_repo'?'sel':''}" onclick="WZ.source='git_repo';renderWizardStep()">
+        <div class="c-ico">📦</div>
+        <div><h4>Git 仓库</h4><p>从代码仓库拉取项目源码（推荐）。支持 GitHub / GitLab / Gitea 等任意 HTTPS 地址。</p><span class="c-tag">git_repo</span></div>
+      </div>
+      <div class="check-card ${WZ.source==='docker_image'?'sel':''}" onclick="WZ.source='docker_image';renderWizardStep()">
+        <div class="c-ico">🐳</div>
+        <div><h4>Docker 镜像</h4><p>直接使用别人构建好的镜像，填镜像名即可，不需要源码。</p><span class="c-tag">docker_image</span></div>
+      </div>
+    </div>
+    <div class="mt20 field">
+      <label>${WZ.source==='git_repo' ? '仓库地址' : '镜像名称'} <span class="req">*</span>
+        <span class="tip" data-tip="${WZ.source==='git_repo'?'HTTPS 格式的 Git 地址，例如 https://git.ktvsky.com/legal/dtp.git（不支持 SSH 格式）。':'镜像全名，例如 registry.tbox.ktvsky.com/report:1.4.2'}">?</span>
+      </label>
+      <input type="text" id="wz-url" placeholder="${WZ.source==='git_repo'?'https://git.ktvsky.com/组织/项目.git':'registry.tbox.ktvsky.com/镜像名:版本'}" value="${esc(WZ.url)}" oninput="WZ.url=this.value">
+    </div>
+    ${WZ.source==='git_repo' ? `
+    <div class="check-card" style="margin-bottom:18px" onclick="WZ.isPrivate=!WZ.isPrivate;renderWizardStep()">
+      <div><h4>🔒 这是一个私有仓库</h4><p>私有仓库需要提供访问令牌，平台用它验证权限并自动配置免密拉取（令牌仅本次使用，不落库）。</p></div>
+      <div class="spacer"></div><div class="js-tag" style="white-space:nowrap">${WZ.isPrivate?'已开启':'未开启'}</div>
+    </div>
+    ${WZ.isPrivate ? `
+    <div class="field"><label>访问令牌（Git Token） <span class="req">*</span></label>
+      <input type="password" id="wz-token" placeholder="粘贴 GitHub PAT（repo 权限）或 GitLab 访问令牌" oninput="WZ.token=this.value">
+      <div class="hint">只用于创建时的快速校验与注册自动拉取密钥，不会保存、不会出现在审计日志中。</div>
+    </div>`:''}`
+    : `<div class="hint" style="margin-bottom:24px">🐳 镜像名可以带版本标签，例如 <span class="mono">nginx:1.27</span>。平台会自动处理镜像拉取与端口映射。</div>`}
+
+    <div class="card mt20" style="border-color:rgba(59,130,246,.35);background:var(--grad-soft)">
+      <div style="padding:16px 18px">
+        <div style="font-size:14px;font-weight:700;margin-bottom:14px">🎯 应用域名 <span class="req">*</span> <span class="tip" data-tip="在 thunderbox 平台下，你的应用会获得「前缀.tbox.ktvsky.com」这样的地址。前缀取 2-20 位小写字母/数字/连字符。">?</span></div>
+        <div class="field" style="margin-bottom:12px">
+          <label style="font-size:12px;font-weight:600;color:var(--txt2)">应用名称（中文也可以）</label>
+          <input type="text" id="wz-name" placeholder="例如：法务小助手 / 案件看板" value="${esc(WZ.name)}"
+            oninput="WZ.name=this.value;WZ.subdomain=WZ.name? pinyinish(WZ.name):'';wzAutoCheck()"
+            style="max-width:360px">
+        </div>
+        <div class="field" style="margin-bottom:0">
+          <label style="font-size:12px;font-weight:600;color:var(--txt2)">子域名前缀 <span class="req">*</span></label>
+          <div class="inp-group" style="flex-wrap:nowrap">
+            <input type="text" id="wz-sub" placeholder="fawu" value="${esc(WZ.subdomain)}"
+              style="max-width:240px;font-family:var(--mono)"
+              oninput="WZ.subdomain=this.value.toLowerCase().replace(/[^a-z0-9-]/g,'');wzAutoCheck()"
+              onblur="wzAutoCheck()">
+            <span class="prefix">.tbox.ktvsky.com</span>
+            <button class="btn btn-ghost btn-sm" id="wz-check-btn" onclick="wzAutoCheck()">🔍 检测</button>
+          </div>
+          <div class="hint" style="margin-top:6px" id="wz-domain-status"></div>
+        </div>
+      </div>
+    </div>
+    <div class="wz-foot">
+      <button class="btn btn-ghost" onclick="go('apps')">取消</button>
+      <button class="btn btn-primary" onclick="wzNext()">下一步：构建配置 →</button>
+    </div>`;
+  if (s===2) {
+    const isNixpacksOrSpa = WZ.build==='nixpacks'||WZ.build==='spa';
+    const isSpa = WZ.build==='spa';
+    const cmdFields = isNixpacksOrSpa ? `
+    <div class="mt20 field"><label>安装命令 <span class="tip" data-tip="覆盖默认的依赖安装命令。nixpacks/spa 默认自动推断，一般不需要改。">?</span></label>
+      <input type="text" id="wz-install-cmd" placeholder="${isSpa?'npm ci':'自动推断（如 pip install -r requirements.txt）'}" value="${esc(WZ.install_cmd)}" oninput="WZ.install_cmd=this.value" style="max-width:480px">
+      <div class="hint">留空使用 nixpacks 默认安装命令</div>
+    </div>
+    <div class="field"><label>构建命令 <span class="tip" data-tip="覆盖默认的构建命令。spa 模式默认是 npm run build，nixpacks 默认自动推断。">?</span></label>
+      <input type="text" id="wz-build-cmd" placeholder="${isSpa?'npm run build':'自动推断'}" value="${esc(WZ.build_cmd)}" oninput="WZ.build_cmd=this.value" style="max-width:480px">
+      <div class="hint">留空使用默认构建命令</div>
+    </div>` : '';
+    const startCmd = WZ.build==='nixpacks' ? `
+    <div class="field"><label>启动命令 <span class="tip" data-tip="nixpacks 自动推断默认启动命令，如需覆盖可以手动指定。">?</span></label>
+      <input type="text" id="wz-start-cmd" placeholder="自动推断（如 node server.js / uvicorn app:app）" value="${esc(WZ.start_cmd)}" oninput="WZ.start_cmd=this.value" style="max-width:480px">
+      <div class="hint">留空使用 nixpacks 默认启动命令</div>
+    </div>` : '';
+    const pubDir = isSpa ? `
+    <div class="field"><label>发布目录 <span class="tip" data-tip="构建产物所在的目录。Vite/Vue 默认 /dist，React CRA 默认 /build，Next.js 默认 /.next。">?</span></label>
+      <input type="text" id="wz-pub-dir" placeholder="/dist" value="${esc(WZ.publish_dir)}" oninput="WZ.publish_dir=this.value" style="max-width:320px">
+      <div class="hint">默认 /dist（如项目用 /build 或 /.next，请填写实际路径）</div>
+    </div>` : '';
+    return `
+    <div class="field"><label>选择构建方式 <span class="req">*</span><span class="tip" data-tip="构建方式（build pack）决定了平台如何把你的代码变成可运行的应用。选错也没关系，大部分项目都能自动识别。">?</span></label></div>
+    <div class="row-2">
+      ${PACKS.map(p=>`
+      <div class="check-card ${WZ.build===p.k?'sel':''}" onclick="WZ.build='${p.k}';WZ.port='';WZ.build_cmd='';WZ.install_cmd='';WZ.start_cmd='';WZ.publish_dir='';renderWizardStep()">
+        <div class="c-ico">${p.ico}</div>
+        <div><h4>${p.name}</h4><p>${p.desc}</p><span class="c-tag">${p.tags.join(' · ')}</span></div>
+      </div>`).join('')}
+    </div>
+    <div class="mt20 field">
+      <label>对外端口 <span class="tip" data-tip="你的应用监听哪个端口？不同框架默认不同：Node(3000) / Python(5000) / Go(8080) / 前端(80)。默认值通常不用改。">?</span></label>
+      <input type="number" id="wz-port" placeholder="${WZ.build==='nixpacks'?'默认自动（按语言）':WZ.build==='dockerfile'?'80':'80'}" value="${WZ.port}" oninput="WZ.port=this.value" style="max-width:220px">
+      <div class="hint">留空则使用该构建方式的默认端口。</div>
+    </div>
+    ${pubDir}
+    ${cmdFields}
+    ${startCmd}
+    <div class="wz-foot">
+      <button class="btn btn-ghost" onclick="WZ.step--;renderWizardStep()">← 上一步</button>
+      <button class="btn btn-primary" onclick="wzNext()">下一步：环境与数据 →</button>
+    </div>`;
+  }
+  if (s===3) return `
+    <div class="field"><label>环境变量 <span class="tip" data-tip="给应用提供的配置项，例如数据库地址、密钥、开关等。应用运行时可以读取它们。">?</span></label></div>
+    <div style="display:flex;flex-direction:column;gap:8px" id="env-rows">
+      ${WZ.envs.map((e,i)=>`
+      <div class="flex">
+        <input type="text" placeholder="变量名（如 LOG_LEVEL）" value="${esc(e[0])}" style="flex:1;font-family:var(--mono)" oninput="WZ.envs[${i}][0]=this.value">
+        <input type="text" placeholder="值" value="${esc(e[1])}" style="flex:2;font-family:var(--mono)" oninput="WZ.envs[${i}][1]=this.value">
+        <button class="btn btn-ghost btn-sm" onclick="WZ.envs.splice(${i},1);renderWizardStep()">🗑</button>
+      </div>`).join('')}
+    </div>
+    <button class="btn btn-ghost btn-sm mt8" onclick="WZ.envs.push(['','']);renderWizardStep()">＋ 添加一行</button>
+
+    <div class="field mt20"><label>附加数据库 <span class="tip" data-tip="可选。Postgres：平台自动创建独立数据库并注入连接信息；SQLite：在应用磁盘上建一个文件库。">?</span></label></div>
+    <div class="row-2">
+      <div class="check-card ${WZ.db==='none'?'sel':''}" onclick="WZ.db='none';renderWizardStep()"><div class="c-ico">🚫</div><div><h4>不需要数据库</h4><p>应用只做展示/静态内容，后面随时可以再加。</p></div></div>
+      <div class="check-card ${WZ.db==='postgres'?'sel':''}" onclick="WZ.db='postgres';renderWizardStep()"><div class="c-ico">🗄️</div><div><h4>PostgreSQL</h4><p>自动建库并注入 <span class="mono">DATABASE_URL</span>，适合正式业务。</p></div></div>
+      <div class="check-card ${WZ.db==='sqlite'?'sel':''}" onclick="WZ.db='sqlite';renderWizardStep()"><div class="c-ico">🗃️</div><div><h4>SQLite</h4><p>轻量文件数据库，应用内 <span class="mono">/data/app.db</span>，零运维。</p></div></div>
+    </div>
+    ${WZ.db==='sqlite' ? `<div class="hint mt8" style="background:rgba(245,158,11,.07);border:1px dashed rgba(245,158,11,.35);border-radius:8px;padding:10px 13px">💡 SQLite 文件存放在应用磁盘上，请同时添加一个卷挂载到 <span class="mono">/data</span>，否则重启后数据会丢失。</div>`:''}
+
+    <div class="field mt20"><label>数据卷 <span class="tip" data-tip="卷用来持久化应用产生的文件（上传、数据库文件等）。格式：源:目标，例如 pgdata:/var/lib/postgresql/data">?</span></label></div>
+    <div style="display:flex;flex-direction:column;gap:8px" id="vol-rows">
+      ${WZ.volumes.map((v,i)=>`
+      <div class="flex">
+        <input type="text" placeholder="具名卷或宿主机路径:容器内路径（如 pgdata:/data）" value="${esc(v)}" style="flex:1;font-family:var(--mono)" oninput="WZ.volumes[${i}]=this.value">
+        <button class="btn btn-ghost btn-sm" onclick="WZ.volumes.splice(${i},1);renderWizardStep()">🗑</button>
+      </div>`).join('')}
+    </div>
+    <button class="btn btn-ghost btn-sm mt8" onclick="WZ.volumes.push('');renderWizardStep()">＋ 添加卷</button>
+
+    <div class="wz-foot">
+      <button class="btn btn-ghost" onclick="WZ.step--;renderWizardStep()">← 上一步</button>
+      <button class="btn btn-primary" onclick="wzNext()">下一步：确认创建 →</button>
+    </div>`;
+  if (s===4) {
+    const sub = WZ.subdomain || '—';
+    const port = WZ.port || (WZ.build==='nixpacks'?'自动':'80');
+    const extras = [WZ.build_cmd?`构建命令: ${WZ.build_cmd}`:'',WZ.install_cmd?`安装命令: ${WZ.install_cmd}`:'',WZ.start_cmd?`启动命令: ${WZ.start_cmd}`:'',WZ.publish_dir?`发布目录: ${WZ.publish_dir}`:''].filter(Boolean);
+    const extrasHtml = extras.length ? `<div style="font-size:11.5px;background:rgba(59,130,246,.07);border:1px dashed rgba(59,130,246,.3);border-radius:7px;padding:8px 12px;margin-top:8px;color:var(--txt2)">${extras.map(e=>`<div>${esc(e)}</div>`).join('')}</div>` : '';
+    return `
+    <div class="card mt20" style="background:var(--bg-surface2);border:1px solid var(--border)">
+      <div style="padding:15px 18px">
+        <div style="font-size:14px;font-weight:700;margin-bottom:11px">📋 确认以下信息后创建</div>
+        <div style="font-size:13px;line-height:2.1;color:var(--txt2)">
+          应用：<b class="txt">${esc(WZ.name)||'（未填）'}</b> · 地址：<span class="mono" style="color:var(--accent2)">${esc(sub)}.tbox.ktvsky.com</span><br>
+          来源：<b class="txt">${WZ.source==='git_repo'?'📦 Git 仓库':'🐳 Docker 镜像'}</b> <span class="mono txt3">${WZ.url||'（待填）'}</span><br>
+          构建：<b class="txt">${PACKS.find(p=>p.k===WZ.build)?.name}</b> · 端口 <span class="mono">${port}</span><br>
+          数据库：<b class="txt">${WZ.db==='none'?'无':WZ.db==='postgres'?'PostgreSQL（自动创建）':'SQLite'}</b> · 卷：<span class="mono">${WZ.volumes.filter(Boolean).length} 个</span>
+        </div>
+        ${extrasHtml}
+      </div>
+    </div>
+    <div class="field mt20"><label>谁能访问？ <span class="req">*</span></label></div>
+    <div class="row-2">
+      <div class="check-card ${WZ.access==='public'?'sel':''}" onclick="WZ.access='public';renderWizardStep()">
+        <div class="c-ico">🌐</div><div><h4>公开（所有人可见）</h4><p>任何能上网的人都能打开，无需登录。适合对外页面。</p><span class="c-tag" style="color:var(--amber);border-color:rgba(245,158,11,.35);background:rgba(245,158,11,.1)">⚠ 谨慎选择</span></div>
+      </div>
+      <div class="check-card ${WZ.access==='internal'?'sel':''}" onclick="WZ.access='internal';renderWizardStep()">
+        <div class="c-ico">🏢</div><div><h4>公司内部（推荐）</h4><p>需要公司账号登录后才能访问，适合内部工具。</p><span class="c-tag">internal</span></div>
+      </div>
+      <div class="check-card ${WZ.access==='restricted'?'sel':''}" onclick="WZ.access='restricted';renderWizardStep()">
+        <div class="c-ico">📧</div><div><h4>指定邮箱白名单</h4><p>只有白名单里的邮箱能访问，适合定向分享。</p><span class="c-tag">restricted</span></div>
+      </div>
+    </div>
+    ${WZ.access==='restricted' ? `
+    <div class="field mt14"><label>允许访问的邮箱（逗号分隔）</label>
+      <input type="text" placeholder="zhangyang@cienet.com.cn, liwei@cienet.com.cn" value="" id="wz-mails" oninput="WZ.mails=this.value">
+    </div>`:''}
+    <div class="wz-foot">
+      <button class="btn btn-ghost" onclick="WZ.step--;renderWizardStep()">← 上一步</button>
+      <button class="btn btn-primary btn-lg" id="wz-create-btn" onclick="wzCreate()">⚡ 创建应用</button>
+    </div>`;
+  }
+}
+function wzAutoCheck(){
+  const sub = (WZ.subdomain||'').trim();
+  const statusEl = $('wz-domain-status');
+  const btn = $('wz-check-btn');
+  if (!statusEl) return;
+  if (!sub){
+    statusEl.innerHTML = '<span style="font-size:12px">请输入子域名前缀（2-20 位小写字母/数字/连字符）</span>';
+    return;
+  }
+  if (sub.length < 2){
+    statusEl.innerHTML = '<span style="font-size:12px;color:var(--amber)">⚠ 前缀太短，至少 2 位</span>';
+    return;
+  }
+  if (btn){ btn.textContent = '⟳ 检测中…'; btn.disabled = true; }
+  statusEl.innerHTML = '<span class="spin" style="font-size:12px">⏳</span> 正在检测…';
+  setTimeout(()=>{
+    const taken = APPS.some(a=>a.domain === sub+'.tbox.ktvsky.com');
+    const btn = $('wz-check-btn');
+    if (btn){ btn.textContent = '🔍 检测'; btn.disabled = false; }
+    if (taken){
+      statusEl.innerHTML = '<span style="font-size:12px;color:#F87171">⛔ 已占用：</span><span class="mono" style="font-size:12px;color:#F87171">'+esc(sub)+'.tbox.ktvsky.com</span> <span style="font-size:11px;color:var(--txt3)">换一个试试？建议加后缀：</span><span class="mono" style="font-size:11px;color:var(--blue2)">'+esc(sub)+'2 / '+esc(sub)+'-v2 / '+esc(sub)+'-test</span>';
+    } else {
+      statusEl.innerHTML = '<span style="font-size:12px;color:#34D399">✅ 可用：</span><span class="mono" style="font-size:12px;color:#34D399">'+esc(sub)+'.tbox.ktvsky.com</span>';
+    }
+  }, 600);
+}
+
+function pinyinish(name){ return name.replace(/[^\w\u4e00-\u9fa5]/g,'').slice(0,4) || '' }
+function wzNext(){
+  if (WZ.step===1) {
+    if (!WZ.url.trim()) return toast('请先填写来源地址', 'err');
+    if (WZ.source==='git_repo' && WZ.isPrivate && !WZ.token.trim()) return toast('私有仓库需要填写访问令牌', 'err');
+    if (!WZ.subdomain.trim()) return toast('请先填写子域名前缀（第 1 步下方）', 'err');
+    if (WZ.subdomain.length < 2) return toast('子域名前缀至少 2 位', 'err');
+    const taken = APPS.some(a=>a.domain === WZ.subdomain.trim()+'.tbox.ktvsky.com');
+    if (taken) return toast('该域名已被占用，请换一个前缀', 'err');
+  }
+  if (WZ.step < 4) { WZ.step++; renderWizardStep(); }
+}
+function wzCreate(){
+  if (!WZ.name.trim() || !WZ.subdomain.trim()) return toast('请填写应用名称与访问地址', 'err');
+  const app = {
+    id: Date.now(), app_id: 'sim_'+Date.now(),
+    name: WZ.name, domain: WZ.subdomain+'.tbox.ktvsky.com', status: 'stopped',
+    source_type: WZ.source, source_url: WZ.url,
+    ref: 'main', access_mode: WZ.access,
+    build_pack: WZ.build, last_build_seconds: null,
+    created_at: new Date().toLocaleString('zh-CN'), updated_at: new Date().toLocaleString('zh-CN'),
+    volumes: WZ.volumes.filter(Boolean).map(v=>{
+      const [src, tgt] = v.split(':');
+      return src && tgt ? { source: src.trim(), target: tgt.trim() } : null;
+    }).filter(Boolean) || null,
+    database: WZ.db!=='none' ? { type: WZ.db } : null,
+    managers: [], allowed_emails: [],
+    env: [], /* MCP: thunderbox_config(env_vars) */
+  };
+  APPS.unshift(app);
+  const extras = [WZ.build_cmd?'构建:'+WZ.build_cmd:'',WZ.install_cmd?'安装:'+WZ.install_cmd:'',WZ.start_cmd?'启动:'+WZ.start_cmd:'',WZ.publish_dir?'目录:'+WZ.publish_dir:''].filter(Boolean).join(' · ');
+  addAudit('创建应用', app.name, '成功', WZ.source_type+' · '+WZ.build + (extras?' · '+extras:''));
+  lastCreatedApp = app;
+  toast(`🎉 应用 <b>${app.name}</b> 创建成功，接下来把它部署上线！`);
+  WZ.step=1; WZ.url=''; WZ.name=''; WZ.subdomain=''; WZ.envs=[['','']]; WZ.volumes=['']; WZ.mails='';
+  WZ.build_cmd=''; WZ.install_cmd=''; WZ.start_cmd=''; WZ.publish_dir='';
+  go('success');
+}/* ============ ④ 应用详情 ============ */
+let dtTab = 'overview';
+function renderDetail(){
+  const a = APPS.find(x=>x.id===detailId); if (!a) return;
+  const isBusy = a.status==='building'||a.status==='deploying';
+  const openBtn = a.status==='running' ? `<button class="btn btn-cyan" onclick="openAppLink(event,'${a.id}')">↗ 打开应用</button>` : '';
+  const actions = `${openBtn} ` + (isBusy
+    ? `<button class="btn btn-ghost" onclick="simCancel('${a.id}')">✕ 取消构建</button>`
+    : a.status==='build_failed'
+      ? `<button class="btn btn-primary" onclick="startDeployFlow(APPS.find(x=>x.id==='${a.id}'))">⟳ 重新部署</button>`
+      : a.status==='stopped'
+        ? `<button class="btn btn-primary" onclick="simStart('${a.id}')">▶ 启动</button>
+           <button class="btn btn-ghost" onclick="simDeploy('${a.id}')">部署新版本</button>`
+        : `<button class="btn btn-primary" onclick="simDeploy('${a.id}')">🚀 部署</button>
+           <button class="btn btn-ghost" onclick="simStop('${a.id}')">⏹ 停止</button>
+           <button class="btn btn-ghost" onclick="rollbackFlow('${a.id}')">↩ 回滚</button>`);
+  $('dt-head').innerHTML = `
+    <div>
+      <div class="flex" style="gap:13px">
+        <h1 class="page-title" style="font-size:24px">${esc(a.name)}</h1> ${badge(a.status)}
+        <span class="badge badge-access">${ACCESS_LABEL[(a.access_mode||'internal')]}</span>
+      </div>
+      <div class="mt8" style="font-size:13px;color:var(--txt2)">
+        <a class="open-link" href="https://${a.domain}" style="font-size:13px" onclick="openAppLink(event,'${a.id}')">https://${a.domain} ↗</a>
+        <span class="txt3" style="margin:0 8px">·</span>${a.source_type==='git_repo'?'Git':'镜像'}：<span class="mono">${esc(a.source_url)}</span>
+        ${a.ref?` <span class="badge badge-access">${a.ref}</span>`:''}
+      </div>
+    </div>
+    <div class="detail-actions">${actions}</div>`;
+  $('dt-body').innerHTML = dtTab==='logs' ? renderLogs(a) : dtTab==='config' ? renderConfig(a) : dtTab==='database' ? renderDb(a) : renderOverview(a);
+}
+function renderOverview(a){
+  /* 容错：API 返回可能缺字段 */
+  a.volumes = a.volumes || [];
+  /* liveCells 数据来源：thunderbox_query(app_id, health:true) → {healthy, http_status, response_time_ms}
+     以下为原型模拟数据（实现版直接渲染 API 返回值）；内存占用/运行时长 API 无此字段，已移除  */
+  const hist = HIST[a.id] || [];
+  const liveCells = a.status==='running'
+    ? [
+        [ '💚', '健康状态', '正常', 'green' ],
+        [ '🌐', 'HTTP 状态', '200 OK', 'green' ],
+        [ '⏱', '响应时间', '165ms', '' ],
+        [ '📌', '当前版本', hist[0]?.v || '—', '' ],
+      ]
+    : a.status==='build_failed'
+      ? [[ '⛔', '健康状态', '构建失败', 'red' ], [ '💡', '处理建议', '查看构建日志', 'amber' ]]
+      : a.status==='stopped'
+        ? [[ '💤', '运行状态', '已停止', '' ], ...(hist[0]?[[ '📌', '上次版本', hist[0].v, '' ]]:[])]
+        : [[ '⟳', '运行状态', '构建中…', 'amber' ]];
+  return `
+  <div class="live-strip">
+    ${liveCells.map(c=>`
+    <div class="live-cell">
+      <div class="lc-ico">${c[0]}</div>
+      <div><div class="lc-k">${c[1]}</div><div class="lc-v ${c[3]||''}">${c[2]}</div></div>
+    </div>`).join('')}
+    ${a.status==='running'?`<div class="live-cell" style="cursor:pointer" onclick="setDtTab('logs')"><div class="lc-ico">📜</div><div><div class="lc-k">运行日志</div><div class="lc-v green">查看 →</div></div></div>`:''}
+  </div>
+  <div class="info-grid">
+    <div class="info-cell"><div class="k">构建方式</div><div class="v plain">${PACK_LABEL[a.build_pack]||a.build_pack||'—'}</div></div>
+    <div class="info-cell"><div class="k">分支</div><div class="v plain"><span class="badge badge-access">${esc(a.ref||'—')}</span></div></div>
+    <div class="info-cell"><div class="k">访问模式</div><div class="v plain">${ACCESS_LABEL[(a.access_mode||'internal')]}</div></div>
+    <div class="info-cell"><div class="k">数据库</div><div class="v plain">${a.database ? (a.database.type==='postgres'?'🗄️ PostgreSQL':'🗃️ SQLite'):'<span class="txt3">无</span>'}</div></div>
+    <div class="info-cell"><div class="k">数据卷</div><div class="v" style="font-size:12px">${a.volumes&&a.volumes.length? a.volumes.map(v=>`${v.source} → ${v.target}`).join('<br>'):'<span class="txt3">无</span>'}</div></div>
+    <div class="info-cell"><div class="k">创建时间</div><div class="v plain" style="font-size:12.5px">${a.created_at||'—'}</div></div>
+    <div class="info-cell"><div class="k">最近构建</div><div class="v plain">${a.last_build_seconds ? a.last_build_seconds+'s' : '<span class="txt3">—</span>'}</div></div>
+    <div class="info-cell"><div class="k">来源</div><div class="v plain" style="font-size:12px;word-break:break-all">${esc(a.source_url)}</div></div>
+  </div>
+  ${a.status==='building'||a.status==='deploying' ? `
+  <div class="card mt20" style="padding:20px">
+    <div class="flex">
+      <div><div style="font-weight:700">正在部署…</div>
+      <div style="font-size:12.5px;color:var(--txt3);margin-top:4px">${a.status==='building'?'构建代码并准备运行环境':'正在启动新容器，马上就好'}</div></div>
+      <div class="spacer"></div><span class="badge badge-building"><span class="dot"></span>${STATUS_LABEL[a.status]}</span>
+    </div>
+    <div class="progress mt14"><div class="bar" style="width:${a.status==='building'?'38':'68'}%"></div></div>
+    <div class="hint mt8" style="color:var(--txt3);font-size:12px">⏱ 预计剩余 ${a.status==='building'?'40':'15'} 秒 · 构建完成后自动刷新页面状态</div>
+  </div>`:''}
+  ${a.status==='build_failed' ? `
+  <div class="card mt20" style="padding:20px;border-color:rgba(239,68,68,.35)">
+    <div class="flex">
+      <div><div style="font-weight:700;color:#F87171">构建失败，应用未变更</div>
+      <div style="font-size:12.5px;color:var(--txt3);margin-top:4px">上一个可用版本仍在线上服务，点击「查看构建日志」定位问题。</div></div>
+      <div class="spacer"></div>
+      <button class="btn btn-primary btn-sm" onclick="setDtTab('logs')">📄 查看构建日志</button>
+    </div>
+  </div>`:''}
+  <div class="card mt20">
+    <div class="flex" style="padding:17px 20px 6px">
+      <div><div style="font-size:15px;font-weight:700">部署历史</div>
+      <div style="font-size:12px;color:var(--txt3);margin-top:3px">每一次发布的版本记录，可一键回滚到任意历史版本（不影响数据）</div></div>
+      <div class="spacer"></div>
+      <button class="btn btn-ghost btn-sm" onclick="rollbackFlow('${a.id}')">↩ 回滚到此前的版本</button>
+    </div>
+    <div style="padding:14px 20px 20px">
+      <div class="timeline">
+        ${hist.map((h,i)=>`
+        <div class="tl-item ${h.ok==='ok'?'ok':h.ok==='fail'?'fail':''}">
+          <div class="tl-top">
+            <span class="tl-title">${esc(h.v)}</span>
+            ${h.ok==='ok'?'<span class="badge badge-running"><span class="dot"></span>成功</span>':h.ok==='fail'?'<span class="badge badge-failed"><span class="dot"></span>失败</span>':'<span class="badge badge-building"><span class="dot"></span>进行中</span>'}
+            <span class="tl-time">${h.time}</span>
+          </div>
+          <div class="tl-desc">${h.desc}</div>
+          ${i===0 && h.ok==='ok' ? `<div class="tl-act"><button class="btn btn-ghost btn-sm" onclick="rollbackFlow('${a.id}')">↩ 回滚到该版本</button></div>`:''}
+        </div>`).join('')}
+      </div>
+    </div>
+  </div>`;
+}
+function rollbackFlow(id){
+  const a = APPS.find(x=>x.id===id);
+  const hist = HIST[a.id] || HIST.a1;
+  confirmBox({
+    title:`回滚 ${a.name}？`,
+    danger:true,
+    desc:`将回滚到 <b>${hist[1] ? hist[1].v : '上一个版本'}</b>（${hist[1]?hist[1].time:''}）。<br>回滚只改变代码版本，<b>不会动数据库和卷里的数据</b>，可随时再次回滚。`,
+    okText:'确认回滚',
+    onOk: ()=>{
+      const prev = hist[1] || hist[0];
+      a.status = 'deploying';
+      renderAll();
+      toast(`正在回滚 <b>${a.name}</b> 到 ${prev.v}…`, 'warn');
+      setTimeout(()=>{ a.status='running'; a.updated_at=new Date().toLocaleString('zh-CN'); addAudit('回滚', a.name, '成功', prev.v); renderAll(); toast(`✅ <b>${a.name}</b> 已回滚到 ${prev.v}`, 'ok'); }, 2200);
+    }
+  });
+}
+function setDtTab(t){
+  dtTab = t;
+  document.querySelectorAll('#dt-tabs .tab').forEach(x=>x.classList.toggle('on', x.dataset.t===t));
+  renderDetail();
+}
+
+/* ---------- 日志 Tab ---------- */
+let logType = 'build';
+function renderLogs(a){
+  const lines = logType==='build' ? (BUILD_LOG[a.id]||BUILD_LOG.a3) : (RUN_LOG[a.id]||RUN_LOG.a1);
+  const buildHint = a.status==='build_failed'
+    ? '<div class="hint mb8" style="color:#FCA5A5">⚠ 构建日志显示失败原因：请检查镜像名是否存在 / Git 分支是否正确 / 构建命令是否成功。</div>' : '';
+  return `
+  <div class="flex">
+    <div class="mode-switch">
+      <button class="log-switch ${logType==='build'?'on-ro':''}" style="${logType==='build'?'color:#34D399;background:rgba(16,185,129,.12)':''}" onclick="logType='build';renderDetail()">🔨 构建日志</button>
+      <button class="log-switch ${logType==='run'?'on-ro':''}" style="${logType==='run'?'color:#34D399;background:rgba(16,185,129,.12)':''}" onclick="logType='run';renderDetail()">▶ 运行日志</button>
+    </div>
+    <div class="spacer"></div>
+    <button class="btn btn-ghost btn-sm" onclick="toast('日志已加载最新内容','ok')">⟳ 刷新</button>
+    <button class="btn btn-ghost btn-sm" onclick="copyLogText('${a.id}')">复制</button>
+  </div>
+  ${buildHint}
+  <div class="terminal mt14">
+    <div class="term-head">
+      <span class="tcircle"></span><span class="tcircle"></span><span class="tcircle"></span>
+      <span class="t-title">${a.name} · ${logType==='build'?'构建日志':'运行日志'} · 滚动查看</span>
+      <div class="t-actions">
+        <button class="btn btn-ghost btn-sm" onclick="toast('已复制日志','ok')">复制</button>
+      </div>
+    </div>
+    <div class="term-body">
+      <pre>${lines.map(l=>`<span class="ln ${l[0]}"><span class="ts">[${new Date().toLocaleTimeString('zh-CN',{hour12:false})}]</span>${esc(l[1])}</span>`).join('')}<span class="ln cursor"></span></pre>
+    </div>
+  </div>
+  <div class="hint mt8" style="font-size:12px">💡 部署中日志自动滚动刷新；失败时优先查看构建日志定位原因。</div>`;
+}
+
+/* ---------- 配置 Tab（thunderbox_config MCP 驱动）---------- */
+/* renderConfig 覆盖：
+   环境变量（env_vars / remove_env）  ← 已有
+   访问控制（access_mode / add_emails / remove_emails） ← P0 新增
+   应用管理者（manager_action / manager_email）         ← P0 新增
+   数据卷（volumes）                                    ← 已有
+*/
+function renderConfig(a){
+  /* 容错：API 返回可能缺字段 */
+  a.env = a.env || [];
+  a.volumes = a.volumes || [];
+  a.managers = a.managers || [];
+  a.allowed_emails = a.allowed_emails || [];
+  const am = a.access_mode || 'internal';
+  const rows = a.env.map((e,i)=>`
+    <tr>
+      <td class="mono" style="font-weight:600">${esc(e[0])}</td>
+      <td class="mono txt3">${esc(e[1])}</td>
+      <td style="width:80px" class="tbl-actions"><button class="btn btn-ghost btn-sm" onclick="rmEnv('${a.id}',${i})">🗑</button></td>
+    </tr>`).join('') || `<tr><td colspan="3" class="txt3" style="text-align:center;padding:22px">还没有环境变量</td></tr>`;
+
+  /* 邮箱白名单（restricted 模式；MCP: thunderbox_config(add_emails / remove_emails)） */
+  const emailList = (a.allowed_emails||[]).map(em=>`
+    <div class="flex" style="gap:6px;align-items:center">
+      <span class="mono txt2" style="flex:1;background:var(--bg2);border:1px solid var(--border);padding:5px 10px;border-radius:6px;font-size:12px">${esc(em)}</span>
+      <button class="btn btn-ghost btn-sm" onclick="removeEmail('${a.id}','${esc(em)}')">✕</button>
+    </div>`).join('') || '<span class="txt3" style="font-size:12.5px">暂无白名单邮箱</span>';
+  const emailPanel = am==='restricted' ? `
+    <div class="card mt14" style="padding:16px 18px">
+      <div style="font-size:13px;font-weight:700;margin-bottom:10px">📧 邮箱白名单 <span class="js-tag">MCP: thunderbox_config</span></div>
+      <div style="font-size:12px;color:var(--txt3);margin-bottom:10px">restricted 模式下，只有以下邮箱可以访问此应用</div>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px" id="email-list-${a.id}">${emailList}</div>
+      <div class="flex" style="gap:6px">
+        <input type="email" id="new-email-${a.id}" placeholder="输入邮箱地址" style="flex:1;font-family:var(--mono);font-size:12px;background:var(--bg2);border:1px solid var(--border);border-radius:7px;padding:6px 10px;color:var(--text)">
+        <button class="btn btn-primary btn-sm" onclick="addEmail('${a.id}')">＋ 添加</button>
+      </div>
+      <div class="hint mt6" style="font-size:11.5px">添加后自动生效，无需重新部署</div>
+    </div>` : '';
+
+  /* 应用管理者（MCP: thunderbox_config(manager_action:add/remove, manager_email)） */
+  const mgrList = (a.managers||[]).map(em=>`
+    <div class="flex" style="gap:6px;align-items:center">
+      <span class="mono txt2" style="flex:1;background:var(--bg2);border:1px solid var(--border);padding:5px 10px;border-radius:6px;font-size:12px">${esc(em)}</span>
+      <button class="btn btn-ghost btn-sm" onclick="removeMgr('${a.id}','${esc(em)}')">✕</button>
+    </div>`).join('') || '<span class="txt3" style="font-size:12.5px">暂无协作者</span>';
+
+  return `
+  <div class="row-2" style="align-items:start">
+    <div style="display:flex;flex-direction:column;gap:16px">
+      <div class="card">
+        <div class="flex" style="padding:16px 18px 0">
+          <div><div style="font-size:15px;font-weight:700">环境变量</div>
+          <div style="font-size:12px;color:var(--txt3);margin-top:3px">修改后需要重新部署才会生效 <span class="js-tag">thunderbox_config</span></div></div>
+          <div class="spacer"></div>
+          <button class="btn btn-ghost btn-sm" onclick="addEnv('${a.id}')">＋ 添加</button>
+          <button class="btn btn-primary btn-sm" onclick="saveEnv('${a.id}')">保存</button>
+        </div>
+        <table class="tbl mt14">
+          <thead><tr><th>变量名</th><th>值</th><th></th></tr></thead>
+          <tbody id="env-tbody">${rows}</tbody>
+        </table>
+        <div id="env-new-rows"></div>
+      </div>
+      <!-- 邮箱白名单（restricted 模式） -->
+      ${emailPanel}
+    </div>
+    <div style="display:flex;flex-direction:column;gap:16px">
+      <div class="card" style="padding:18px">
+        <div style="font-size:15px;font-weight:700">访问控制 <span class="js-tag">thunderbox_config</span></div>
+        <div style="display:flex;flex-direction:column;gap:9px;margin-top:13px">
+          ${[['public','🌐 公开','互联网所有人可访问'],['internal','🏢 公司内部','公司账号登录后可访问'],['restricted','📧 白名单','仅指定邮箱可访问']].map(([k,lab,desc])=>`
+          <label class="check-card" style="padding:12px 14px;${am===k?'sel':''}">
+            <input type="radio" name="access" value="${k}" style="width:auto;margin-top:2px;accent-color:#3B82F6" ${am===k?'checked':''}>
+            <div><div style="font-weight:700;font-size:13.5px">${lab}</div><div style="font-size:11.5px;color:var(--txt3);margin-top:2px">${desc}</div></div>
+          </label>`).join('')}
+        </div>
+        <button class="btn btn-primary btn-sm mt8" onclick="saveAccess('${a.id}')">💾 保存访问设置</button>
+        <div class="hint mt6" style="font-size:11.5px">切换为 restricted 后，请到上方「邮箱白名单」添加允许访问的邮箱</div>
+      </div>
+      <div class="card" style="padding:18px">
+        <div style="font-size:15px;font-weight:700">应用管理者 <span class="js-tag">thunderbox_config</span></div>
+        <div style="font-size:12px;color:var(--txt3);margin-top:5px;line-height:1.6">协作者可帮助运维此应用，拥有与所有者同等的部署/配置权限。调用 <span class="mono" style="font-size:11px">thunderbox_config(manager_action, manager_email)</span></div>
+        <div style="display:flex;flex-direction:column;gap:6px;margin-top:12px" id="mgr-list-${a.id}">${mgrList}</div>
+        <div class="flex mt10" style="gap:6px">
+          <input type="email" id="new-mgr-${a.id}" placeholder="协作者邮箱地址" style="flex:1;font-family:var(--mono);font-size:12px;background:var(--bg2);border:1px solid var(--border);border-radius:7px;padding:6px 10px;color:var(--text)">
+          <button class="btn btn-primary btn-sm" onclick="addMgr('${a.id}')">＋ 添加</button>
+        </div>
+        <div class="hint mt6" style="font-size:11.5px">所有者（${esc(a.owner_email||'')}) 不可移除</div>
+      </div>
+      <div class="card" style="padding:18px">
+        <div style="font-size:15px;font-weight:700;display:flex;align-items:center;gap:7px">数据卷 <span class="js-tag">⚠ 替换式</span></div>
+        <div style="font-size:12px;color:var(--txt3);margin-top:5px;line-height:1.7">当前 ${a.volumes.length} 个卷。修改将以「替换」方式生效，<b style="color:var(--amber)">可能影响已有数据</b>，请谨慎。</div>
+        <div class="mt14" style="display:flex;flex-direction:column;gap:7px">
+          ${a.volumes.map((v,i)=>`<div class="flex"><span class="mono txt2" style="flex:1;background:var(--bg2);border:1px solid var(--border);padding:8px 11px;border-radius:7px;font-size:12.5px">${esc(v.source||v)}</span></div>`).join('')||'<span class="txt3" style="font-size:12.5px">无数据卷</span>'}
+        </div>
+        <button class="btn btn-ghost btn-sm mt14" onclick="confirmBox({title:'卷修改为破坏性操作',danger:true,desc:'替换卷会<b>断开旧卷的挂载</b>，旧卷数据可能不可见。确认继续？',okText:'我了解，继续',onOk:()=>toast('已进入卷编辑模式（原型演示）','ok')})">修改卷</button>
+      </div>
+    </div>
+  </div>`;
+}
+function addEnv(id){
+  $('env-new-rows').insertAdjacentHTML('beforeend', `
+    <div class="flex" style="padding:10px 14px;border-top:1px solid var(--border)">
+      <input type="text" placeholder="新变量名" style="flex:1;font-family:var(--mono)" class="new-env-k">
+      <input type="text" placeholder="值" style="flex:2;font-family:var(--mono)" class="new-env-v">
+      <button class="btn btn-ghost btn-sm" onclick="this.parentElement.remove()">🗑</button>
+    </div>`);
+}
+function saveEnv(id){
+  const a = APPS.find(x=>x.id===id);
+  document.querySelectorAll('.new-env-k').forEach((k,i)=>{
+    const v = document.querySelectorAll('.new-env-v')[i];
+    if (k.value.trim()) a.env.push([k.value.trim(), v.value]);
+  });
+  document.querySelectorAll('.new-env-k, .new-env-v').forEach(x=>x.remove());
+  addAudit('修改配置', a.name, '成功', '更新环境变量');
+  renderDetail(); toast(`已保存环境变量（重新部署后生效）`, 'ok');
+}
+function rmEnv(id, i){
+  const a = APPS.find(x=>x.id===id);
+  a.env.splice(i,1);
+  addAudit('修改配置', a.name, '成功', '删除环境变量 '+ (a.env[i]?.[0]||''));
+  renderDetail();
+}
+function addEmail(id){
+  const a = APPS.find(x=>x.id===id);
+  const inp = $('new-email-'+id);
+  if (!inp || !inp.value.trim()) return toast('请输入邮箱地址', 'err');
+  const em = inp.value.trim();
+  if ((a.allowed_emails||[]).includes(em)) return toast('该邮箱已在白名单中', 'warn');
+  if (!a.allowed_emails) a.allowed_emails = [];
+  a.allowed_emails.push(em);
+  inp.value = '';
+  addAudit('修改配置', a.name, '成功', '添加邮箱白名单：'+em);
+  renderDetail(); toast(`已添加 ${em} 到白名单（thunderbox_config MCP）`, 'ok');
+}
+function removeEmail(id, em){
+  const a = APPS.find(x=>x.id===id);
+  if (em === a.owner_email) return toast('所有者邮箱不可移除', 'warn');
+  a.allowed_emails = (a.allowed_emails||[]).filter(e=>e!==em);
+  addAudit('修改配置', a.name, '成功', '移除邮箱白名单：'+em);
+  renderDetail(); toast(`已从白名单移除 ${em}`, 'ok');
+}
+function addMgr(id){
+  const a = APPS.find(x=>x.id===id);
+  const inp = $('new-mgr-'+id);
+  if (!inp || !inp.value.trim()) return toast('请输入邮箱地址', 'err');
+  const em = inp.value.trim();
+  if ((a.managers||[]).includes(em)) return toast('该邮箱已是协作者', 'warn');
+  if (em === a.owner_email) return toast('所有者已是协作者，无需重复添加', 'warn');
+  if (!a.managers) a.managers = [];
+  a.managers.push(em);
+  inp.value = '';
+  addAudit('修改配置', a.name, '成功', '添加应用管理者：'+em);
+  renderDetail(); toast(`已添加 ${em} 为应用管理者（thunderbox_config MCP）`, 'ok');
+}
+function removeMgr(id, em){
+  const a = APPS.find(x=>x.id===id);
+  if (em === a.owner_email) return toast('所有者不可移除', 'warn');
+  a.managers = (a.managers||[]).filter(e=>e!==em);
+  addAudit('修改配置', a.name, '成功', '移除应用管理者：'+em);
+  renderDetail(); toast(`已移除应用管理者 ${em}`, 'ok');
+}
+function saveAccess(id){
+  const a = APPS.find(x=>x.id===id);
+  const sel = document.querySelector('input[name="access"]:checked');
+  if (!sel) return;
+  const newMode = sel.value;
+  const wasMode = a.access_mode||'internal';
+  a.access_mode = newMode;
+  const changed = wasMode !== newMode;
+  const detail = changed ? `访问模式 → ${ACCESS_LABEL[newMode]||newMode}` : '访问设置';
+  if (newMode==='public') toast('⚠️ 已切换为公开模式：应用将对互联网所有人可见','warn');
+  addAudit('修改配置', a.name, '成功', detail);
+  renderDetail(); toast('访问设置已保存 ✅', 'ok');
+}
+
+/* ---------- 数据库 Tab ---------- */
+let sqlMode = 'ro';
+let sqlResult = null;
+let sqlDraft = 'SELECT * FROM court_matters;'; // 默认 SQL 改为真实表名
+const SQL_HIST = [];
+let previewingTable = null;
+let dbSubTab = 'dt-db-tables'; // 数据库子页签记忆（表/SQL/迁移）
+function renderDb(a){
+  const db = DB_STATE[a.id]; // 无 DB_STATE 条目 → 未附加数据库
+  if (!db) {
+    return `<div class="card" style="padding:30px">
+      <div class="empty" style="padding:30px">
+        <div class="e-ico">🗄️</div>
+        <h3>${a.name} 还没有数据库</h3>
+        <p>给应用附加一个数据库：PostgreSQL（自动建库、注入连接串）或 SQLite（文件库）。<br>完成后需要重新部署一次让应用读取数据库配置。</p>
+      </div>
+      <div style="display:flex;justify-content:center;gap:12px">
+        <button class="btn btn-primary" onclick="dbAdd('${a.id}','postgres')">＋ PostgreSQL 数据库</button>
+        <button class="btn btn-ghost" onclick="dbAdd('${a.id}','sqlite')">＋ SQLite 文件库</button>
+      </div>
+    </div>`;
+  }
+  const tabs = [[`表（${db.tables.length}）`, 'dt-db-tables'],['SQL 工作台','dt-db-sql'],['迁移','dt-db-mig']];
+  const dbPane = dbSubTab==='dt-db-sql' ? dbSqlHTML(db, a) : dbSubTab==='dt-db-mig' ? dbMigHTML(db, a) : dbTablesHTML(db, a.id);
+  return `
+  <div class="flex mb8">
+    <span style="font-weight:700">PostgreSQL 数据库 <span class="badge badge-running" style="margin-left:6px"><span class="dot"></span>已附加</span></span>
+    <div class="spacer"></div>
+    <button class="btn btn-ghost btn-sm" onclick="confirmBox({title:'删除数据库',danger:true,desc:'平台安全策略：<b>数据库不能通过本控制台删除</b>，请前往 Thunderbox 管理后台操作。此按钮仅为说明。',okText:'知道了',onOk:()=>toast('已了解：删除需走管理后台','warn')})">🗑 删除数据库</button>
+  </div>
+  <div class="tabs borderless" style="border:none;margin:0">
+    ${tabs.map(([lab,key])=>`<div class="tab ${key===dbSubTab?'on':''}" data-db-tab="${key}" onclick="switchDbTab(this,'${key}')" style="border-bottom-color:transparent">${lab}</div>`).join('')}
+  </div>
+  <div class="card" style="margin-top:14px">
+    <div id="dt-db-pane">${dbPane}</div>
+  </div>`;
+}
+function getDbTabState(key){
+  if (key==='dt-db-tables') return 0; if (key==='dt-db-sql') return 1; return 2;
+}
+function switchDbTab(el, key){
+  dbSubTab = key;
+  document.querySelectorAll('#dt-body [data-db-tab]').forEach(x=>x.classList.toggle('on', x===el));
+  const a = APPS.find(x=>x.id===detailId);
+  const db = DB_STATE[a.id] || { tables:[], migrations:[] };
+  $('dt-db-pane').innerHTML =
+    key==='dt-db-tables' ? dbTablesHTML(db, detailId)
+    : key==='dt-db-sql' ? dbSqlHTML(db, a)
+    : dbMigHTML(db, a);
+}
+function dbTablesHTML(db, aId){
+  return `<table class="tbl">
+    <thead><tr><th>表名</th><th>列（{name · 类型 · 约束}）</th></tr></thead>
+    <tbody>${db.tables.map(t=>`
+      <tr>
+        <td class="mono" style="font-weight:700">
+          <button class="clickable" onclick="togglePreview(${aId?`'${aId}'`:''},'${esc(t.name)}')">▸ ${esc(t.name)}</button>
+          <span class="txt3" style="font-size:10px;font-weight:400">点表名预览数据</span>
+        </td>
+        <td><div style="display:flex;flex-wrap:wrap;gap:5px">${t.cols.map(c=>`<span style="font-size:11px;font-family:var(--mono);background:var(--bg2);border:1px solid var(--line);padding:2px 8px;border-radius:5px;color:var(--txt2)">${esc(c[0])} <span class="txt3">· ${esc(c[1])}</span>${c[2]?` <span style="color:#FBBF24">${esc(c[2])}</span>`:''}</span>`).join('')}</div></td>
+      </tr>
+      <tr class="hidden" id="preview-${esc(t.name)}"><td colspan="2"><div class="table-preview" id="pv-${esc(t.name)}"></div></td></tr>`).join('')}</tbody></table>`;
+}
+function togglePreview(aId, name){
+  const row = $('preview-'+name); if (!row) return;
+  row.classList.toggle('hidden');
+  if (row.classList.contains('hidden')) { previewingTable = null; return; }
+  previewingTable = name;
+  const a = APPS.find(x=>x.id===aId) || APPS[0];
+  const db = DB_STATE[a.id] || {};
+  const key = 'SELECT * FROM '+name;
+  let res = (db.sqlResults||{})[key];
+  if (!res) res = { cols:['id','created_at'], rows:[['1','2026-08-20 10:00'],['2','2026-08-21 09:30']] };
+  $('pv-'+name).innerHTML = `
+    <div class="tp-title">SELECT * FROM ${esc(name)} LIMIT 20 · 前 20 行预览</div>
+    <table class="tbl"><thead><tr>${res.cols.map(c=>`<th style="font-size:11px">${esc(c)}</th>`).join('')}</tr></thead>
+    <tbody>${res.rows.slice(0,20).map(r=>`<tr>${r.map(c=>`<td style="font-size:12px">${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody></table>
+    <div class="hint mt8" style="font-size:11.5px">仅预览前 20 行；完整查询请用 SQL 工作台（只读模式）</div>`;
+}
+function dbSqlHTML(db, a){
+  const histHtml = SQL_HIST.length ? `
+    <div style="padding:10px 14px;border-bottom:1px solid var(--line);display:flex;gap:7px;flex-wrap:wrap;align-items:center">
+      <span style="font-size:11px;color:var(--txt3);font-family:var(--mono)">最近查询</span>
+      ${SQL_HIST.map((h,i)=>`<span class="js-tag" style="cursor:pointer;font-size:10.5px" title="${esc(h.sql)}" onclick="sqlDraft='${esc(h.sql.replace(/'/g,"\\'"))}';renderDetail()">${esc(h.sql.slice(0,28))}${h.sql.length>28?'…':''}</span>`).join('')}
+    </div>` : '';
+  return `
+  <div class="sql-toolbar">
+    <div class="mode-switch">
+      <button class="${sqlMode==='ro'?'on-ro':''}" onclick="sqlMode='ro';renderDetail()">🛡 只读 ro</button>
+      <button class="${sqlMode==='rw'?'on-rw':''}" onclick="sqlMode='rw';renderDetail()">✏️ 读写 rw</button>
+    </div>
+    ${sqlMode==='rw' ? '<span style="font-size:11.5px;color:#F87171">⚠ 读写模式可修改数据，将记录审计</span>' : '<span style="font-size:11.5px;color:#34D399">🛡 只读模式，无法误删数据</span>'}
+    <div class="spacer"></div>
+    <button class="btn btn-primary btn-sm" onclick="runSql('${a.id}')">▶ 执行</button>
+  </div>
+  ${histHtml}
+  <textarea class="sql-editor" id="sql-input" spellcheck="false" oninput="sqlDraft=this.value">${esc(sqlDraft)}</textarea>
+  <div id="sql-out">${sqlResult ? sqlResultHTML(sqlResult) : ''}</div>`;
+}
+function sqlResultHTML(r){
+  return `<div class="sql-results">
+    <div class="rows-badge"><span class="badge badge-running" style="font-size:10.5px"><span class="dot"></span>${r.rows.length} 行</span><span>${esc(r.sql)}</span></div>
+    <table class="tbl"><thead><tr>${r.cols.map(c=>`<th>${esc(c)}</th>`).join('')}</tr></thead>
+    <tbody>${r.rows.map(row=>`<tr>${row.map(c=>`<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody></table>
+  </div>`;
+}
+function runSql(id){
+  const a = APPS.find(x=>x.id===id);
+  const sql = $('sql-input')?.value?.trim() || sqlDraft.trim();
+  if (!sql) return toast('请输入 SQL 语句', 'err');
+  const start = sql.toUpperCase();
+  const isWrite = /^(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|TRUNCATE)\b/.test(start);
+  const doRun = ()=>{
+    const res = (DB_STATE[a.id]||{}).sqlResults?.[sql] || { cols:['结果'], rows:[['（原型模拟执行完成）']] };
+    sqlResult = { ...res, sql }; sqlDraft = sql;
+    SQL_HIST.unshift({ sql }); if (SQL_HIST.length>8) SQL_HIST.pop();
+    addAudit('执行 SQL', a.name, '成功', sql.slice(0,40)+(sql.length>40?'…':'')+' ('+sqlMode+')');
+    renderDetail();
+    if (sqlMode==='ro') toast('查询完成（只读模式）', 'ok');
+  };
+  if (sqlMode==='rw' || isWrite) {
+    confirmBox({ title:'写入模式确认', danger:true, desc:`将以<b>读写模式</b>执行：<span class="mono" style="color:#FCA5A5">${esc(sql)}</span><br>此操作会<b>真实修改数据库</b>并记录审计。确定继续？`, okText:'确认执行', onOk:doRun });
+  } else doRun();
+}
+function dbMigHTML(db, a){
+  return `
+  <div style="padding:16px 18px;border-bottom:1px solid var(--line)">
+    <div style="font-size:14px;font-weight:700">新建迁移</div>
+    <div class="hint" style="margin-bottom:11px">迁移 = 一段带名字的 SQL 脚本，一次性应用、自动事务、重复提交自动跳过（幂等）。适合安全地变更表结构。</div>
+    <div class="field"><label>迁移名称 <span class="req">*</span></label>
+      <input type="text" id="mig-name" placeholder="004_add_cases_index" style="font-family:var(--mono);max-width:320px"></div>
+    <div class="field"><label>SQL 内容 <span class="req">*</span></label>
+      <textarea id="mig-sql" placeholder="CREATE INDEX idx_cases_court ON cases(court);" style="min-height:90px"></textarea></div>
+    <button class="btn btn-primary btn-sm" onclick="runMig('${a.id}')">⚡ 应用迁移</button>
+  </div>
+  <div>
+    <div style="padding:13px 18px;font-size:12px;color:var(--txt3);font-weight:600;letter-spacing:.5px">已应用的迁移</div>
+    ${db.migrations.map(m=>`
+    <div class="mig-item">
+      <span class="m-name">${esc(m.name)}</span>
+      <span class="m-time">${m.time}</span>
+      <span class="m-status badge badge-running"><span class="dot"></span>${esc(m.state)}</span>
+    </div>`).join('')}
+  </div>`;
+}
+function runMig(id){
+  const a = APPS.find(x=>x.id===id);
+  const name = $('mig-name').value.trim(), sql = $('mig-sql').value.trim();
+  if (!name || !sql) return toast('请填写迁移名称与 SQL', 'err');
+  const db = DB_STATE[a.id] || { tables:[], migrations:[] };
+  if (db.migrations.some(m=>m.name===name)) return toast(`迁移 ${name} 已应用过（幂等跳过）`, 'warn');
+  db.migrations.unshift({ name, time:'刚刚', state:'已应用' });
+  addAudit('迁移', a.name, '成功', name);
+  renderDetail(); toast(`迁移 <b>${name}</b> 应用成功（事务内执行）`, 'ok');
+}
+function dbAdd(id, engine){
+  const a = APPS.find(x=>x.id===id);
+  const label = engine==='postgres' ? 'PostgreSQL' : 'SQLite';
+  confirmBox({ title:`附加 ${label} 数据库？`,
+    desc: engine==='postgres'
+      ? `平台将自动创建独立数据库与读写账号，并向应用注入 <span class="mono">DATABASE_URL</span> 等连接变量。<br>完成后需<b>重新部署</b>一次使应用生效。`
+      : `将应用磁盘上创建 <span class="mono">/data/app.db</span> 文件库。<br>建议应用已挂载卷覆盖 <span class="mono">/data</span>，防止数据丢失。`,
+    okText:'附加数据库',
+    onOk: ()=>{ a.db = { attached:true, engine }; addAudit('附加数据库', a.name, '成功', engine); renderDetail(); toast(`✅ ${label} 数据库已附加，请重新部署应用`, 'ok'); } });
+}
+
+/* ============ ⑤ 域名探测 ============ */
+function probeDomain(){
+  const name = $('probe-name').value.trim().toLowerCase();
+  if (!name) return toast('请输入要探测的域名前缀', 'err');
+  const res = $('probe-result');
+  const taken = APPS.some(a=>a.domain === name+'.tbox.ktvsky.com');
+  res.className = 'probe-result show';
+  res.innerHTML = `<div class="flex" style="gap:10px"><span class="spin">⏳</span><span class="txt2">正在探测 <span class="mono blue2">${esc(name)}.tbox.ktvsky.com</span>…</span></div>`;
+  setTimeout(()=>{
+    res.innerHTML = taken ? `
+      <div class="card" style="padding:18px;border-color:rgba(239,68,68,.4)">
+        <div class="flex"><span style="font-size:22px">⛔</span>
+          <div><div style="font-weight:700;color:#F87171">该地址已被占用</div>
+          <div class="hint" style="margin-top:3px">换成其他前缀，或参考域名命名建议：<span class="mono blue2">${name}-v2 / ${name}-dev / ${name}-test</span></div></div></div>
+      </div>`
+      : `
+      <div class="card" style="padding:18px;border-color:rgba(16,185,129,.4)">
+        <div class="flex"><span style="font-size:22px">✅</span>
+          <div><div style="font-weight:700;color:#34D399">${esc(name)}.tbox.ktvsky.com 可用！</div>
+          <div class="hint" style="margin-top:3px">可以在创建应用向导中直接使用这个地址。</div></div>
+          <div class="spacer"></div>
+          <button class="btn btn-primary btn-sm" onclick="go('create');WZ.url='https://git.ktvsky.com/legal/${name||'my-app'}';WZ.subdomain='${name}';WZ.name='${name}';renderWizardStep()">去创建应用 →</button>
+        </div>
+      </div>`;
+  }, 900);
+}
+
+/* ============ ⑥ 审计 ============ */
+function renderAudit(){
+  const fa = $('audit-action').value, fr = $('audit-result').value;
+  const list = AUDIT.filter(x=>(!fa || x.action===fa) && (!fr || x.result===fr));
+  $('audit-body').innerHTML = `
+    <table class="tbl">
+      <thead><tr><th>时间</th><th>操作</th><th>应用</th><th>详情</th><th>结果</th></tr></thead>
+      <tbody>${list.map(x=>`
+        <tr>
+          <td class="mono txt3" style="font-size:12px">${x.time}</td>
+          <td style="font-weight:600">${esc(x.action)}</td>
+          <td class="mono">${esc(x.app)}</td>
+          <td class="txt2" style="font-size:12.5px">${esc(x.detail)}</td>
+          <td>${x.result==='成功'?'<span class="badge badge-running"><span class="dot"></span>成功</span>':'<span class="badge badge-failed"><span class="dot"></span>失败</span>'}</td>
+        </tr>`).join('')}</tbody>
+    </table>`;
+}
+
+/* ============ 全局渲染 + 事件绑定 ============ */
+function copyLogText(id){
+  const a = APPS.find(x=>x.id===id); if (!a) return;
+  const lines = logType==='build' ? (BUILD_LOG[a.id]||BUILD_LOG.a3) : (RUN_LOG[a.id]||RUN_LOG.a1);
+  const text = lines.map(l=>l[1]).join('\n');
+  copyText(text);
+}
+function renderAll(){
+  renderDashboard();
+  renderApps();
+  if (curView==='detail') renderDetail();
+  if (curView==='audit') renderAudit();
+  document.querySelectorAll('.f-chip').forEach(c=>{
+    const key = c.dataset.f;
+    const n = key==='all' ? APPS.length : APPS.filter(a=>a.status===key).length;
+    $('fc-'+key).textContent = n;
+  });
+  $('nav-app-cnt').textContent = APPS.length;
+}
+function bindEvents(){
+  document.querySelectorAll('.nav-item').forEach(n=>n.addEventListener('click', ()=>go(n.dataset.nav)));
+  $('tb-new-btn').onclick = ()=>go('create');
+  $('dash-new').onclick = ()=>go('create');
+  $('apps-new').onclick = ()=>go('create');
+  $('probe-btn').onclick = probeDomain;
+  $('probe-name').addEventListener('keydown', e=>{ if(e.key==='Enter') probeDomain() });
+  // ⌘K 按钮
+  $('btn-cmdk').onclick = openCmdk;
+  document.addEventListener('keydown', e=>{
+    if ((e.metaKey||e.ctrlKey) && e.key==='k'){ e.preventDefault(); openCmdk(); }
+    if (e.key==='Escape'){ closeCmdk(); hideNotif(); hideConfirm(); }
+  });
+  // 通知（已移除：Thunderbox MCP 无 webhook）
+  // 命令面板
+  $('cmdk-input').addEventListener('input', filterCmdk);
+  $('cmdk-mask').addEventListener('click', e=>{ if (e.target===$('cmdk-mask')) closeCmdk(); });
+  document.addEventListener('keydown', e=>{
+    if (!$('cmdk-mask').classList.contains('show')) return;
+    if (e.key==='ArrowDown'){ e.preventDefault(); cmdkMove(1); }
+    if (e.key==='ArrowUp'){ e.preventDefault(); cmdkMove(-1); }
+    if (e.key==='Enter'){ e.preventDefault(); if (cmdkItems[cmdkSel]) cmdkRun(cmdkItems[cmdkSel]); }
+  });
+  // 新手引导
+  $('guide-close').onclick = ()=>{ guideDismissed = true; $('guide-banner').classList.add('hidden'); toast('下次打开总览时会再次显示引导','ok'); };
+  document.querySelectorAll('.f-chip').forEach(c=>c.addEventListener('click', ()=>{
+    document.querySelectorAll('.f-chip').forEach(x=>x.classList.remove('on'));
+    c.classList.add('on'); appFilter = c.dataset.f; renderApps(); }));
+  $('vt-grid').onclick = ()=>{ appViewType='grid'; $('vt-grid').classList.add('on'); $('vt-list').classList.remove('on'); renderApps(); };
+  $('vt-list').onclick = ()=>{ appViewType='list'; $('vt-list').classList.add('on'); $('vt-grid').classList.remove('on'); renderApps(); };
+  $('global-search').addEventListener('input', e=>{ appSearch = e.target.value; renderApps(); });
+  document.querySelectorAll('#dt-tabs .tab').forEach(t=>t.addEventListener('click', ()=>setDtTab(t.dataset.t)));
+  document.querySelectorAll('.mode-switch button').forEach(b=>b.addEventListener('click', ()=>{ logType = b.textContent.includes('构建')?'build':'run'; renderDetail(); }));
+  $('confirm-mask').addEventListener('click', e=>{ if (e.target === $('confirm-mask')) hideConfirm(); });
+  $('cf-cancel').onclick = hideConfirm;
+}
+
+/* 初始化 */
+bindEvents();
+if (!guideDismissed) $('guide-banner')?.classList.remove('hidden');
+renderDashboard();
+renderApps();
+</script>
+</body>
+</html>

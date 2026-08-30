@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Trash2, Download, Eye, ChevronDown, ChevronUp, Camera } from "lucide-react";
 import { historyApi } from "../lib/api";
 import PdfPreviewModal from "../components/PdfPreviewModal";
+import ConfirmDialog from "../components/ConfirmDialog";
 
 function toHex(str: string): string {
   return Array.from(new TextEncoder().encode(str))
@@ -26,6 +27,7 @@ export default function HistoryPage() {
   const [filesMap, setFilesMap] = useState<Record<number, Array<{ name: string; path: string; size: number; is_pdf: boolean }>>>({});
   const [previewFile, setPreviewFile] = useState<{ path: string; name: string } | null>(null);
   const [loadingFiles, setLoadingFiles] = useState<number | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
 
   const remove = useMutation({
     mutationFn: (id: number) => historyApi.delete(id),
@@ -64,6 +66,16 @@ export default function HistoryPage() {
           filePath={previewFile.path}
           title={previewFile.name}
           onClose={() => setPreviewFile(null)}
+        />
+      )}
+      {confirmDelete !== null && (
+        <ConfirmDialog
+          title="删除历史记录"
+          message={`确定删除这条生成记录吗？\n输出目录：${history.find(h => h.id === confirmDelete)?.output_dir || ""}\n此操作不可恢复。`}
+          confirmText="删除"
+          danger={true}
+          onCancel={() => setConfirmDelete(null)}
+          onConfirm={() => { remove.mutate(confirmDelete); setConfirmDelete(null); }}
         />
       )}
 
@@ -108,7 +120,7 @@ export default function HistoryPage() {
                     </button>
                     <button
                       className="btn btn-danger" style={{ padding: "4px 10px", fontSize: 12 }}
-                      onClick={() => remove.mutate(h.id)}
+                      onClick={() => setConfirmDelete(h.id)}
                     >
                       <Trash2 size={12} />
                     </button>

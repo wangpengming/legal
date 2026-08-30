@@ -132,6 +132,42 @@ def create_case(body: CaseIn, x_workspace_id: str = Header(alias="X-Workspace-Id
         )
 
 
+@router.put("/{case_id}", response_model=CaseOut)
+def update_case(case_id: int, body: CaseIn, x_workspace_id: str = Header(alias="X-Workspace-Id")):
+    from app.core.database import get_conn
+    from app.api.presets import register_preset
+    import sqlite3
+    with get_conn(x_workspace_id) as conn:
+        cols = {r[1] for r in conn.execute("PRAGMA table_info(cases)")}
+        cause_col = "case_cause" if "case_cause" in cols else "cause"
+        # 自动注册预设库
+        register_preset(conn, x_workspace_id, "court", body.court)
+        register_preset(conn, x_workspace_id, "cause", body.cause)
+        conn.execute(
+            f"""UPDATE cases SET
+               case_number=?, court=?, {cause_col}=?, hearing_date=?, opposing_party=?,
+               our_role=?, company_id=?, agent_id=?
+               WHERE id=?""",
+            (body.case_number, body.court, body.cause, body.hearing_date,
+             body.opposing_party, body.our_role, body.company_id, body.agent_id, case_id),
+        )
+        conn.commit()
+        row = conn.execute("SELECT * FROM cases WHERE id = ?", (case_id,)).fetchone()
+        conn.row_factory = sqlite3.Row
+        d = dict(row)
+        # F6 操作日志
+        from app.api.audit import log_action
+        log_action(x_workspace_id, "case_update", f"case {case_id} {d['case_number']}")
+        return CaseOut(
+            id=d["id"], case_number=d["case_number"], court=d.get("court", ""),
+            cause=d.get("cause") or d.get("case_cause", ""),
+            hearing_date=d.get("hearing_date", ""), opposing_party=d.get("opposing_party", ""),
+            our_role=d.get("our_role", ""), company_id=d.get("company_id"),
+            agent_id=d.get("agent_id"), status=d.get("status"),
+            created_at=d.get("created_at") or d.get("updated_at"),
+        )
+
+
 @router.delete("/{case_id}")
 def delete_case(case_id: int, x_workspace_id: str = Header(alias="X-Workspace-Id")):
     from app.core.database import get_conn

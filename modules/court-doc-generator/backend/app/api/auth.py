@@ -5,7 +5,7 @@ import secrets
 import sqlite3
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Header
 from pydantic import BaseModel
 
 from app.core.config import settings
@@ -75,6 +75,11 @@ class LoginOut(BaseModel):
     token: str  # 简单 session token
 
 
+class ChangePasswordIn(BaseModel):
+    old_password: str
+    new_password: str
+
+
 # ── 端点 ─────────────────────────────────────────────────────────────────
 @router.post("/register", response_model=LoginOut)
 def register(body: RegisterIn):
@@ -142,6 +147,39 @@ def login(body: LoginIn):
     )
 
 
+@router.put("/password")
+def change_password(
+    body: ChangePasswordIn,
+    x_workspace_id: str = Header(alias="X-Workspace-Id"),
+):
+    """登录用户修改自己的密码（需验证旧密码）。"""
+    import sqlite3
+    if len(body.new_password) < 4:
+        raise HTTPException(400, "新密码至少 4 个字符")
+
+    conn = sqlite3.connect(str(_WS_DB))
+    conn.row_factory = sqlite3.Row
+    row = conn.execute(
+        "SELECT password_hash FROM workspaces WHERE id = ?", (x_workspace_id,)
+    ).fetchone()
+    if not row:
+        conn.close()
+        raise HTTPException(404, "workspace 不存在")
+
+    if not _verify_password(body.old_password, row["password_hash"]):
+        conn.close()
+        raise HTTPException(400, "旧密码错误")
+
+    new_hash = _hash_password(body.new_password)
+    conn.execute(
+        "UPDATE workspaces SET password_hash = ? WHERE id = ?",
+        (new_hash, x_workspace_id),
+    )
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
+
 @router.get("/list")
 def list_workspaces() -> list[WorkspaceOut]:
     import sqlite3
@@ -155,18 +193,29 @@ def list_workspaces() -> list[WorkspaceOut]:
 
 
 def _ensure_leishi(ws_id: str):
-    """写默认公司「雷石」（每个 workspace 都有）。"""
+    """写默认公司「雷石」（每个 workspace 都有），公司文件指向 static 默认文件。"""
     from app.core.database import get_conn, init_db
+
     init_db(ws_id)
     with get_conn(ws_id) as conn:
         existing = conn.execute(
-            "SELECT id FROM companies WHERE name = '雷石'"
+            "SELECT id FROM companies WHERE name = '北京雷石天地电子技术股份有限公司'"
         ).fetchone()
         if not existing:
             conn.execute(
                 """INSERT INTO companies
-                   (name, legal_rep_name, legal_rep_position, address, is_default)
-                   VALUES ('雷石', '马杰', '总经理',
-                           '北京市朝阳区望京东园四区1号楼29层2901号10', 1)""",
+                   (name, credit_code, legal_rep_name, legal_rep_position,
+                    address, phone, business_license_path, legal_rep_cert_path,
+                    legal_rep_id_card_path, is_default)
+                   VALUES (
+                     '北京雷石天地电子技术股份有限公司',
+                     '91110108MA01234X7Y',
+                     '马杰', '总经理',
+                     '北京市朝阳区望京东园四区1号楼29层2901号10',
+                     '010-84488000',
+                     'static/1.营业执照复印件.pdf',
+                     'static/2.法定代表人证明.pdf',
+                     'static/法人身份证.pdf',
+                     1)""",
             )
             conn.commit()
