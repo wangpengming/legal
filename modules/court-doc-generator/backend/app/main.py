@@ -1,6 +1,4 @@
 """FastAPI 主入口。"""
-import hashlib
-import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -11,29 +9,13 @@ from fastapi.staticfiles import StaticFiles
 
 from app.api import api_router
 from app.core.config import settings
-from app.core.database import init_db
 from app.migration import run_migration
-
-# 固定 shared workspace ID（单租户模式）
-SHARED_WORKSPACE_ID = "shared"
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    # FORCE_MIGRATION=1 时强制重新迁移（删除 shared workspace 再重建）
+    # 启动时初始化 shared workspace（幂等，CREATE TABLE IF NOT EXISTS）
     data_dir = settings.DATA_DIR
-    if os.environ.get("FORCE_MIGRATION") == "1":
-        shared_db = data_dir / "workspaces" / SHARED_WORKSPACE_ID / "court_matters.db"
-        if shared_db.exists():
-            shared_db.unlink()
-            print(f"[startup] FORCE_MIGRATION=1: removed {shared_db}")
-        shared_ws_dir = data_dir / "workspaces" / SHARED_WORKSPACE_ID
-        agents_dir = shared_ws_dir / "agents"
-        if agents_dir.exists():
-            import shutil
-            shutil.rmtree(agents_dir)
-            print(f"[startup] FORCE_MIGRATION=1: removed {agents_dir}")
-    # 启动时迁移多 workspace 数据到 shared workspace（幂等）
     result = run_migration(data_dir)
     print(f"[startup] migration done: {result}")
     yield
