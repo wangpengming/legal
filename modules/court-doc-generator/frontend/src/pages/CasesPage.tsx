@@ -4,7 +4,6 @@ import { Plus, Trash2, Zap, Eye, Search, X, Download, Camera } from "lucide-reac
 import { caseApi, companyApi, agentApi, generateApi, Case } from "../lib/api";
 import { useDebounced } from "../hooks/useDebounced";
 import { useFormDraft, draftKey, loadDraft, clearDraft } from "../hooks/useFormDraft";
-import { useAuthStore } from "../stores/authStore";
 import PdfPreviewModal from "../components/PdfPreviewModal";
 import CaseDetailModal from "../components/CaseDetailModal";
 import ConfirmDialog from "../components/ConfirmDialog";
@@ -19,7 +18,7 @@ const EMPTY_FORM = {
 
 export default function CasesPage() {
   const qc = useQueryClient();
-  const workspaceId = useAuthStore(s => s.workspaceId);
+  const workspaceId = sessionStorage.getItem("_ws_id");
   const [showForm, setShowForm] = useState(false);
   // F2：待恢复草稿（检测到未提交草稿时弹确认）
   const [draftPending, setDraftPending] = useState<null | typeof EMPTY_FORM>(null);
@@ -312,6 +311,28 @@ export default function CasesPage() {
             <Download size={12} /> {exporting ? "导出中..." : "导出 CSV"}
           </button>
         </div>
+        {hasData && (
+          <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12, padding: "8px 12px", background: "var(--bg-secondary, #f5f5f5)", borderRadius: 6 }}>
+            <span className="text-sm text-muted">生成使用：</span>
+            <select
+              className="form-input"
+              style={{ width: "auto", padding: "4px 8px", fontSize: 12 }}
+              value={selCompany ?? (companies[0]?.id ?? "")}
+              onChange={e => setSelCompany(Number(e.target.value))}
+            >
+              {companies.map(co => <option key={co.id} value={co.id}>{co.name}</option>)}
+            </select>
+            <span className="text-sm text-muted">+</span>
+            <select
+              className="form-input"
+              style={{ width: "auto", padding: "4px 8px", fontSize: 12 }}
+              value={selAgent ?? (agents[0]?.id ?? "")}
+              onChange={e => setSelAgent(Number(e.target.value))}
+            >
+              {agents.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+            </select>
+          </div>
+        )}
         {isLoading ? <div className="empty">加载中...</div>
           : cases.length === 0 ? <div className="empty"><div className="empty-icon">📋</div>暂无案件</div>
           : (
@@ -338,22 +359,6 @@ export default function CasesPage() {
                       )}
                       {hasData && (
                         <>
-                          <select
-                            className="form-input"
-                            style={{ width: "auto", padding: "4px 8px", fontSize: 12 }}
-                            value={selCompany ?? (companies[0]?.id ?? "")}
-                            onChange={e => setSelCompany(Number(e.target.value))}
-                          >
-                            {companies.map(co => <option key={co.id} value={co.id}>{co.name}</option>)}
-                          </select>
-                          <select
-                            className="form-input"
-                            style={{ width: "auto", padding: "4px 8px", fontSize: 12 }}
-                            value={selAgent ?? (agents[0]?.id ?? "")}
-                            onChange={e => setSelAgent(Number(e.target.value))}
-                          >
-                            {agents.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-                          </select>
                           <button
                             className="btn btn-primary" style={{ padding: "4px 10px", fontSize: 12 }}
                             disabled={generating !== null}
