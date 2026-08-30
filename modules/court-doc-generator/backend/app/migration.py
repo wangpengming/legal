@@ -183,12 +183,21 @@ def run_migration(data_dir: Path) -> dict:
 
     conn.commit()
 
+    leishi_name = "北京雷石天地电子技术股份有限公司"
+
     # 幂等保护：完全迁移过则跳过
     existing_agent_count = conn.execute("SELECT COUNT(*) FROM agents").fetchone()[0]
     cases_existing = conn.execute("SELECT COUNT(*) FROM cases").fetchone()[0]
-    print(f"[migration] shared db: {existing_agent_count} agents, {cases_existing} cases")
 
-    if existing_agent_count > 0 and cases_existing > 0:
+    # 检查是否已完成公司文件迁移（通过判断雷石公司是否有文件路径）
+    leishi_check = conn.execute(
+        "SELECT business_license_path FROM companies WHERE name = ?",
+        (leishi_name,)).fetchone()
+    company_files_done = leishi_check and leishi_check[0]
+
+    print(f"[migration] shared db: {existing_agent_count} agents, {cases_existing} cases, company_files={bool(company_files_done)}")
+
+    if existing_agent_count > 0 and cases_existing > 0 and company_files_done:
         conn.close()
         return {
             "shared_ws_id": SHARED_WS_ID,
@@ -217,8 +226,40 @@ def run_migration(data_dir: Path) -> dict:
         conn.commit()
         print(f"[migration] inserted company: {leishi_name}")
 
-    leishi = conn.execute("SELECT id FROM companies WHERE name = ?", (leishi_name,)).fetchone()
+    leishi = conn.execute("SELECT id, business_license_path FROM companies WHERE name = ?", (leishi_name,)).fetchone()
     leishi_id = leishi[0] if leishi else None
+
+    # 迁移公司文件（营业执照/法人身份证/法人代表证明）：从代码 static/ 目录复制到 volume
+    # 模板文件（授权委托书/推荐信）在 templates/，由 files.py 端点直接读取代码目录，无需迁移
+    if leishi_id and (not leishi[1] if leishi else True):
+        module_root = data_dir.parent  # /app/ (Docker: /app/backend/ 的 parent)
+        static_src = module_root / "static"
+        company_files_dst = shared_ws_dir / "companies" / str(leishi_id)
+        company_files_dst.mkdir(parents=True, exist_ok=True)
+
+        company_file_map = {
+            "business_license_path": "1.营业执照复印件.pdf",
+            "legal_rep_cert_path":    "2.法定代表人证明.pdf",
+            "legal_rep_id_card_path": "法人身份证.pdf",
+        }
+
+        migrated_paths = {}
+        for db_field, filename in company_file_map.items():
+            src_file = static_src / filename
+            if src_file.exists():
+                dst_file = company_files_dst / src_file.name
+                shutil.copy2(src_file, dst_file)
+                migrated_paths[db_field] = str(dst_file)
+                print(f"  [company file] {filename} -> {dst_file} copied")
+            else:
+                print(f"  [company file] NOT FOUND: {src_file}")
+
+        if migrated_paths:
+            set_clause = ", ".join(f"{k}=?" for k in migrated_paths)
+            vals = list(migrated_paths.values()) + [leishi_id]
+            conn.execute(f"UPDATE companies SET {set_clause} WHERE id=?", vals)
+            conn.commit()
+            print(f"  [company files] updated in DB")
 
     # 3. 合并 agents（含文件）
     agents_migrated = 0

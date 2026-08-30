@@ -10,8 +10,7 @@ FROM python:3.12-slim-bookworm
 RUN apt-get update && apt-get install -y --no-install-recommends \
         tesseract-ocr tesseract-ocr-chi-sim fonts-wqy-microhei poppler-utils \
     && rm -rf /var/lib/apt/lists/*
-ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
-
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 
 WORKDIR /app/backend
 COPY requirements.txt /app/
 COPY backend/requirements.txt .
