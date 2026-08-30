@@ -1,3 +1,4 @@
+# rebuild: force frontend cache invalidation
 FROM node:20-alpine AS fe
 WORKDIR /build
 COPY modules/court-doc-generator/frontend/package*.json ./
