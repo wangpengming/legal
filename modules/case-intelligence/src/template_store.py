@@ -1,6 +1,6 @@
 # =============================================
 # template_store.py - 模板存储层
-# 管理通用模板（templates/）和已归档模板（templates_extracted/）
+# 管理固定模板（output_templates/）和已归档模板（templates_extracted/）
 # 数据库操作委托给 database.py
 # =============================================
 import json
@@ -11,8 +11,8 @@ from typing import Optional
 from . import database as db
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-TEMPLATES_ROOT = PROJECT_ROOT / "templates"
-EXTRACTED_ROOT = PROJECT_ROOT / "templates_extracted"
+TEMPLATES_ROOT = PROJECT_ROOT / "output_templates"  # 固定模板（答辩状/质证意见/当庭陈述/证据目录）
+EXTRACTED_ROOT = PROJECT_ROOT / "templates_extracted"  # 历史案件归档
 
 
 def _ensure_dir(d: Path) -> Path:

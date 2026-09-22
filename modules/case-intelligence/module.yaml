@@ -1,24 +1,29 @@
 name: case-intelligence
-version: 3.1.0
+version: 3.2.0
 status: active
-description: 案例智能分析模块（CLI工具，案件注册+提取物管理+模板归纳，半自动不引入RAG）
+description: 案例智能分析模块（五维度提取+prompts驱动+固定模板输出，CLI工具，不引入RAG）
 entry: bin/extract.py
 deps: []
 created: 2026-08-10
 integrated: 2026-08-17
+updated: 2026-09-22
 tech_stack:
   - Python 3（CLI工具，无Web服务）
   - SQLite（case_registry.db，三表：cases/artifacts/templates）
-  - Markdown（提取物/模板存储格式，含YAML frontmatter）
-  - case-analysis-master skill（六阶段+两步法+六层抗辩矩阵，方法论根基）
+  - Markdown（提取物/模板/提示词存储格式，含YAML frontmatter）
+  - prompts/（AI提示词规则库，8个提示词文件，v1.0.0）
 features:
-  - 案件注册与识别（案号精确/当事人指纹/案由模糊，三级置信度）
-  - 提取物管理（10种类型：抗辩论证链/质证策略/证据结构等，写DB+写MD文件）
-  - 模板归纳与存储（4分类：答辩状/质证意见/当庭陈述/证据目录）
+  - 案源管理（注册+识别+画像标签，录入方式CLI/UI/AI）
+  - 五维度提取（D1事实认定/D2法律依据/D3攻防策略/D4证据体系/D5赔偿裁量，固定维度内容随案由变化）
+  - 提取物知识库（按D1-D5组织，写DB+写MD文件）
+  - 模板归纳（output_templates/，4种固定模板：答辩状/质证意见/当庭陈述/证据目录）
+  - 文书生成（output/，按案件+日期组织，MD+DOCX格式）
+  - prompts驱动（prompts/，AI操作的规则大脑，不可随意修改）
+  - 案件匹配（D1-D5画像标签匹配合相似案件）
   - 外部数据源引用（reference_index.yaml索引，不移动原文件）
-  - 半自动提取CLI（register/extract/promote/complete/search/check/report/list）
+  - 半自动CLI（register/extract/promote/complete/search/check/report/list/templates）
   - 提取操作日志（EXTRACTION_LOG.md）
 port: {}
 readme: docs/README.md
-spec: spec/SPEC.md
+spec: docs/SPEC.md
 reference: reference_index.yaml

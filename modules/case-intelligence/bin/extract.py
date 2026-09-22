@@ -105,6 +105,10 @@ def cmd_register(args) -> None:
     result = getattr(args, "result", None) or ""
     source_path = getattr(args, "source_path", None) or ""
     notes = getattr(args, "notes", None) or ""
+    entry_method = getattr(args, "entry_method", None) or "CLI"
+    scene = getattr(args, "scene", None) or ""
+    plaintiff_auth_level = getattr(args, "plaintiff_auth_level", None) or ""
+    defendant_auth_status = getattr(args, "defendant_auth_status", None) or ""
 
     # 识别重复
     if case_number:
@@ -128,6 +132,10 @@ def cmd_register(args) -> None:
             result=result,
             source_path=source_path,
             notes=notes,
+            entry_method=entry_method,
+            scene=scene,
+            plaintiff_auth_level=plaintiff_auth_level,
+            defendant_auth_status=defendant_auth_status,
         )
         print(f"\n✅ 案件注册成功")
         _print_case(case)
@@ -197,17 +205,19 @@ def cmd_extract(args) -> None:
         content = args.content
     else:
         content_map = {
-            "defense_argument_chain": "## 抗辩主线\n\n## 核心论点\n\n## 法律依据\n\n## 论证结构\n\n## 适用条件\n",
-            "cross_exam_strategy": "## 质证结论\n\n## 理由\n\n## 攻击点\n",
-            "evidence_structure": "## 证据分类\n\n## 证据清单\n",
-            "legal_reasoning_chain": "## 推理前提\n\n## 推理步骤\n\n## 结论\n",
-            "quantitative_analysis": "## 量化指标\n\n## 计算公式\n\n## 数据来源\n",
-            "liability_calculation": "## 责任类型\n\n## 计算方式\n\n## 参考法条\n",
-            "contingency_response": "## 场景\n\n## 应变话术\n\n## 注意事项\n",
-            "reverse_strategy": "## 打击维度\n\n## 弹药路径\n\n## 时间轴\n",
-            "court_statement": "## 开场\n\n## 主体论点\n\n## 总结\n",
-            "case_key_facts": "## 关键事实清单\n\n## 事实状态\n",
+            "D1": "## 1.1 当事人信息\n\n## 1.2 案件背景\n\n## 1.3 争议焦点\n\n## 1.4 关键事实清单\n\n## 1.5 权利基础分析\n\n## 1.6 行为定性\n",
+            "D2": "## 2.1 适用法律\n\n## 2.2 法律关系定性\n\n## 2.3 权利基础分析\n\n## 2.4 被告抗辩的法律可行性\n",
+            "D3": "## 3.1 原告诉请\n\n## 3.2 被告抗辩（按优先级排序）\n\n## 3.3 抗辩论证结构\n\n## 3.4 主战场决策\n",
+            "D4": "## 4.1 原告证据清单\n\n## 4.2 被告证据清单\n\n## 4.3 证据质证要点\n\n## 4.4 举证责任分配\n",
+            "D5": "## 5.1 赔偿请求\n\n## 5.2 被告抗辩理由\n\n## 5.3 计算方式分析\n\n## 5.4 裁量因素\n\n## 5.5 预估结论\n",
         }
+        type_names = {}
+        for k, v in db.ARTIFACT_TYPE_NAMES.items():
+            type_names[k] = f"{k}: {v}"
+        options = [type_names.get(t, t) for t in db.ARTIFACT_TYPES]
+        if args.type and args.type not in db.ARTIFACT_TYPES:
+            print(f"❌ 无效类型: {args.type}，有效值: {', '.join(db.ARTIFACT_TYPES)}")
+            sys.exit(1)
         content = _input_multiline(
             content_map.get(artifact_type, "## 内容\n\n")
         )
@@ -488,6 +498,10 @@ def main() -> None:
     p.add_argument("--result", help="案件结果")
     p.add_argument("--source-path", dest="source_path", help="原始文件路径")
     p.add_argument("--notes", help="备注")
+    p.add_argument("--entry-method", dest="entry_method", choices=["CLI", "UI", "AI"], default="CLI", help="录入方式（CLI/UI/AI）")
+    p.add_argument("--scene", help="涉案场景（实体KTV/车载KTV/线上平台等）")
+    p.add_argument("--plaintiff-auth-level", dest="plaintiff_auth_level", help="原告授权层级")
+    p.add_argument("--defendant-auth-status", dest="defendant_auth_status", help="被告授权状态")
     p.set_defaults(func=cmd_register)
 
     # link

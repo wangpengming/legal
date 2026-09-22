@@ -1,205 +1,170 @@
 # case-intelligence 模块使用手册
 
-> **模块定位**：案件情报提取与模板归纳系统。接收已结案件材料，提取结构化参考源（Artifact），归纳可复用文书模板（Template），为 AI 生成诉讼文书提供高质量燃料。
+> **模块定位**：案件情报提取与文书生成系统。接收案件材料，按 5 维度提取结构化知识（Artifact），通过 prompts 驱动 AI 生成文书，输出 MD + DOCX 格式。
 
 ---
 
-## 1. 快速开始
+## 1. 核心概念
 
-### 1.1 环境要求
+```
+案源（Case）
+    ├── 录入方式（CLI / UI / AI）
+    ├── 画像标签（涉案场景 / 授权状态 / ...）
+    │
+    ├── 提取 → Artifact（按 5 维度 D1-D5）
+    │         └── 知识库积累（随案件增多）
+    │
+    └── 生成 → Template（固定 4 种文书格式）
+              └── MD 格式 + DOCX 输出
+```
 
-- Python 3.10+
-- 无需额外依赖（仅标准库 + 内置 SQLite）
+### 三个核心对象
 
-### 1.2 查看帮助
+| 对象 | 定义 | 特征 |
+|------|------|------|
+| **案源** | 案件基本信息 + 画像标签 | 录入方式固定（CLI/UI/AI） |
+| **提取物** | 按 5 维度（D1-D5）提取的知识 | 内容随案由变化，维度固定 |
+| **模板** | 固定的文书格式 | 不随案由变化，4 种通用 |
 
-```bash
-cd modules/case-intelligence
-python3 bin/extract.py --help
+### 5 个提取维度（D1-D5）
+
+| 维度 | 名称 | 说明 |
+|------|------|------|
+| D1 | 事实认定 | 当事人/背景/争议焦点/关键事实/权利基础/行为定性 |
+| D2 | 法律依据 | 适用法条/法律关系定性/权利基础/抗辩可行性 |
+| D3 | 攻防策略 | 原告诉请/被告抗辩/论证结构/主战场决策 |
+| D4 | 证据体系 | 双方证据清单/质证要点/举证责任分配 |
+| D5 | 赔偿裁量 | 赔偿请求/抗辩理由/计算方式/裁量因素/预估区间 |
+
+---
+
+## 2. prompts/ 目录（核心）
+
+**所有 AI 操作通过 prompts/ 目录的提示词驱动**，提示词是系统的"大脑"。
+
+```
+prompts/
+├── prompts.yaml              # 索引 + 使用指南
+├── 提取/
+│   ├── 1_新案材料提取_D1-D5.md    # 从材料提取 5 维度
+│   ├── 2_跨案归纳_Artifact汇聚.md  # 从多个同类 artifact 归纳通用结构
+│   └── 3_质量检查_提取物审核.md   # 提取物质量审核
+├── 匹配/
+│   └── 4_新案匹配_相似案源检索.md  # 新案匹配相似案件
+└── 生成/
+    ├── 5_答辩状生成.md
+    ├── 6_质证意见生成.md
+    ├── 7_当庭陈述生成.md
+    └── 8_证据目录生成.md
+```
+
+### 使用流程A：建设知识库（历史案件 → artifacts）
+
+```
+1. 准备原始案件材料
+2. 复制 prompts/提取/1_新案材料提取_D1-D5.md
+3. AI 按 5 维度提取 → 输出结构化结果
+4. 人工复核 → 入库
+```
+
+### 使用流程B：生成文书（新案 → output/）
+
+```
+1. 输入新案基本信息
+2. 复制 prompts/匹配/4_新案匹配_相似案源检索.md
+3. AI 匹配相似案件 + 列出相关 artifact
+4. 选择文书类型 → 复制对应 prompts/生成/5-8_*.md
+5. AI 生成文书 → 导出 MD + DOCX
 ```
 
 ---
 
-## 2. 核心概念
+## 3. CLI 命令参考
 
-| 概念 | 说明 | 示例 |
-|------|------|------|
-| **Case（案件）** | 已结案的原始案件记录 | 腾讯音乐诉北京雷石侵权纠纷案 |
-| **Artifact（提取物）** | 从案件中提取的结构化参考源 | 主体不适格四层递进论证 |
-| **Template（模板）** | 从多个提取物归纳的通用文书结构 | 答辩状四层递进模板 |
-
-> 关系：Case → 提取 N 个 Artifact → 归纳为 1 个 Template
-
----
-
-## 3. 核心工作流
-
-### 3.1 注册案件
+### 3.1 案源管理
 
 ```bash
+# 注册案源（支持画像标签）
 python3 bin/extract.py register \
   --name "腾讯音乐诉北京雷石侵权纠纷案" \
   --case-number "2023京0491民初23751号" \
   --plaintiff "腾讯音乐" \
-  --defendant "北京雷石天地" \
+  --defendant "北京雷石" \
   --cause "侵害作品信息网络传播权纠纷" \
-  --source-path "/Users/zhangyang/Desktop/腾讯案/"
-```
+  --entry-method "CLI" \
+  --scene "实体KTV" \
+  --defendant-auth-status "已获音集协授权"
 
-### 3.2 提取 Artifact
-
-```bash
-# 提取抗辩论证链
-python3 bin/extract.py extract \
-  --case-id <案件ID> \
-  --type defense_argument_chain \
-  --title "主体不适格四层递进论证" \
-  --source-ref "从答辩状第3-15段提取"
-```
-
-支持的提取物类型：
-
-| 类型 | 说明 |
-|------|------|
-| `defense_argument_chain` | 抗辩论证链 |
-| `cross_exam_strategy` | 质证策略 |
-| `evidence_structure` | 证据结构 |
-| `legal_reasoning_chain` | 法律推理链 |
-| `quantitative_analysis` | 量化分析 |
-| `liability_calculation` | 责任计算 |
-| `contingency_response` | 应变话术 |
-| `reverse_strategy` | 反向维权路径 |
-| `court_statement` | 当庭陈述 |
-| `case_key_facts` | 关键事实清单 |
-
-### 3.3 将 Artifact 归纳为 Template
-
-```bash
-python3 bin/extract.py promote \
-  --artifact-id <Artifact ID> \
-  --template-name "答辩状四层递进模板" \
-  --category "答辩状"
-```
-
-### 3.4 标记案件提取完成
-
-```bash
-python3 bin/extract.py complete --case-id <案件ID>
-```
-
----
-
-## 4. CLI 命令参考
-
-### 4.1 案件管理
-
-```bash
-# 注册案件
-python3 bin/extract.py register --name "案件名" ...
-
-# 列出所有案件
+# 列出所有案源
 python3 bin/extract.py list
 python3 bin/extract.py list --status pending
 
-# 搜索案件
+# 搜索案源
 python3 bin/extract.py search --query "腾讯"
 
-# 检查案件重复
+# 检查重复
 python3 bin/extract.py check --case-number "2023京0491民初23751号"
-
-# 关联原始材料路径
-python3 bin/extract.py link --case-id <ID> --path "/path/to/materials"
 ```
 
-### 4.2 提取物管理
+### 3.2 提取物管理（D1-D5）
 
 ```bash
-# 列出某案件所有提取物
-python3 bin/extract.py artifacts --case-id <案件ID>
+# 提取 Artifact（5 维度）
+python3 bin/extract.py extract \
+  --case-id <案件ID> \
+  --type D1 \
+  --title "腾讯案事实认定"
 
-# 提取新的提取物
-python3 bin/extract.py extract --case-id <案件ID> --type <类型> --title "标题"
+# 列出案件下所有提取物
+python3 bin/extract.py artifacts --case-id <案件ID>
 ```
 
-### 4.3 模板管理
+### 3.3 模板管理
 
 ```bash
 # 列出所有模板
 python3 bin/extract.py templates list
-
-# 按分类筛选模板
 python3 bin/extract.py templates list --category "答辩状"
 
 # 搜索模板
-python3 bin/extract.py templates search --query "赔偿数额"
+python3 bin/extract.py templates search --query "主体不适格"
 
 # 查看模板详情
 python3 bin/extract.py templates show --template-id <模板ID>
 ```
 
-### 4.4 报告与统计
+### 3.4 统计报告
 
 ```bash
-# 生成统计报告
 python3 bin/extract.py report
 ```
 
 ---
 
-## 5. 数据库结构
+## 4. 目录说明
 
-```
-data/case_registry.db
-├── cases         案件表
-├── artifacts      提取物表
-└── templates      模板表
-```
-
----
-
-## 6. 文件存储
-
-```
-data/
-├── case_registry.db          SQLite 数据库
-└── artifacts/               提取物 Markdown 文件（按 case_id 目录）
-    └── {case_id}/
-        ├── metadata.yaml
-        └── *.md
-
-templates_extracted/          案件归档模板（从历史案件提取）
-├── 腾讯音乐诉北京雷石侵权纠纷案/
-└── 浙江广电诉雷石广汽埃安案件/
-```
+| 目录 | 用途 |
+|------|------|
+| `src/` | 源代码（database / artifact_store / template_store / case_recognizer / extractor_cli） |
+| `data/artifacts/` | 提取物文件（按案件 ID 目录组织） |
+| `prompts/` | AI 提示词规则库（系统大脑） |
+| `output_templates/` | 固定模板（答辩状/质证意见/当庭陈述/证据目录） |
+| `output/` | 生成的文书（按案件 ID + 日期组织，MD + DOCX） |
+| `templates_extracted/` | 历史案件归档 |
 
 ---
 
-## 7. 已有数据
+## 5. 数据统计
 
-### 7.1 已注册案件（3 个）
-
-| 案件 | 案号 | 提取物 | 状态 |
-|------|------|--------|------|
-| 腾讯音乐诉北京雷石侵权纠纷案 | 2023京0491民初23751号 | 7 个 | ✅ extracted |
-| 浙江广电诉雷石:广汽埃安案件 | — | 5 个 | ⏳ pending |
-| 安徽酝醒追偿权纠纷 | 2025-18841号 | 0 个 | ⏳ pending |
-
-### 7.2 已有模板（7 个）
-
-| 模板名 | 分类 |
-|--------|------|
-| 答辩状四层递进模板 | 答辩状 |
-| 主观无过错四点论证模板 | 答辩状 |
-| 质证意见四性分别表述格式 | 质证意见 |
-| 当庭陈述四段式结构 | 当庭陈述 |
-| 双主线当庭陈述四段式 | 当庭陈述 |
-| 证据三级分类清单 | 证据目录 |
-| 赔偿数额应变话术体系 | 其他 |
+- 案源总数: 3
+- 提取物总数: 12（D1:1 / D2:1 / D3:2 / D4:2 / D5:6）
+- 模板总数: 7
 
 ---
 
-## 8. 注意事项
+## 6. 注意事项
 
-- **原文件不移动**：原始案件文件留在原位，case-intelligence 仅通过 `reference_index.yaml` 索引引用
-- **暂不 RAG**：当前版本不使用向量检索，使用结构化字段匹配
-- **提取物是燃料**：提取物本身不是最终文书，而是 AI 生成文书时的参考输入
+- **Prompts 是核心**：所有 AI 操作通过 prompts/ 驱动，修改需谨慎
+- **维度固定，内容变化**：5 个维度（D1-D5）适用于所有案由
+- **原文件不移动**：原始案件文件留在原位，通过 reference_index.yaml 索引引用
+- **暂不 RAG**：当前版本使用结构化字段匹配，不引入向量检索

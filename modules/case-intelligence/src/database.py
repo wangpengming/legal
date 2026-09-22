@@ -12,6 +12,50 @@ from typing import Optional
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DB_PATH = PROJECT_ROOT / "data" / "case_registry.db"
 
+# 提取维度（5个固定维度，适用于所有案由类型）
+ARTIFACT_TYPES = ["D1", "D2", "D3", "D4", "D5"]
+ARTIFACT_TYPE_NAMES = {
+    "D1": "事实认定",
+    "D2": "法律依据",
+    "D3": "攻防策略",
+    "D4": "证据体系",
+    "D5": "赔偿裁量",
+}
+
+# 录入方式
+ENTRY_METHODS = ["CLI", "UI", "AI"]
+
+# 涉案场景
+SCENE_TYPES = [
+    "实体KTV",
+    "车载KTV",
+    "线上平台",
+    "实体场所",
+    "线上应用",
+    "混合场景",
+    "其他",
+]
+
+# 被告授权状态
+AUTH_STATUS_TYPES = [
+    "已获音集协+音著协双授权",
+    "已获音集协授权",
+    "已获音著协授权",
+    "部分授权",
+    "未获授权",
+    "待核实",
+]
+
+# 原告授权层级
+PLAINTIFF_AUTH_LEVELS = [
+    "原始权利人",
+    "独家被授权方",
+    "间接授权(2级)",
+    "间接授权(3级+)",
+    "集体管理组织",
+    "待核实",
+]
+
 
 def _get_conn(db_path: Optional[Path] = None) -> sqlite3.Connection:
     """获取数据库连接（自动建表）。"""
@@ -84,6 +128,10 @@ def create_case(
     result: str = "",
     source_path: str = "",
     notes: str = "",
+    entry_method: str = "CLI",
+    scene: str = "",
+    plaintiff_auth_level: str = "",
+    defendant_auth_status: str = "",
     db_path: Optional[Path] = None,
 ) -> dict:
     """注册新案件，返回案件记录 dict（含 id）。"""
@@ -95,11 +143,13 @@ def create_case(
             """
             INSERT INTO cases
               (id, case_number, case_name, plaintiff, defendant, cause,
-               result, source_path, status, notes, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
+               result, source_path, status, notes, created_at,
+               entry_method, scene, plaintiff_auth_level, defendant_auth_status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?)
             """,
             (case_id, case_number, case_name, plaintiff, defendant, cause,
-             result, source_path, notes, now),
+             result, source_path, notes, now,
+             entry_method, scene, plaintiff_auth_level, defendant_auth_status),
         )
         conn.commit()
     except sqlite3.IntegrityError as e:
