@@ -1,6 +1,6 @@
 # Legal System 系统规格 v1.1
 
-> 最后更新：2026-08-17
+> 最后更新：2026-09-22
 
 ## 1. 系统架构
 
@@ -87,7 +87,7 @@ env:
 |------|------|------|------|--------|----------|
 | court-doc-generator | active | 1.1.4 | 出庭手续文档生成器（7 份材料一键生成 + PDF 合并预览） | Streamlit + python-docx + reportlab（PDF.js 内联预览） | 2026-08-17（原生开发） |
 | litigation-system | active | 0.2.0 | 法务诉讼业务平台（飞书历年案件天级同步 + 检索/统计/AI 双模式，基线 638 条） | FastAPI + SQLAlchemy + SQLite FTS5 / React 18 + Vite + ECharts | 2026-08-17（并入 modules/） |
-| case-intelligence | planning | 3.0.0 | 同质化案件文档检索与规则系统（三对象模型，不做 AI，只做检索） | NocoDB + Paperless-ngx + Docker Compose（7 容器） | 2026-08-17（并入 modules/） |
+| case-intelligence | active | 3.2.0 | 同质化案件文档检索与规则系统（三对象模型，不做 AI，只做检索） | Python CLI + SQLite（轻量工具） | 2026-08-17（并入 modules/，2026-09-22 落地 v3.2.0） |
 
 ## 3. 需求管理规范
 
@@ -152,7 +152,7 @@ env:
            └───────────────────────────────┴────────────────────────────────┘
 ```
 
-- **现状**：三模块各自独立运行；litigation-system 从飞书同步案件主数据，case-intelligence 于规划阶段（`entry: none`），court-doc-generator 离线生成材料
+- **现状**：三模块各自独立运行；litigation-system 从飞书同步案件主数据，case-intelligence 已落地 v3.2.0（SQLite 轻量 CLI），court-doc-generator 离线生成材料
 - **远期**：模块间数据流按「案件主数据 → 卷宗文档/审核规则」组织，详见各模块 SPEC 演化路线
 
 ## 5. Qoder项目配置

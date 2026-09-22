@@ -649,6 +649,57 @@ F-031~F-035 已完成多代理人材料动态绑定主体功能，但 3 个边�
 
 ---
 
+## 2026-09-22 case-intelligence v3.1 落地：案件注册+提取物管理+模板归纳 CLI
+
+**类型**: implementation
+**模块**: case-intelligence
+**状态**: in-progress
+**优先级**: P1
+
+### 描述
+
+Phase 1 基础设施（本周完成）：
+- src/database.py（SQLite 三表：cases/artifacts/templates）+ artifact_store.py + template_store.py + case_recognizer.py + extractor_cli.py（register/extract/promote/complete/search/check/report/list 10 子命令）
+- bin/start.py/stop.py/restart.py/status.py（4 件套，CLI 模块适配版）
+- reference_index.yaml（登记腾讯/广电/安徽酝醒/海帆 4 个历史案件，引用不移动原文件）
+- module.yaml 更新：planning→active，entry→bin/extract.py，tech_stack 更新为 CLI+SQLite+Markdown
+
+Phase 2 历史案件迁移（本周）：
+- 腾讯案 8 个 Artifact + 广电案 5 个 Artifact 入库 + 归档到 templates_extracted/
+- 归纳 4+ 个通用 Template（答辩状/质证意见/当庭陈述/证据目录）
+- EXTRACTION_LOG.md 记录迁移操作
+
+### 核心概念
+
+| 概念 | 定义 |
+|------|------|
+| 案件（Case） | 已结案原始案件，含原告/被告/案由/结果 |
+| 提取物（Artifact） | 从案件中提取的结构化参考源（10 种类型） |
+| 模板（Template） | 从多个提取物归纳的通用文书结构 |
+
+### CLI 命令速查
+
+```bash
+cd modules/case-intelligence
+python bin/extract.py register  --name '腾讯案' --case-number '2023京0491民初23751号'
+python bin/extract.py extract  --case-id <id> --type defense_argument_chain --title '主体不适格四层论证'
+python bin/extract.py promote  --artifact-id <id> --template-name '主体不适格答辩状模板' --category '答辩状'
+python bin/extract.py complete --case-id <id>
+python bin/extract.py check   --case-number '2023京0491民初23751号'
+python bin/extract.py list
+python bin/extract.py report
+```
+
+### 验收标准
+- [x] Phase1 infrastructure（DB + store + CLI + bin/4件套 + reference_index.yaml）
+- [ ] 腾讯案 8 个 Artifact 入库
+- [ ] 广电案 5 个 Artifact 入库
+- [ ] 通用 Template ≥ 4 份
+- [ ] docs/README.md 完成
+- [ ] docs/REQUIREMENTS.md 完成
+
+---
+
 ## 归档需求（已完成/已拒绝）
 
 | 日期 | 需求 | 结果 |

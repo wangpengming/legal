@@ -1,0 +1,55 @@
+{
+  "case_id": "f843bae6-3c1d-4bb7-8c52-b37ce7744ce4",
+  "case_name": "腾讯音乐诉北京雷石侵权纠纷案",
+  "artifacts": [
+    {
+      "id": "5fbbbb12-12d2-4431-9f1b-919e123b214a",
+      "artifact_type": "defense_argument_chain",
+      "title": "主体不适格四层递进论证",
+      "source_ref": "从答辩状-第一部分-原告权利基础.docx 第3-15段提取",
+      "version": 1
+    },
+    {
+      "id": "52211a0d-055f-4115-8bed-e2e94cb8c925",
+      "artifact_type": "case_key_facts",
+      "title": "案件关键事实清单",
+      "source_ref": "从腾讯案案件分析框架提取",
+      "version": 1
+    },
+    {
+      "id": "4e914e96-5c9f-4332-966d-6cf58bb3d9e7",
+      "artifact_type": "cross_exam_strategy",
+      "title": "质证意见四性分别表述格式",
+      "source_ref": "从240415-质证意见.docx提取",
+      "version": 1
+    },
+    {
+      "id": "5afea8f6-d7e3-4c9d-a40f-8fc200506dd3",
+      "artifact_type": "contingency_response",
+      "title": "庭审应变话术体系",
+      "source_ref": "从广电案应变准备体系提取，适用于腾讯案类似场景",
+      "version": 1
+    },
+    {
+      "id": "4efcce31-27f4-447d-8438-27bfe5cac749",
+      "artifact_type": "reverse_strategy",
+      "title": "反向维权九维打击路径",
+      "source_ref": "从极致唱响打击办.docx提取",
+      "version": 1
+    },
+    {
+      "id": "39e761fd-0221-44e5-9a93-2b35d2079c25",
+      "artifact_type": "court_statement",
+      "title": "当庭陈述四段式结构",
+      "source_ref": "从广电案当庭陈述提炼通用结构",
+      "version": 1
+    },
+    {
+      "id": "71801719-53b9-4831-b732-48011db65cfc",
+      "artifact_type": "evidence_structure",
+      "title": "证据三级分类清单",
+      "source_ref": "从证据管理模板提取",
+      "version": 1
+    }
+  ]
+}

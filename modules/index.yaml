@@ -21,10 +21,10 @@ modules:
 
   - name: case-intelligence
     path: modules/case-intelligence
-    status: planning
-    version: 3.0.0
-    description: 同质化案件文档检索与规则系统（NocoDB + Paperless-ngx，方案设计阶段，不做 AI）
-    entry: none
+    status: active
+    version: 3.1.0
+    description: 案例智能分析模块（CLI工具，案件注册+提取物管理+模板归纳，半自动不引入RAG，v3.1 active）
+    entry: bin/extract.py
     created: 2026-08-10
     integrated: 2026-08-17
 

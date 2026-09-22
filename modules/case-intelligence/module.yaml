@@ -1,33 +1,24 @@
 name: case-intelligence
-version: 3.0.0
-status: planning
-description: 同质化案件文档检索与规则系统（案件/卷宗/规则三对象，NocoDB + Paperless-ngx，方案设计阶段）
-entry: none
-port:
-  nocodb: 8090
-  paperless: 8091
-  gotenberg: 8092
-  postgres_nocodb: 5432
-  postgres_paperless: 5433
-  redis: 6379
-  tika: 8093
-deps: [] # 直接依赖的其他模块（当前无；组件/镜像见 tech_stack 与 docker-compose）
+version: 3.1.0
+status: active
+description: 案例智能分析模块（CLI工具，案件注册+提取物管理+模板归纳，半自动不引入RAG）
+entry: bin/extract.py
+deps: []
 created: 2026-08-10
 integrated: 2026-08-17
 tech_stack:
-  - NocoDB（案件/规则/清单管理，:8090）
-  - Paperless-ngx（文档 OCR + 全文检索，:8091）
-  - PostgreSQL 16 x2（NocoDB / Paperless 各自独立）
-  - Redis 7 + Gotenberg + Tika（Paperless 内部依赖）
-  - Docker Compose（7 容器，~2GB RAM / ~10GB 磁盘）
-  - python-docx + docx-revisions（Word 批注/修订提取脚本，约 200 行自研代码）
+  - Python 3（CLI工具，无Web服务）
+  - SQLite（case_registry.db，三表：cases/artifacts/templates）
+  - Markdown（提取物/模板存储格式，含YAML frontmatter）
+  - case-analysis-master skill（六阶段+两步法+六层抗辩矩阵，方法论根基）
 features:
-  - 三对象模型：案件（结构化）+ 文档（原始卷宗）+ 规则/检查清单（经验积累）
-  - 6 张表：cases(31字段) / checklists / checklist_items / review_records / rules / comment_records
-  - 中文 OCR 全文检索（社区中文镜像，PAPERLESS_OCR_LANGUAGE=chi_sim+eng）
-  - 检查清单按案由自动匹配（数据库筛选，非 AI 推荐）
-  - Word 批注/修订自动提取 → 批注记录表（规则来源沉淀）
-  - 7 步新案件审核工作流（录入→上传→预处理→检索→审核→结论→经验沉淀）
-  - 审计追溯：审核记录可追溯到检查项与来源案件
+  - 案件注册与识别（案号精确/当事人指纹/案由模糊，三级置信度）
+  - 提取物管理（10种类型：抗辩论证链/质证策略/证据结构等，写DB+写MD文件）
+  - 模板归纳与存储（4分类：答辩状/质证意见/当庭陈述/证据目录）
+  - 外部数据源引用（reference_index.yaml索引，不移动原文件）
+  - 半自动提取CLI（register/extract/promote/complete/search/check/report/list）
+  - 提取操作日志（EXTRACTION_LOG.md）
+port: {}
 readme: docs/README.md
 spec: spec/SPEC.md
+reference: reference_index.yaml

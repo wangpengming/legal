@@ -1,0 +1,41 @@
+{
+  "case_id": "0bf66137-731a-4359-b60d-628239d14346",
+  "case_name": "浙江广电诉雷石:广汽埃安案件",
+  "artifacts": [
+    {
+      "id": "4a162c6c-a89a-4eee-a771-aba3515477cf",
+      "artifact_type": "defense_argument_chain",
+      "title": "主观无过错四点论证",
+      "source_ref": "从1.主观无过错抗辩.docx提取",
+      "version": 1
+    },
+    {
+      "id": "8e96668a-4219-45b2-a33a-8b75aff64db0",
+      "artifact_type": "legal_reasoning_chain",
+      "title": "赔偿数额六点论证",
+      "source_ref": "从2.赔偿数额抗辩.docx提取",
+      "version": 1
+    },
+    {
+      "id": "944003fc-8256-4f49-a2a1-6ec4746b1610",
+      "artifact_type": "quantitative_analysis",
+      "title": "传播范围量化分析",
+      "source_ref": "从广电案分析提炼",
+      "version": 1
+    },
+    {
+      "id": "bc611421-bb14-4d0e-8974-598a06b7e107",
+      "artifact_type": "contingency_response",
+      "title": "赔偿数额应变话术",
+      "source_ref": "从广电案应变准备提取",
+      "version": 1
+    },
+    {
+      "id": "b8bd2a5c-d250-4b0e-9922-1fb778c29d45",
+      "artifact_type": "court_statement",
+      "title": "双主线当庭陈述四段式",
+      "source_ref": "从广电案双主线提炼",
+      "version": 1
+    }
+  ]
+}
