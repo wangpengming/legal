@@ -4,6 +4,24 @@
 
 ---
 
+## 2026-08-24 case-intelligence 飞书Bot集成
+
+**类型**: feature
+**模块**: case-intelligence
+**状态**: planning
+**优先级**: P0
+
+### 描述
+将飞书 Bot 接入 case-intelligence 模块，实现通过飞书对话完成案件管理（/case list/search/register/detail）、提取物查询（/case artifacts）和文书生成（/case generate）。通过 Bot → CLI subprocess 模式，复用现有 extract.py。
+
+### 验收标准
+- [ ] /case list — 返回案件列表（表格格式）
+- [ ] /case search <关键词> — 返回匹配案件
+- [ ] /case register <信息> — 创建新案件
+- [ ] /case detail <case_id> — 返回案件详情
+- [ ] /case help — 返回指令帮助
+- [ ] 指令解析支持自然语言模糊匹配
+
 ## 2026-08-22 court-doc-generator 案件搜索/筛选（增强）
 
 **类型**: feature

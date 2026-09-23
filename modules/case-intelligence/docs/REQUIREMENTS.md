@@ -100,7 +100,93 @@
 
 ---
 
-## 2. Should Have（应该实现）
+### M-6: 飞书 Bot 集成
+
+**类型**: feature
+**优先级**: P0
+**模块**: case-intelligence
+
+#### 描述
+将飞书 Bot 接入 case-intelligence 模块，实现通过飞书对话完成案件管理、提取物查询和文书生成等核心操作。用户在飞书群中通过指令与 Bot 交互，无需切换到本地 CLI。
+
+#### 用户故事
+作为法务人员，我希望在飞书群中直接通过 Bot 指令查询案件、提取文书参考、生成法律文书，以便随时随地高效工作。
+
+#### 系统架构
+
+```
+飞书群用户
+    │
+    ▼
+┌──────────────────────────────┐
+│   飞书 Bot（lark-mcp 或     │
+│   hermes-feishu channel）    │
+└────────────┬─────────────────┘
+             │ 接收消息/指令
+             ▼
+┌──────────────────────────────┐
+│  case-intelligence CLI 层    │
+│  bin/extract.py              │
+│  （扩展支持 HTTP API 或      │
+│   subprocess 调用模式）       │
+└────────────┬─────────────────┘
+             │
+             ▼
+┌──────────────────────────────┐
+│  case-intelligence Core      │
+│  database.py / artifact_     │
+│  store.py / template_store   │
+└──────────────────────────────┘
+```
+
+#### 指令设计
+
+| 指令 | 功能 | 示例 |
+|------|------|------|
+| `/case register` | 注册新案件 | `/case register 案号：（2026）xxx号 原告：xxx 被告：xxx` |
+| `/case list` | 列出案件 | `/case list` 或 `/case list --status pending` |
+| `/case search` | 搜索案件 | `/case search 腾讯音乐` |
+| `/case detail` | 查看案件详情 | `/case detail <case_id>` |
+| `/case extract` | 提取案件（调用 prompts） | `/case extract <case_id>` |
+| `/case artifacts` | 查询提取物 | `/case artifacts <case_id>` |
+| `/case generate` | 生成文书 | `/case generate <case_id> 答辩状` |
+| `/case status` | 修改案件状态 | `/case status <case_id> extracted` |
+| `/case help` | 查看帮助 | `/case help` |
+
+#### 技术方案
+
+**方案A（推荐）：Bot → CLI subprocess**
+- Bot 接收消息 → 解析指令 → 调用 `python3 bin/extract.py <args>` subprocess
+- 输出截获 → 格式化回复 → 发送到飞书群
+- 优点：复用现有 CLI，无需重写核心逻辑
+- 缺点：每次调用有 Python 启动开销（可接受）
+
+**方案B：Bot → HTTP API**
+- 在 `bin/` 新增 HTTP server（如 FastAPI）暴露 REST API
+- Bot 通过 API 调用核心功能
+- 优点：响应更快，支持长连接
+- 缺点：引入额外依赖，需要管理 API 认证
+
+#### 验收标准
+
+- [ ] 飞书 Bot 能响应 `/case list` 并返回案件列表（表格格式）
+- [ ] 飞书 Bot 能响应 `/case search <关键词>` 并返回匹配案件
+- [ ] 飞书 Bot 能响应 `/case register <信息>` 创建新案件
+- [ ] 飞书 Bot 能响应 `/case detail <case_id>` 返回案件详情
+- [ ] 飞书 Bot 能响应 `/case help` 返回指令帮助
+- [ ] Bot 与 legal 模块共用水印/模板文件（如需生成 DOCX）
+- [ ] 指令解析容错：支持自然语言模糊匹配
+
+#### 依赖项
+
+- `lark-mcp`（飞书多维表格等 17 个工具）
+- 或 `hermes-feishu channel`（Hermes 内置飞书集成）
+- case-intelligence CLI（现有 `bin/extract.py`）
+
+#### 备注
+
+- 本需求复用现有 `case-intelligence` 的 database、prompts 和 templates，不复制数据
+- 文书生成调用 `prompts/生成/` 下的提示词，由 AI 填充内容后返回
 
 ### S-1: 外部数据源索引
 
