@@ -4,11 +4,99 @@
 
 ---
 
+## 2026-10-12 系统级：thunderbox 部署平台接入 + 模块域名规划（一模块一域名）
+
+**类型**: chore（工程规范）
+**模块**: 系统级（横切 4 模块：court-doc-generator / litigation-system / case-intelligence / portal）
+**状态**: done
+**优先级**: P0（部署红线：服务器只支持 GitHub 部署方式；域名随意创建会造成不可追溯的碎片）
+
+### 描述
+
+为统一部署到雷石内部平台 **thunderbox**（雷石盒子），固化两项系统级规范：
+
+1. **部署平台信息固化**：thunderbox 控制台 / MCP 端点 / 域名规范 / 部署方式（GitHub 唯一通道）写入 `docs/`，避免每次口头传递。
+2. **模块域名规划（一模块一域名）**：每个模块在 thunderbox 上**有且仅有一个域名**，域名绑定在应用创建时确定、不可随意新建；所有域名统一 `legal-*` 命名空间、`access_mode=internal`（仅内网）。域名必须像端口一样集中登记与查重。
+
+### thunderbox 平台关键事实（实证）
+
+| 项 | 值 |
+|----|----|
+| 控制台 | `https://box.tbox.ktvsky.com/` |
+| MCP 端点 | `https://api-box.tbox.ktvsky.com/mcp`（HTTP transport） |
+| 域名规范 | `<subdomain>.tbox.ktvsky.com` |
+| 应用创建 | `thunderbox_create` **强制要求 subdomain** → 1 应用 = 1 域名，创建即绑定 |
+| 域名占用查询 | `thunderbox_check(target=domain, value=<sub>)` → `{subdomain, domain, available}` |
+| 访问模式 | `public` / `internal` / `restricted`（本项目一律 `internal`） |
+| 删除应用 | **无 MCP 工具**，仅能在控制台人工删除（`thunderbox_control` 仅 start/stop/cancel） |
+| 代码来源 | **仅支持 GitHub 方式**，部署前必须先将代码迁移到 GitHub 仓库 |
+| Token 获取 | 控制台点入创建 token；token 严禁写入仓库（项目 scope 会被提交） |
+
+### 模块域名规划（一模块一域名）
+
+| 模块 | 规划域名 | 状态 | 说明 |
+|------|---------|------|------|
+| court-doc-generator | `legal-court` | ⚠️ **待回收** | 该 subdomain 已被遗留应用占用；候选回退 `legal-court-generator` / `legal-courtdocs`（均可用） |
+| litigation-system | `legal-litigation` | ✅ 可用 | 待部署时申请 |
+| case-intelligence | `legal-case` | ✅ 可用 | 待部署时申请 |
+| portal | `legal-portal` | ✅ 可用 | 待部署时申请 |
+
+> 全部 `access_mode=internal`。域名注册表见 [`shared/config/domains.yaml`](../../shared/config/domains.yaml)。
+
+### 落地清单
+
+- [x] **doc01** 新建 `shared/config/domains.yaml`：域名注册表（平台规范 + 4 模块唯一域名 + 占用状态 + 遗留冲突登记 + 申请/查重流程）
+- [x] **doc02** `AGENTS.md` 新增域名管理规则 §10.4.5（一模块一域名 / 禁止随意创建 / 创建前必查重 / 必须登记 domains.yaml）+ §10.2 禁令 + §1.5 完整性表 + §2 模块清单域名列 + §11 速查
+- [x] **doc03** 根 `README.md` 新增「部署到 thunderbox」章节 + 模块表域名列；`docs/SPEC.md` 新增「部署与域名」章节；`docs/README.md` 索引登记
+- [x] **doc04** `docs/deployment-thunderbox.md`：thunderbox 部署手册（GitHub 通道 / MCP 工具 / 域名申请 / access_mode / 排障）
+- [x] **cfg01** `modules/index.yaml` + 4× `module.yaml` 补 `domain` 字段（与 domains.yaml 一致）
+- [x] **cfg02** 4× 模块 `README.md` + 模块 docs 补「部署/域名」章节；`court-doc-generator/docs/DEPLOYMENT.md` 补 thunderbox 通道
+- [x] **cfg03** `shared/config/README.md` 更新（登记 domains.yaml）
+
+### 验收标准
+
+- [x] `shared/config/domains.yaml` 存在，登记 4 模块唯一域名 + 平台规范 + 遗留占用说明
+- [x] `AGENTS.md` 含「一模块一域名，禁止随意创建」强制规则（dev flow 或 §10.4 中可检索到）
+- [x] `modules/index.yaml` 与 4× `module.yaml` 均含 `domain` 字段，且与 domains.yaml **完全一致**
+- [x] 根 README / 4× 模块 README / docs 均可检索到 thunderbox 部署方式与所属域名
+- [x] 无任何 token / 密钥写入仓库（仅记录 token 获取入口）
+- [x] 全部编辑的 YAML 可解析（`yaml.safe_load` 通过）
+
+---
+
+## 2026-10-12 case-intelligence 治理：版本归位 + backlog 纠偏 + 单测补齐 + 健康端点
+
+**类型**: chore（文档/测试治理）
+**模块**: case-intelligence
+**状态**: done
+**优先级**: P1
+
+### 描述
+
+对 case-intelligence 做一次一致性与完整性治理（A~E）：
+
+- **A 版本归位**：确认 v3.3.0 内容 = Web UI + 目录扫描录入 + AI 引擎配置 + LangChain 文书生成 + prompts 固化 v1.2 + 飞书 Bot（commit `ea21774`）；补 `CHANGELOG` 3.3.0 条目；统一 `docs/SPEC.md` / `docs/REQUIREMENTS.md` / `docs/README.md` / 根 `docs/SPEC.md` 版本头至 3.3.0。
+- **B backlog 状态纠偏**：目录扫描（2026-09-26）、v3.1 落地（2026-09-22）、遗留项修复（2026-09-27）→ `done`；Web UI 补勾验收项；飞书 Bot 条目降级为「代码就绪 · 通道暂停」。
+- **C 合并重复**：合并同日（2026-09-27）两条「产品级达标」条目（SPEC-001~007 + 产品增强、LangChain + MiniMax）为一条。
+- **D 处置 v4.0 提案**：2026-08-17「v3.0 → v4.0 案例分析输出生成器」标记 `superseded`（核心生成能力已由 v3.3.0 LangChain/MiniMax 实现；原 NocoDB + Paperless 方案作废），归档。
+- **E1 单测补齐**：新增 `tests/test_langchain_llm.py` / `test_document_generator.py` / `test_lark_bot.py` / `test_ui.py`（stdlib + mock，无外部依赖，可 pytest 收集亦可独立运行）。
+- **E2 健康端点**：新增 `bin/health.py` 轻量 JSON 探针（版本 + UI `/_stcore/health` + DB 统计，只读）；对齐 portal SPEC 健康契约（case-intelligence → `/case/_stcore/health`）。
+
+### 验收标准
+- [x] 版本头一致（3.3.0），`CHANGELOG` 3.3.0 条目存在
+- [x] case-intelligence 相关 backlog 条目无 `in-progress` 残留
+- [x] 同日重复「产品级达标」条目已合并
+- [x] v4.0 提案状态为 `superseded` 并归档
+- [x] 新增 4 份单测文件，独立运行全部通过（39 用例）
+- [x] `bin/health.py` 输出 JSON 且退出码正确
+
+---
+
 ## 2026-09-26 case-intelligence 目录扫描 + AI 辅助录入
 
 **类型**: feature
 **模块**: case-intelligence
-**状态**: in-progress
+**状态**: done
 **优先级**: P1（短期任务）
 
 ### 描述
@@ -54,8 +142,8 @@ python bin/extract.py scan /path/to/case --ai --preview
 - [x] **F-063** extractor.py：AI 提取器（Mock/Ollama 引擎/D1-D5 提取）
 - [x] **F-064** importer.py：数据导入器（cases 表/artifacts 表写入）
 - [x] **F-065** extract.py scan 命令：CLI 交互界面（--dry-run/--ai/--import）
-- [ ] **F-066** ai_engines.yaml：AI 引擎配置
-- [ ] **F-067** 单元测试：scanner/parser/extractor
+- [x] **F-066** ai_engines.yaml：AI 引擎配置（MiniMax / Ollama，v3.3.0 落地）
+- [x] **F-067** 单元测试：scanner/parser/extractor（`tests/test_scanner.py` / `test_parser.py` / `test_extractor.py`）
 - [x] **F-068** 端到端测试：完整流程（已验证）
 
 ### 验收标准
@@ -65,7 +153,7 @@ python bin/extract.py scan /path/to/case --ai --preview
 - [x] 从目录名推断案件名称（已测试：从"腾讯音乐诉北京雷石侵权纠纷案"目录名正确提取）
 - [x] AI 提取 D1-D5 维度完整（已测试：Mock 引擎输出完整 D1-D5）
 - [x] 提取结果格式规范（JSON + Markdown）（已测试：Markdown 输出格式正确）
-- [ ] 入库后可通过 CLI 检索（待测试：需真实 AI 引擎或 Mock 引擎完成入库）
+- [x] 入库后可通过 CLI 检索（已通过 scan --ai --import 端到端验证；v3.3.0 亦可经 Web UI 检视）
 
 ### 规格文档
 
@@ -101,35 +189,35 @@ python bin/extract.py scan /path/to/case --ai --preview
 ### 功能需求
 
 #### 1. 登录认证
-- [ ] 简单Session认证（不引入复杂OAuth/JWT）
-- [ ] 默认账号：
+- [x] 简单Session认证（不引入复杂OAuth/JWT）
+- [x] 默认账号：
   - `admin` / `admin123`（管理员）
   - `test` / `test123`（测试账号）
-- [ ] 无资源隔离，所有登录用户可见所有案件
-- [ ] 登录状态持久化（Streamlit session_state）
+- [x] 无资源隔离，所有登录用户可见所有案件
+- [x] 登录状态持久化（Streamlit session_state）
 
 #### 2. 案件管理
-- [ ] 案件列表（分页、搜索）
-- [ ] 案件详情页（基本信息 + 提取物列表）
-- [ ] 健康度指标显示
-- [ ] 快速跳转到提取/生成功能
+- [x] 案件列表（分页、搜索）
+- [x] 案件详情页（基本信息 + 提取物列表）
+- [x] 健康度指标显示
+- [x] 快速跳转到提取/生成功能
 
 #### 3. 扫描录入
-- [ ] 目录选择器（上传或路径输入）
-- [ ] 触发 `scan --ai --import --yes` 流程
-- [ ] 实时显示扫描结果
-- [ ] 扫描历史记录
+- [x] 目录选择器（上传或路径输入）
+- [x] 触发 `scan --ai --import --yes` 流程
+- [x] 实时显示扫描结果
+- [x] 扫描历史记录
 
 #### 4. 文书生成
-- [ ] 选择案件 + 选择文书类型
-- [ ] 调用 LLM 生成
-- [ ] 预览 + 导出（DOCX/Markdown）
-- [ ] 生成历史记录
+- [x] 选择案件 + 选择文书类型
+- [x] 调用 LLM 生成
+- [x] 预览 + 导出（DOCX/Markdown）
+- [x] 生成历史记录
 
 #### 5. 统计看板
-- [ ] 案件总数/已提取/待提取
-- [ ] 案由分布图（简单文本图表）
-- [ ] 最近操作记录
+- [x] 案件总数/已提取/待提取
+- [x] 案由分布图（简单文本图表）
+- [x] 最近操作记录
 
 ### 技术方案
 
@@ -139,36 +227,35 @@ python bin/extract.py scan /path/to/case --ai --preview
 - 复用 src/ 下现有模块（database, scanner, parser, extractor, langchain_llm）
 - 复用 bin/extract.py CLI 功能
 
-目录结构：
+目录结构（实际落地）：
 case-intelligence/
 ├── app.py                      # Streamlit 主入口
+├── config.py                   # UI 配置（端口 18503、账号）
+├── pages/
+│   ├── 1_登录.py
+│   ├── 2_案件列表.py
+│   ├── 2_案件详情.py
+│   ├── 3_扫描录入.py
+│   ├── 4_文书生成.py
+│   └── 5_统计看板.py
 ├── ui/
-│   ├── __init__.py
-│   ├── pages/
-│   │   ├── 1_登录.py
-│   │   ├── 2_案件列表.py
-│   │   ├── 3_扫描录入.py
-│   │   ├── 4_文书生成.py
-│   │   └── 5_统计看板.py
-│   ├── components/
-│   │   ├── auth.py            # 登录组件
-│   │   ├── case_card.py       # 案件卡片
-│   │   └── doc_preview.py     # 文书预览
-│   └── utils/
-│       └── cli_wrapper.py     # CLI 封装
-├── config.py                   # UI 配置（端口、账号）
-└── requirements.txt           # streamlit 等依赖
+│   ├── auth.py                 # 登录守卫
+│   └── utils.py                # UI 辅助函数
+└── bin/
+    ├── start_ui.py             # UI 启动（写 PID + 日志）
+    ├── stop_ui.py
+    └── status_ui.py            # 端口 + /_stcore/health 健康检查
 ```
 
 ### 验收标准
 
-- [ ] admin/test 账号可登录
-- [ ] 登录后可见所有案件
-- [ ] 可扫描目录并导入案件
-- [ ] 可为案件生成4种文书
-- [ ] 文书可导出为 DOCX/MD
-- [ ] 健康度检查显示正确
-- [ ] 统计看板显示正确
+- [x] admin/test 账号可登录
+- [x] 登录后可见所有案件
+- [x] 可扫描目录并导入案件
+- [x] 可为案件生成4种文书
+- [x] 文书可导出为 DOCX/MD
+- [x] 健康度检查显示正确
+- [x] 统计看板显示正确
 
 ### 里程碑
 
@@ -179,16 +266,16 @@ case-intelligence/
 
 ---
 
-## 2026-09-27 产品级达标 v2（SPEC-001~007 + 产品增强）
+## 2026-09-27 case-intelligence 产品级达标（SPEC-001~007 + LangChain/MiniMax + 产品增强）
 
 **类型**: feature + refactor
 **模块**: case-intelligence
 **状态**: done
 **优先级**: P0
 
-### 描述
+> **合并归档**：本条目合并同日两条重复的「产品级达标」需求（原「产品级达标 v2：SPEC-001~007 + 产品增强」与「产品级达标：LangChain + MiniMax」），统一为一条。
 
-SPEC-001~007 全部完成 + 2个产品增强功能：
+### 一、SPEC-001~007（工程缺陷修复）
 
 #### SPEC-001: Prompts未用于文书生成
 - [x] `langchain_llm.generate_direct()` 优先加载 `prompts/生成/` 下的提示词
@@ -218,7 +305,22 @@ SPEC-001~007 全部完成 + 2个产品增强功能：
 #### SPEC-007: 统计增强
 - [x] `cmd_report()` 增加按案由分布统计（Top 10）
 
-### 产品增强
+### 二、LangChain / LangGraph 架构（T-001~T-010）
+
+实现 LangChain/LangGraph 架构，集成 MiniMax LLM：LangChain LLM 服务（MiniMax-Text-01）、scan 命令支持 minimax 引擎、模板 + LLM 混合生成、LangGraph 工作流（生成 → 审查 → 定稿）、import 命令（JSON 增量导入）。
+
+- [x] **T-001** LarkBot search 格式统一（已验证正常）
+- [x] **T-002** 统一 extractor 与 ai_engine（MiniMaxAdapter）
+- [x] **T-003** scan 命令接入 MiniMax（--engine minimax）
+- [x] **T-004** 扫描链路入库测试（--import --yes）
+- [x] **T-005** 模板 + LLM 混合生成（template+llm source）
+- [x] **T-006** LangGraph 工作流集成（review_node 实际调用 LLM）
+- [x] **T-007** Database 类封装（函数式接口已可用，跳过）
+- [x] **T-008** Prompts 规则库验证（load_prompt 正常工作）
+- [x] **T-009** import 命令（JSON 增量导入 CLI）
+- [x] **T-010** TemplateStore 类封装（函数式接口已可用，跳过）
+
+### 三、产品增强
 
 #### 增强1: 案件健康度检查
 - [x] 新增 `health <case_id>` 命令
@@ -233,67 +335,36 @@ SPEC-001~007 全部完成 + 2个产品增强功能：
 ### 验证结果
 
 - pytest: 28 passed, 5 skipped ✅
-- 文书生成：4种类型全部使用prompts ✅
-- scan链路：去重/完整性/入库 全部通过 ✅
+- 文书生成：4种类型全部使用prompts（defense/evidence_objection/court_statement/evidence_index）✅
+- scan链路：去重/完整性/入库 全部通过（--import --yes 端到端）✅
 - 批量导入：进度条显示正常 ✅
 - 健康度检查：83% / 100% 等 ✅
 - 导出DOCX：37KB文件正常生成 ✅
-
-## 2026-09-27 case-intelligence 产品级达标（LangChain + MiniMax）
-
-**类型**: refactor + feature
-**模块**: case-intelligence
-**状态**: done
-**优先级**: P0
-
-### 描述
-
-实现 LangChain/LangGraph 架构，集成 MiniMax LLM，完成以下改进：
-
-1. **T-001 ~ T-010** 全部完成
-2. LangChain LLM 服务（MiniMax-Text-01）
-3. scan 命令支持 minimax 引擎
-4. 模板 + LLM 混合生成
-5. LangGraph 工作流（生成 → 审查 → 定稿）
-6. import 命令（JSON 增量导入）
-
-### 完成清单
-
-- [x] **T-001** LarkBot search 格式统一（已验证正常）
-- [x] **T-002** 统一 extractor 与 ai_engine（MiniMaxAdapter）
-- [x] **T-003** scan 命令接入 MiniMax（--engine minimax）
-- [x] **T-004** 扫描链路入库测试（--import --yes）
-- [x] **T-005** 模板 + LLM 混合生成（template+llm source）
-- [x] **T-006** LangGraph 工作流集成（review_node 实际调用 LLM）
-- [x] **T-007** Database 类封装（函数式接口已可用，跳过）
-- [x] **T-008** Prompts 规则库验证（load_prompt 正常工作）
-- [x] **T-009** import 命令（JSON 增量导入 CLI）
-- [x] **T-010** TemplateStore 类封装（函数式接口已可用，跳过）
-
-### 验证结果
-
-- pytest: 28 passed, 5 skipped
-- MiniMax LLM 生成：defense/evidence_objection/court_statement/evidence_index 全部通过
-- scan --import --yes 端到端测试通过
-- import 命令增量导入测试通过
+- MiniMax LLM 生成：defense/evidence_objection/court_statement/evidence_index 全部通过（源码 MiniMax-Text-01）✅
+- import 命令增量导入测试通过 ✅
 
 ## 2026-08-24 case-intelligence 飞书Bot集成
 
 **类型**: feature
 **模块**: case-intelligence
-**状态**: planning
+**状态**: in-progress（代码就绪 · 通道暂停）
 **优先级**: P0
 
 ### 描述
 将飞书 Bot 接入 case-intelligence 模块，实现通过飞书对话完成案件管理（/case list/search/register/detail）、提取物查询（/case artifacts）和文书生成（/case generate）。通过 Bot → CLI subprocess 模式，复用现有 extract.py。
 
+> **当前状态（2026-10-12）**：代码已就绪——`src/lark_bot.py` 实现 `CaseBot.handle_message()`（命令 list/search/register/detail/artifacts/report/help）+ `LarkWebhookHandler` 事件处理 + CLI 自测模式，全部命令经本地自测通过。**通道暂停**：飞书 SDK 为可选依赖（未安装时走 mock 模式），上线需飞书企业权限（app_id / app_secret / 事件订阅回调）。待权限就绪后再推进网关接入。
+
 ### 验收标准
-- [ ] /case list — 返回案件列表（表格格式）
-- [ ] /case search <关键词> — 返回匹配案件
-- [ ] /case register <信息> — 创建新案件
-- [ ] /case detail <case_id> — 返回案件详情
-- [ ] /case help — 返回指令帮助
-- [ ] 指令解析支持自然语言模糊匹配
+- [x] /case list — 返回案件列表（表格格式）
+- [x] /case search <关键词> — 返回匹配案件
+- [x] /case register <信息> — 创建新案件（含年份/法院推断）
+- [x] /case detail <case_id> — 返回案件详情
+- [x] /case artifacts <case_id> — 返回提取物列表
+- [x] /case report — 返回统计报告
+- [x] /case help — 返回指令帮助
+- [ ] 指令解析支持自然语言模糊匹配（当前仅支持显式 `/case <cmd>` 命令）
+- [ ] /case generate — 文书生成（暂未接入 Bot，生成能力见 v3.3.0 LangChain/MiniMax 路径）
 
 ## 2026-08-22 court-doc-generator 案件搜索/筛选（增强）
 
@@ -605,9 +676,17 @@ F-031~F-035 已完成多代理人材料动态绑定主体功能，但 3 个边�
 
 **类型**: feature
 **模块**: case-intelligence（吸收方案，原 cross-module 决策已并入）
-**状态**: proposed
+**状态**: superseded（已被 v3.3.0 实现，原方案作废归档）
 **优先级**: P1（业务核心需求）
-**版本演进**: case-intelligence v3.0 → v4.0（起引入 LLM 生成能力，打破 v3.0"不做 AI"原则）
+**版本演进**: case-intelligence v3.0 → v4.0（原计划引入 LLM 生成能力，打破 v3.0"不做 AI"原则）
+
+> ### ⚠️ 处置结论（2026-10-12）：superseded / 作废
+>
+> **核心生成能力已由 v3.3.0 落地实现**：case-intelligence v3.3.0 已通过 **LangChain + MiniMax** 路径实现 LLM 文书生成（答辩状 / 质证意见 / 当庭陈述 / 证据目录），本提案的"引入 LLM 生成层"目标已达成（见 `src/langchain_llm.py` / `src/document_generator.py`，CHANGELOG 2026-10-12）。
+>
+> **原规划的基础设施方案作废**：本提案原设想复用 **NocoDB + Paperless-ngx 多容器**（v3.0 方案）作为底座，该方案**已废弃**——模块现状收敛为 **Python CLI + SQLite（三表）+ Streamlit Web UI** 轻量形态（v3.3.0）。
+>
+> **剩余未覆盖项（如需推进请重新登记新需求）**：① 我方证据目录 / 我方证据资料 生成；② 与 court-doc-generator 出庭材料的一站式对接；③ 六阶段分析框架（`case-analysis-master`）的方法论沉淀。这些不再沿用本提案的 NocoDB/Paperless 前置条件。
 
 ### 描述
 基于原告方材料（起诉状 + 证据清单 + 证据），自动生成我方全套应对材料：答辩状、我方证据目录、我方证据资料、质证意见。**通过扩展 case-intelligence 模块实现**——复用其三对象模型（案件+文档+规则）、Paperless-ngx OCR、检查清单等现有 v3.0 基础设施，仅引入 LLM 生成层（限于答辩状 / 质证意见 / 证据目录）。
@@ -944,7 +1023,7 @@ F-031~F-035 已完成多代理人材料动态绑定主体功能，但 3 个边�
 
 **类型**: implementation
 **模块**: case-intelligence
-**状态**: in-progress
+**状态**: done
 **优先级**: P1
 
 ### 描述
@@ -983,11 +1062,13 @@ python bin/extract.py report
 
 ### 验收标准
 - [x] Phase1 infrastructure（DB + store + CLI + bin/4件套 + reference_index.yaml）
-- [ ] 腾讯案 8 个 Artifact 入库
-- [ ] 广电案 5 个 Artifact 入库
-- [ ] 通用 Template ≥ 4 份
-- [ ] docs/README.md 完成
-- [ ] docs/REQUIREMENTS.md 完成
+- [x] 腾讯案 8 个 Artifact 入库
+- [x] 广电案 5 个 Artifact 入库
+- [x] 通用 Template ≥ 4 份
+- [x] docs/README.md 完成
+- [x] docs/REQUIREMENTS.md 完成
+
+> **状态归档**：本条目对应 v3.1 阶段，后续演进见「v3.2.0 落地」（CHANGELOG 2026-09-22）与「v3.3.0 落地」（CHANGELOG 2026-10-12）。
 
 ---
 
@@ -995,7 +1076,7 @@ python bin/extract.py report
 
 **类型**: fix + feature
 **模块**: case-intelligence
-**状态**: in-progress
+**状态**: done
 **优先级**: P0（Bug修复）
 
 ### 已完成修复
@@ -1017,7 +1098,7 @@ python bin/extract.py report
 
 | 项目 | 状态 | 说明 |
 |------|------|------|
-| **飞书Bot接入** | ⏸️ 暂停 | 等待飞书企业权限 |
+| **飞书Bot接入** | ⏸️ 通道暂停 | 代码就绪（`src/lark_bot.py` 全部命令已实现并通过 CLI 自测，见 2026-08-24 条目）；**通道暂停**——等待飞书企业权限（app_id / app_secret / 事件订阅）方可上线 |
 | **容器化部署** | ⏸️ 暂停 | 优先级较低 |
 
 ### 验证结果
@@ -1050,6 +1131,7 @@ python bin/extract.py report
 |------|------|------|
 | 2026-08-17 | 系统骨架初始化 | done |
 | 2026-08-20 | 案件管理页：查看详情 + 文件预览 + 生成/删除二次确认 | done |
+| 2026-08-17 | 扩展 case-intelligence 为案例分析输出生成器（v3.0 → v4.0 升级） | superseded（核心生成能力已由 v3.3.0 LangChain/MiniMax 实现；原 NocoDB + Paperless 方案作废） |
 
 ---
 
