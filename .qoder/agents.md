@@ -25,8 +25,19 @@
 1. **提出需求** → 写入 `backlog.md`
 2. **评审** → 确认优先级和模块归属
 3. **开发** → 在对应 `modules/<name>/` 下实现
-4. **注册** → 更新 `modules/index.yaml`
+4. **注册** → 更新 `modules/index.yaml` + 模块 `module.yaml`（含 `domain` 字段）
 5. **上线** → 更新 `backlog.md` 状态 + `CHANGELOG.md`
+
+## 部署与域名（thunderbox）🔴
+
+生产部署统一走雷石 **thunderbox**（雷石盒子）：
+
+- 控制台 `https://box.tbox.ktvsky.com/` · MCP 端点 `https://api-box.tbox.ktvsky.com/mcp`
+- 代码来源**仅支持 GitHub** —— 部署前须先把代码迁移到 GitHub 仓库
+- **一模块一域名**：每个模块有且仅有一个域名（`legal-*` 前缀，`access_mode=internal`），**禁止随意创建**；域名统一登记 `shared/config/domains.yaml`（与端口注册表 `ports.yaml` 并列）
+- `module.yaml` 的 `domain` 字段必须与 `domains.yaml` 一致
+- thunderbox token **严禁写入仓库**（项目 scope 的 `.qoder/settings.json` 会被提交）
+- 完整规则见根目录 `AGENTS.md §10.4.5`；部署手册 `docs/deployment-thunderbox.md`
 
 ## 目录规范
 

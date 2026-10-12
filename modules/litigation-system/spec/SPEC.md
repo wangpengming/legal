@@ -5,6 +5,7 @@
 > 上游输入: `requirements/01-需求规格说明书.md`（v1.0 需求基线）
 > 证据基线: ①飞书多维表格实测（638 条/35 字段/5 关联表，2026-08-13）②WebSearch 网络调研（裁判文书网现状等，详见 research/）③review 报告（本版按 P0/P1 修正全量落地）
 > 版本历史: v0.1（2026-08-12 草稿，基于假设：18 字段/数千~数万条/买卖合同劳动争议用例）→ v0.2（本次，全部实测）
+> 部署/域名: thunderbox · `legal-litigation.tbox.ktvsky.com`（唯一域名 / `internal`），代码来源 GitHub（见 `AGENTS.md §10.4.5`）
 
 ---
 

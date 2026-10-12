@@ -284,8 +284,8 @@ const APPS = [
   { name:"litigation-system", title:"诉讼业务平台", desc:"案件台账 · 飞书同步 · 文书与流程管理", color:"#1F3A93", icon:"诉",
     path:"/litigation", health:"/litigation/api/health", port:"8000", ver:"0.2.0", entry:"FastAPI + React",
     status:"on", lastBeat:0, latency:52, uptime:0, fails:0 },
-  { name:"case-intelligence", title:"卷宗检索与规则", desc:"同质化案件检索 · 文档规则化 · 卷宗归档", color:"#B7984D", icon:"卷",
-    path:"/case", health:"/case/api/healthz", ports:"8090/8091", ver:"3.0.0", entry:"docker compose",
+  { name:"case-intelligence", title:"案例智能分析", desc:"五维度提取 · 文书生成 · 案件库", color:"#B7984D", icon:"案",
+    path:"/case", health:"/case/_stcore/health", port:"18503", ver:"3.3.0", entry:"app.py（Streamlit）",
     status:"on", lastBeat:0, latency:44, uptime:0, fails:0 },
 ];
 const ST = { "on":"在线","deg":"降级","off":"离线" };
@@ -423,7 +423,7 @@ function seedLogs(){
   pushLog("portal", "Portal v0.1 原型已启动，欢迎页渲染完成", "sys");
   pushLog("court-doc-generator", "心跳 200 OK · /court/_stcore/health", "ok");
   pushLog("litigation-system", "心跳 200 OK · /litigation/api/health", "ok");
-  pushLog("case-intelligence", "心跳 200 OK · NocoDB 8090 · Paperless 8091", "ok");
+  pushLog("case-intelligence", "心跳 200 OK · /case/_stcore/health", "ok");
   pushLog("portal", "nginx 同源反代规则已加载：/court /litigation /case", "sys");
 }
 

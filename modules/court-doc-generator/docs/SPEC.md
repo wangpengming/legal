@@ -6,6 +6,7 @@
 > **当前架构**：React 18 + TypeScript + Vite（前端） + FastAPI + Uvicorn（后端） + SQLite（数据）
 > **对应需求**：见 [REQUIREMENTS.md](./REQUIREMENTS.md)
 > **配套索引**：`docs/SPEC.md`（系统级）→ 本文件（模块级）
+> **部署/域名**：thunderbox · `legal-court.tbox.ktvsky.com`（唯一域名 / `internal`；⚠️ `legal-court` 待回收）→ 见 [DEPLOYMENT.md §8](./DEPLOYMENT.md)
 > ⚠️ **历史档案说明**：本文档保留 v1.x Streamlit 时代的决策档案（§3 决策矩阵 / 端口等）；当前实现已切换
 >    React+FastAPI，生产运行与部署以 [DEPLOYMENT.md](./DEPLOYMENT.md) 为准。
 

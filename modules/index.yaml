@@ -1,12 +1,19 @@
 # 模块注册表 / Module Registry
+#
+# 域名字段与 shared/config/domains.yaml 保持一致（一模块一域名，见 AGENTS.md §10.4.5）
 
 modules:
   - name: court-doc-generator
     path: modules/court-doc-generator
     status: active
-    version: 2.2.2
+    version: 2.2.5
     description: 出庭手续文档生成器（React+FastAPI 全栈，7份材料 + OCR扫描建档 + 在线打印 + 多用户 workspace 隔离 + 搜索筛选/预设库/操作日志/CSV导出/草稿/开庭提醒/暗色模式）
     entry: backend/app/main.py
+    domain:
+      subdomain: legal-court              # ⚠️ 待回收（遗留应用占用；回退候选 legal-court-generator / legal-courtdocs）
+      fqdn: legal-court.tbox.ktvsky.com
+      access_mode: internal
+      status: reserved
     created: 2026-08-17
     integrated: 2026-08-17
 
@@ -16,15 +23,25 @@ modules:
     version: 0.2.0
     description: 法务诉讼业务平台（飞书历年案件天级同步 + 检索/统计/AI 双模式，基线 638 条）
     entry: backend/app/main.py
+    domain:
+      subdomain: legal-litigation
+      fqdn: legal-litigation.tbox.ktvsky.com
+      access_mode: internal
+      status: planned
     created: 2026-08-13
     integrated: 2026-08-17
 
   - name: case-intelligence
     path: modules/case-intelligence
     status: active
-    version: 3.1.0
-    description: 案例智能分析模块（CLI工具，案件注册+提取物管理+模板归纳，半自动不引入RAG，v3.1 active）
+    version: 3.3.0
+    description: 案例智能分析模块（CLI工具，案件注册+提取物管理+模板归纳，半自动不引入RAG，v3.3 active）
     entry: bin/extract.py
+    domain:
+      subdomain: legal-case
+      fqdn: legal-case.tbox.ktvsky.com
+      access_mode: internal
+      status: planned
     created: 2026-08-10
     integrated: 2026-08-17
 
@@ -34,5 +51,10 @@ modules:
     version: 0.1.0
     description: Legal 统一门户（注册表驱动子系统集成框架 + 系统健康监控总览，单文件原型已交付，正式版规划中）
     entry: prototype.html
+    domain:
+      subdomain: legal-portal
+      fqdn: legal-portal.tbox.ktvsky.com
+      access_mode: internal
+      status: planned
     created: 2026-08-17
     integrated: 2026-08-17

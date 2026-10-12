@@ -73,6 +73,12 @@ python3 bin/start.py --prod     # 校验 frontend/dist 存在后启动
 
 完整步骤（前端构建 → dist 携带/服务器构建 → .env → systemd 托管 → 日志/排障）见 **[docs/DEPLOYMENT.md](./DEPLOYMENT.md)**。
 
+### 云平台部署（thunderbox）
+
+- **本模块域名（唯一）**：`legal-court.tbox.ktvsky.com`（`access_mode=internal`，⚠️ `legal-court` 被遗留应用占用，待回收）
+- 部署通道：**GitHub（唯一）** → thunderbox 从 GitHub 构建；🔴 一模块一域名，禁止随意创建（`AGENTS.md §10.4.5`）
+- 系统级手册：[`docs/deployment-thunderbox.md`](../../../docs/deployment-thunderbox.md)
+
 ## 拍照扫描功能
 
 **状态**：已上线（v2.2.x）

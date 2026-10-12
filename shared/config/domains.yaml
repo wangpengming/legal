@@ -1,0 +1,75 @@
+# =============================================
+# 模块域名注册表 / Module Domain Registry
+# =============================================
+# 平台：thunderbox（雷石盒子）
+# 原则（详见 AGENTS.md §10.4.5）：
+#   1. 一模块一域名：每个模块在 thunderbox 上有且仅有一个域名
+#   2. 禁止随意创建：域名在应用创建时绑定，不得无登记地新建
+#   3. 创建前必查重：thunderbox_check(target=domain) 确认可用后再创建
+#   4. 域名必须登记本表，与 module.yaml 的 domain 字段一致
+#   5. 访问模式一律 internal（仅内网），禁止 public
+# =============================================
+
+platform:
+  name: thunderbox
+  console: https://box.tbox.ktvsky.com/          # 控制台（创建 token / 删除应用）
+  mcp_endpoint: https://api-box.tbox.ktvsky.com/mcp
+  domain_suffix: tbox.ktvsky.com                  # 真实域名后缀 <subdomain>.tbox.ktvsky.com
+  access_mode_default: internal                   # 本项目统一 internal
+  code_source: github                             # 服务器仅支持 GitHub 方式部署（代码须先迁 GitHub）
+  deploy_prerequisite: "代码先迁移到 GitHub 仓库，thunderbox 从 GitHub 拉取构建"
+  token_note: "token 在控制台创建；严禁写入仓库（.qoder/settings.json 为项目 scope 会被提交）"
+
+# 命名空间约定
+namespace: legal-*   # 所有模块域名统一 legal- 前缀
+
+# 域名分配表（与 modules/index.yaml、各 module.yaml 的 domain 字段一致）
+allocations:
+  court-doc-generator:
+    subdomain: legal-court
+    domain: legal-court.tbox.ktvsky.com
+    access_mode: internal
+    status: reserved        # 已规划；subdomain 当前被遗留应用占用，待控制台回收
+    note: "⚠️ legal-court 已被遗留应用占用（非本模块）；回收前不得在本模块部署使用。回退候选：legal-court-generator / legal-courtdocs（均可用）"
+
+  litigation-system:
+    subdomain: legal-litigation
+    domain: legal-litigation.tbox.ktvsky.com
+    access_mode: internal
+    status: planned         # 已规划未申请（thunderbox_check 确认可用）
+    note: ""
+
+  case-intelligence:
+    subdomain: legal-case
+    domain: legal-case.tbox.ktvsky.com
+    access_mode: internal
+    status: planned
+    note: ""
+
+  portal:
+    subdomain: legal-portal
+    domain: legal-portal.tbox.ktvsky.com
+    access_mode: internal
+    status: planned
+    note: ""
+
+# 遗留冲突登记（非本工程模块，勿动；仅作查重依据）
+legacy_occupancy:
+  - subdomain: legal-court
+    owner: zhangyang@thunder.com.cn
+    note: "遗留应用占用 legal-court，导致 court-doc-generator 无法直接使用；需控制台人工回收或改用回退候选"
+  - subdomain: legal-court-doc
+    note: "遗留命名变体，已占用"
+  - subdomain: legal-courtdocs
+    note: "遗留命名变体，已占用"
+
+# 域名申请流程
+provision_flow:
+  - "1. 查重：MCP thunderbox_check(target=domain, value=<subdomain>)，确认 available=true"
+  - "2. 创建应用：MCP thunderbox_create（强制携带 subdomain + access_mode=internal）→ 域名即绑定"
+  - "3. 登记：在本表 allocations 新增/更新条目，并与 module.yaml domain 字段保持一致"
+  - "4. 删除：thunderbox 无删除 MCP 工具，仅可在控制台人工删除；删除后同步移除本表条目"
+
+# 与端口注册表的区别
+# - 端口（ports.yaml）：一个模块可有多个端口（后端/前端/容器）
+# - 域名（本表）：一个模块有且仅有一个域名

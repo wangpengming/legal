@@ -7,6 +7,11 @@ port:
   api: 8000           # FastAPI 后端
   web: 8080           # 前端 Nginx 容器对外端口
   fallback_api: 18000 # 后端端口被占用时备选
+domain:
+  subdomain: legal-litigation
+  fqdn: legal-litigation.tbox.ktvsky.com
+  access_mode: internal             # thunderbox 一模块一域名，见 shared/config/domains.yaml
+  status: planned
 deps: [] # 直接依赖的其他模块（当前无；Python 包见 tech_stack 与 requirements.txt）
 created: 2026-08-13
 integrated: 2026-08-17

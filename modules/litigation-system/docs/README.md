@@ -29,3 +29,4 @@
 - 环境变量：仅存 `.env`（`.gitignore` 防护），模板见 [../.env.example](../.env.example)，字段含义见 [module.yaml](../module.yaml)
 - 运行时数据：`data/app.db`（SQLite WAL，`.gitignore` 排除，提交仅源码）
 - 后端接口契约：[backend/tests/test_api.py](../backend/tests/test_api.py)
+- 部署（thunderbox）：域名 `legal-litigation.tbox.ktvsky.com`（唯一 / `internal`）；通道 **GitHub**；系统级手册 [`docs/deployment-thunderbox.md`](../../../docs/deployment-thunderbox.md)

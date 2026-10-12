@@ -32,6 +32,7 @@
 | 脚本管理 | Python 核心脚本 + 跨平台壳层（`.sh` / `.bat`） | `bin/start.{py,sh,bat}` |
 | 路由架构 | RESTful API：模块前缀 + 版本前缀 + 资源路径 | `/api/<module>/v1/<resource>` |
 | 端口管理 | 固定端口 + 全局注册表 + 启动前冲突检测 | `module.yaml` 声明 `port` |
+| 域名管理 | **一模块一域名** + 全局注册表 + 创建前查重 | `module.yaml` 声明 `domain` |
 | 健康检查 | HTTP `/health` 端点返回 200 + 模块版本 | 启动 8 秒内可探测 |
 | 日志 / PID | `.run/<name>.{pid,log}` 统一管理 | 已纳入 `.gitignore` |
 | 模块登记 | `module.yaml` + `modules/index.yaml` 双登记 | 缺一不可 |
@@ -40,16 +41,17 @@
 
 ---
 
-## 2. 当前模块清单（截至 2026-08-17）
+## 2. 当前模块清单（截至 2026-10-12）
 
-| 模块 | 状态 | 版本 | 职责 | 入口 | 来源 |
-|------|------|------|------|------|------|
-| `court-doc-generator` | active | 1.1.4 | 出庭手续文档生成器（7 份材料 + PDF 合并预览） | `modules/court-doc-generator/app.py` | 原生开发 |
-| `litigation-system` | active | 0.2.0 | 法务诉讼业务平台（飞书历年案件天级同步 + 检索/统计/AI） | `modules/litigation-system/backend/app/main.py` | 2026-08-17 并入 |
-| `case-intelligence` | planning | 3.0.0 | 同质化案件文档检索与规则系统 | `none` | 2026-08-17 并入（方案设计） |
-| `portal` | planning | 0.1.0 | Legal 统一门户（注册表驱动子系统集成框架 + 系统健康监控总览） | `modules/portal/prototype.html` | 2026-08-17 原生开发 |
+| 模块 | 状态 | 版本 | 域名（thunderbox） | 职责 | 入口 | 来源 |
+|------|------|------|--------------------|------|------|------|
+| `court-doc-generator` | active | 2.2.5 | `legal-court`（⚠️待回收） | 出庭手续文档生成器（React+FastAPI，7 份材料 + OCR + 多用户隔离） | `modules/court-doc-generator/backend/app/main.py` | 原生开发 |
+| `litigation-system` | active | 0.2.0 | `legal-litigation` | 法务诉讼业务平台（飞书历年案件天级同步 + 检索/统计/AI） | `modules/litigation-system/backend/app/main.py` | 2026-08-17 并入 |
+| `case-intelligence` | active | 3.3.0 | `legal-case` | 案例智能分析模块（CLI，五维度提取 + 目录扫描 + AI 辅助录入） | `modules/case-intelligence/bin/extract.py` | 2026-08-17 并入 |
+| `portal` | planning | 0.1.0 | `legal-portal` | Legal 统一门户（注册表驱动子系统集成框架 + 系统健康监控总览） | `modules/portal/prototype.html` | 2026-08-17 原生开发 |
 
 > 模块注册表：`modules/index.yaml`。任何模块变更须先改此处再改代码。
+> **域名规则（强制，§10.4.5）**：每个模块在 thunderbox 上**有且仅有一个域名**（`legal-*` 前缀，`access_mode=internal`），统一登记于 `shared/config/domains.yaml`；**禁止随意创建域名**。`legal-court` 当前被遗留应用占用，需控制台回收或改用回退候选。
 
 ---
 
@@ -63,6 +65,7 @@ legal/
 ├── docs/
 │   ├── SPEC.md            系统规格 v1.1
 │   ├── README.md          文档索引
+│   ├── deployment-thunderbox.md  thunderbox 部署手册
 │   └── requirements/
 │       ├── backlog.md     需求池（YAML 头部结构化）
 │       └── CHANGELOG.md   变更日志
@@ -90,7 +93,7 @@ legal/
 | ① 需求登记 | 在 `docs/requirements/backlog.md` 新增条目（含 YAML 头部） | `proposed` 状态条目 |
 | ② 评审 | 与用户确认优先级 + 模块归属 + 验收标准 | 状态保持 `proposed`，标准明确 |
 | ③ 开发 | 在 `modules/<name>/` 下实现，遵循模块自身 SPEC | 可运行的代码 + 单测 |
-| ④ 注册 | 更新 `modules/index.yaml` + 模块 `module.yaml`（必要时） | 模块元数据同步 |
+| ④ 注册 | 更新 `modules/index.yaml` + 模块 `module.yaml`（必要时）；**新增模块须登记域名** `shared/config/domains.yaml`（§10.4.5） | 模块元数据同步 |
 | ⑤ 上线 | 改 `backlog.md` 状态为 `done` + 在 `CHANGELOG.md` 登记版本变更 | 完成归档 |
 
 ---
@@ -225,6 +228,7 @@ modules/<name>/docs/
 - [ ] 代码运行 `pytest` 通过
 - [ ] 无 PII 硬编码
 - [ ] 无密钥泄露
+- [ ] 新增/变更模块已登记域名（`domains.yaml` + `module.yaml` 一致，§10.4.5）
 - [ ] `backlog.md` 状态已更新
 - [ ] `CHANGELOG.md` 已记录（如有版本变更）
 
@@ -241,6 +245,7 @@ modules/<name>/docs/
 | 涉及跨模块 | **先查 `docs/SPEC.md §4`**（模块间接口约定） |
 | 涉及安全 | **必查 §6 数据安全红线**，PII / 密钥 / gitignore |
 | 测试相关 | **必查 §7 测试要求**，覆盖率与跨平台兼容 |
+| 涉及部署 / 域名 | **必查 §10.4.5 域名规则** + `shared/config/domains.yaml`；一模块一域名，禁止随意创建 |
 | 提交前 | **执行 §9.2 自检清单** |
 
 ### 10.2 严禁做的事
@@ -258,6 +263,9 @@ modules/<name>/docs/
 | ❌ 接到新需求未做全系统重复性检查就登记 backlog | 违反 §10.1"接到新需求"4 步检查要求，会造成重复造轮子 / 同主题多个需求并存 |
 | ❌ 模块不提供 `bin/` 4 件套（直接 `python app.py` 启动） | 违反 §10.4.1，无法稳定托管 PID/日志/健康检查 |
 | ❌ 硬编码非注册表端口（魔法数字） | 端口冲突无法溯源，违反 §10.4.2 |
+| ❌ 为同一模块创建多个域名 / 未查重就创建域名 | 违反 §10.4.5「一模块一域名」，造成不可追溯的域名碎片 |
+| ❌ 域名不登记 `shared/config/domains.yaml`（或与 module.yaml 不一致） | 域名无单一真值，违反 §10.4.5 |
+| ❌ 将 thunderbox token 写入仓库（项目 scope 会被提交） | 密钥泄露，违反 §6.2 |
 | ❌ 模块无 `/health` 健康检查端点 | 启动状态不可观测，违反 §10.4.4 |
 | ❌ 跨模块 `from modules.<other>.xxx import ...` | 破坏 §4 跨模块接口约定，违反 §10.4.3 |
 
@@ -410,6 +418,68 @@ $ cd modules/<name> && python bin/status.py
 
 退出码：`0` = 运行中 / `1` = 未运行 / `2` = 异常。
 
+### 10.4.5 域名管理（thunderbox · 一模块一域名）🔴
+
+> 部署平台：**thunderbox（雷石盒子）**。控制台 `https://box.tbox.ktvsky.com/`，MCP 端点 `https://api-box.tbox.ktvsky.com/mcp`。
+
+#### 域名注册表：`shared/config/domains.yaml`
+
+```yaml
+platform:
+  domain_suffix: tbox.ktvsky.com          # 真实域名 <subdomain>.tbox.ktvsky.com
+  access_mode_default: internal           # 本项目统一 internal（仅内网）
+  code_source: github                     # 服务器仅支持 GitHub 方式部署
+allocations:
+  court-doc-generator:
+    subdomain: legal-court                # ⚠️ 待回收（遗留占用）
+    access_mode: internal
+  litigation-system:
+    subdomain: legal-litigation
+    access_mode: internal
+  case-intelligence:
+    subdomain: legal-case
+    access_mode: internal
+  portal:
+    subdomain: legal-portal
+    access_mode: internal
+```
+
+#### 核心规则
+
+| 规则 | 说明 |
+|------|------|
+| **一模块一域名** | 每个模块在 thunderbox 上**有且仅有一个域名**；域名在应用创建时（`thunderbox_create` 强制携带 `subdomain`）绑定，**不得为同一模块另建域名** |
+| **禁止随意创建** | 新建域名前必须先在 `domains.yaml` 登记、并走查重；无登记的域名视为违规资产 |
+| **创建前必查重** | MCP `thunderbox_check(target=domain, value=<subdomain>)` → 确认 `available=true` 再创建 |
+| **命名空间** | 统一 `legal-*` 前缀，子域名词用 kebab-case（如 `legal-court`） |
+| **访问模式** | 一律 `access_mode=internal`（仅内网），禁止 `public` |
+| **双登记一致** | `module.yaml` 的 `domain` 字段 **必须**与 `domains.yaml` 一致（同端口登记规则 §10.4.2） |
+| **GitHub 通道** | 部署代码须**先迁移到 GitHub 仓库**，thunderbox 从 GitHub 拉取构建（服务器仅支持此方式） |
+| **token 安全** | thunderbox token 在控制台创建，**严禁写入仓库**（`.qoder/settings.json` 为项目 scope 会被提交）；仅放 user/local scope 或 `.env` |
+| **删除应用** | thunderbox **无删除 MCP 工具**，仅能在控制台人工删除；删除后同步移除注册表条目 |
+
+#### module.yaml 强制声明
+
+```yaml
+name: litigation-system
+domain:
+  subdomain: legal-litigation
+  fqdn: legal-litigation.tbox.ktvsky.com
+  access_mode: internal
+```
+
+#### 与端口注册表的区别
+
+- **端口**（§10.4.2）：一个模块可有多个端口（后端 / 前端 / 容器）
+- **域名**（本节）：一个模块**有且仅有一个域名**
+
+#### 申请流程（新增模块 / 首次部署）
+
+1. 查重：`thunderbox_check(target=domain, value=<subdomain>)` → `available=true`
+2. 创建：`thunderbox_create`（携带 `subdomain` + `access_mode=internal`）→ 域名即绑定
+3. 登记：在 `shared/config/domains.yaml` 新增条目 + `module.yaml` 补 `domain` 字段（两处一致）
+4. 删除：仅控制台人工删除 → 同步移除注册表条目
+
 ---
 
 ## 11. 关联文档速查
@@ -427,6 +497,8 @@ $ cd modules/<name> && python bin/status.py
 | `.qoder/agents.md` | Qoder 特定配置 |
 | `.gitignore` | 屏蔽规则 |
 | [`shared/config/ports.yaml`](file:///Users/zhangyang/Desktop/code/legal/shared/config/ports.yaml) | 模块端口注册表（§10.4.2） |
+| `shared/config/domains.yaml` | 模块域名注册表（thunderbox，§10.4.5） |
+| `docs/deployment-thunderbox.md` | thunderbox 部署手册（GitHub 通道 / MCP / 域名申请） |
 
 ---
 
@@ -439,6 +511,21 @@ $ cd modules/<name> && python bin/status.py
 | 新增模块 | 先在 `ports.yaml` 申请端口 → 再写 `module.yaml` |
 | 端口冲突 | 先查 `ports.yaml` 定位占用方 → 再调整 |
 | 模块登记 | `modules/index.yaml` 不必重复登记端口（仅 `module.yaml` 即可） |
+
+---
+
+## 11.2 域名注册表（联动）
+
+所有模块域名统一登记在 `shared/config/domains.yaml`（thunderbox 平台）。
+
+| 何时读 | 场景 |
+|--------|------|
+| 新增模块 | 先在 `domains.yaml` 登记域名（查重后） → 再写 `module.yaml` 的 `domain` 字段 |
+| 部署到 thunderbox | 查 `domains.yaml` 确认本模块唯一域名与 `access_mode` |
+| 域名冲突 / 遗留占用 | 查 `domains.yaml` 的 `legacy_occupancy` 定位占用方 |
+| 域名变更 | 改 `domains.yaml` + 对应 `module.yaml` `domain` 字段（两处必须一致） |
+
+> 关联部署手册：`docs/deployment-thunderbox.md`。
 
 ---
 

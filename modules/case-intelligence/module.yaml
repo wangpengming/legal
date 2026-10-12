@@ -31,6 +31,11 @@ features:
   - AI引擎支持（Mock测试引擎 + Ollama本地引擎 + 抽象接口可扩展）
 port:
   ui: 18503       # Streamlit Web UI（与 shared/config/ports.yaml 一致）
+domain:
+  subdomain: legal-case
+  fqdn: legal-case.tbox.ktvsky.com
+  access_mode: internal             # thunderbox 一模块一域名，见 shared/config/domains.yaml
+  status: planned
 readme: docs/README.md
 spec: docs/SPEC.md
 spec_scan: docs/SPEC-scan-intake.md

@@ -3,6 +3,7 @@
 > 法务部门统一门户与子系统集成框架
 > 状态：**planning** · 交付物：`prototype.html` 单文件交互原型
 > 更新时间：2026-08-17
+> 部署/域名：thunderbox · `legal-portal.tbox.ktvsky.com`（唯一域名 / `internal`），代码来源 GitHub（见 `AGENTS.md §10.4.5`）
 
 ## 1. 定位与目标
 
@@ -69,7 +70,7 @@ Legal Portal 是 legal monorepo 的第 4 个组成模块，承担：
              ├─ /            → Portal 主框架
              ├─ /court       → nginx 反代 ─→ court-doc-generator     (:18501 · Streamlit)
              ├─ /litigation  → nginx 反代 ─→ litigation-system       (FastAPI + React)
-             ├─ /case        → nginx 反代 ─→ case-intelligence       (:8090 · NocoDB)
+             ├─ /case        → nginx 反代 ─→ case-intelligence       (:18503 · Streamlit)
              └─ /api/heartbeat → Portal 后端聚合三系统健康状态
 ```
 
@@ -106,14 +107,14 @@ apps:
     port: 8000
     entry: backend 服务 + frontend 构建
   - name: case-intelligence
-    title: 卷宗检索与规则
-    description: 同质化案件检索 / 文档规则化
+    title: 案例智能分析
+    description: 五维度提取 / 文书生成 / 案件库
     color: "#B7984D"
     path: /case
-    health: /case/api/healthz
-    version: 3.0.0
-    ports: [8090, 8091]       # NocoDB / Paperless
-    entry: docker compose
+    health: /case/_stcore/health
+    version: 3.3.0
+    port: 18503                # Streamlit UI（CLI 无服务端口）
+    entry: app.py（Streamlit）
 ```
 
 ### 4.2 驱动规则
@@ -130,7 +131,9 @@ apps:
 |--------|----------|----------|
 | court-doc-generator | `/_stcore/health` | 200 JSON |
 | litigation-system | `/api/health`（待补） | `{"status":"ok","version":"0.2.0"}` |
-| case-intelligence | `/api/healthz`（待补） | `{"status":"ok"}` |
+| case-intelligence | `/_stcore/health`（Streamlit 内置） | `200 ok` |
+
+> **补充探针**：case-intelligence 另提供 `bin/health.py`（轻量 JSON 探针：模块版本 + UI `/_stcore/health` + DB 统计），供无 HTTP 依赖的集成方使用（退出码 0/1）。
 
 ### 5.2 状态机
 

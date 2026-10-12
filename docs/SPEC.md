@@ -1,6 +1,6 @@
 # Legal System 系统规格 v1.1
 
-> 最后更新：2026-09-22
+> 最后更新：2026-10-12
 
 ## 1. 系统架构
 
@@ -68,6 +68,12 @@ version: <semver>
 status: active | planning | archived
 description: 一句话描述
 entry: src/main.py
+port:                       # 端口（登记的注册表：shared/config/ports.yaml）
+  app: <port>
+domain:                     # 域名（登记的注册表：shared/config/domains.yaml）
+  subdomain: legal-<name>   # 一模块一域名，legal-* 前缀
+  fqdn: legal-<name>.tbox.ktvsky.com
+  access_mode: internal     # 一律 internal（仅内网）
 deps:
   - <module-name>
 env:
@@ -81,13 +87,14 @@ env:
 
 ### 2.4 当前已注册模块
 
-以 `modules/index.yaml` 为准，当前 3 个模块：
+以 `modules/index.yaml` 为准，当前 4 个模块：
 
-| 模块 | 状态 | 版本 | 职责 | 技术栈 | 并入日期 |
-|------|------|------|------|--------|----------|
-| court-doc-generator | active | 1.1.4 | 出庭手续文档生成器（7 份材料一键生成 + PDF 合并预览） | Streamlit + python-docx + reportlab（PDF.js 内联预览） | 2026-08-17（原生开发） |
-| litigation-system | active | 0.2.0 | 法务诉讼业务平台（飞书历年案件天级同步 + 检索/统计/AI 双模式，基线 638 条） | FastAPI + SQLAlchemy + SQLite FTS5 / React 18 + Vite + ECharts | 2026-08-17（并入 modules/） |
-| case-intelligence | active | 3.2.0 | 同质化案件文档检索与规则系统（三对象模型，不做 AI，只做检索） | Python CLI + SQLite（轻量工具） | 2026-08-17（并入 modules/，2026-09-22 落地 v3.2.0） |
+| 模块 | 状态 | 版本 | 域名（thunderbox） | 职责 | 技术栈 | 并入日期 |
+|------|------|------|--------------------|------|--------|----------|
+| court-doc-generator | active | 2.2.5 | `legal-court` ⚠️待回收 | 出庭手续文档生成器（7 份材料一键生成 + OCR 扫描 + 多用户隔离） | FastAPI + React 18 + Vite + SQLite | 2026-08-17（原生开发） |
+| litigation-system | active | 0.2.0 | `legal-litigation` | 法务诉讼业务平台（飞书历年案件天级同步 + 检索/统计/AI 双模式，基线 638 条） | FastAPI + SQLAlchemy + SQLite FTS5 / React 18 + Vite + ECharts | 2026-08-17（并入 modules/） |
+| case-intelligence | active | 3.3.0 | `legal-case` | 案例智能分析模块（五维度提取 + 目录扫描 + AI 辅助录入，CLI） | Python CLI + SQLite | 2026-08-17（并入 modules/） |
+| portal | planning | 0.1.0 | `legal-portal` | Legal 统一门户（注册表驱动子系统集成框架 + 健康监控总览） | 单文件 HTML/JS 原型 + nginx 同源反代（规划） | 2026-08-17（原生开发） |
 
 ## 3. 需求管理规范
 
@@ -152,7 +159,7 @@ env:
            └───────────────────────────────┴────────────────────────────────┘
 ```
 
-- **现状**：三模块各自独立运行；litigation-system 从飞书同步案件主数据，case-intelligence 已落地 v3.2.0（SQLite 轻量 CLI），court-doc-generator 离线生成材料
+- **现状**：三模块各自独立运行；litigation-system 从飞书同步案件主数据，case-intelligence 已落地 v3.3.0（SQLite 轻量 CLI + Streamlit UI），court-doc-generator 离线生成材料
 - **远期**：模块间数据流按「案件主数据 → 卷宗文档/审核规则」组织，详见各模块 SPEC 演化路线
 
 ## 5. Qoder项目配置
@@ -182,3 +189,46 @@ project:
 - 模块状态机：`planning`（方案设计）→ `active`（运行使用）→ `archived`（下线归档），状态由 `modules/index.yaml` 与各模块 `module.yaml` 声明
 - 并入策略：外部子项目（如 tmp/dev 下的成型项目）以**原样迁入**为原则，仅补登记文件（module.yaml / docs/ / SPEC.md），不重构其内部代码；源码层面改动走独立演进
 - 演进记录：所有模块变更登记于 `docs/requirements/CHANGELOG.md`，需求条目记录于 `backlog.md`
+
+## 9. 部署与域名规范
+
+生产部署统一走雷石内部平台 **thunderbox（雷石盒子）**。完整手册见 [`docs/deployment-thunderbox.md`](./deployment-thunderbox.md)。
+
+### 9.1 平台信息
+
+| 项 | 值 |
+|----|----|
+| 控制台 | `https://box.tbox.ktvsky.com/` |
+| MCP 端点 | `https://api-box.tbox.ktvsky.com/mcp`（HTTP transport） |
+| 域名规范 | `<subdomain>.tbox.ktvsky.com` |
+| 代码来源 | **仅支持 GitHub** —— 部署代码须先迁移到 GitHub 仓库 |
+| 访问模式 | 一律 `internal`（仅内网） |
+| Token | 控制台创建；**严禁写入仓库**（项目 scope 会被提交） |
+
+### 9.2 域名规则：一模块一域名 🔴
+
+> 强制规则详见 `AGENTS.md §10.4.5`。
+
+1. **一模块一域名**：每个模块在 thunderbox 上有且仅有一个域名，域名为应用创建时绑定，不得为同一模块另建域名。
+2. **禁止随意创建**：新建域名前必须先在域名注册表登记并走查重。
+3. **命名空间**：统一 `legal-*` 前缀（kebab-case）。
+4. **双登记一致**：`module.yaml` 的 `domain` 字段必须与 `shared/config/domains.yaml` 一致。
+5. **注册表**：[`shared/config/domains.yaml`](../shared/config/domains.yaml)（与端口注册表 `ports.yaml` 并列）。
+
+### 9.3 域名分配
+
+| 模块 | 域名 | access_mode | 状态 |
+|------|------|-------------|------|
+| court-doc-generator | `legal-court.tbox.ktvsky.com` | internal | ⚠️ 待回收（遗留占用；回退候选 `legal-court-generator` / `legal-courtdocs`） |
+| litigation-system | `legal-litigation.tbox.ktvsky.com` | internal | 待申请 |
+| case-intelligence | `legal-case.tbox.ktvsky.com` | internal | 待申请 |
+| portal | `legal-portal.tbox.ktvsky.com` | internal | 待申请 |
+
+### 9.4 部署形态（各模块生产运行方式）
+
+| 模块 | 生产形态 | 健康端点 |
+|------|---------|---------|
+| court-doc-generator | FastAPI 单端口（8001）托管前端 `dist/`；systemd 可选 | `/health` |
+| litigation-system | Docker Compose（api:8000 + nginx:8080） | `/healthz` |
+| case-intelligence | Streamlit UI（18503）+ SQLite CLI（Docker 方案已收敛为轻量形态） | `/_stcore/health` |
+| portal | 规划：nginx 同源反代 + 静态页面（`legal-portal`） | 待定义 |

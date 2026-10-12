@@ -21,6 +21,7 @@
 |------|------|
 | 前端产物 | `frontend/dist/` 由 `npm run build` 生成。**dist/ 被根 .gitignore 忽略**，随代码库不会自动到达 server，需单独携带（构建机 scp）或在 server 上构建（见 §2.3） |
 | 端口 | 8001（与 `shared/config/ports.yaml` 注册一致） |
+| 域名 | `legal-court.tbox.ktvsky.com`（thunderbox，唯一域名，见 §8 与本模块 `module.yaml`） |
 | 同源 | 前端 API 请求为相对路径 `/api/v1`，生产无跨域问题 |
 | 进程模型 | 手动模式 `bin/start.py` 用 `os.fork()` 后台化；systemd 模式直接托管 uvicorn（Type=simple），两者二选一 |
 
@@ -193,3 +194,20 @@ curl -s http://localhost:8001/health
 | `backend/.env.example` | 环境变量模板 |
 | `docs/court-doc-generator.service.example` | systemd 单元样例 |
 | `backend/app/core/config.py` | Settings（.env 字段来源） |
+
+---
+
+## 8. 云平台部署（thunderbox / 雷石盒子）
+
+云平台部署统一走雷石 **thunderbox**，与本地/服务器（systemd）模式并存：
+
+- **本模块域名（唯一）**：`legal-court.tbox.ktvsky.com` · `access_mode=internal`
+  - ⚠️ `legal-court` 当前被遗留应用占用，**待控制台回收**；回退候选：`legal-court-generator` / `legal-courtdocs`
+- **代码来源**：**仅支持 GitHub** —— 部署前须先把代码推送到 GitHub 仓库（Push 需用户授权）
+- **平台信息**：控制台 `https://box.tbox.ktvsky.com/` · MCP 端点 `https://api-box.tbox.ktvsky.com/mcp`
+- **健康端点**：`/health`（返回 `{"status":"ok","version":"2.2.5"}`）
+
+> 🔴 **域名规则**：每个模块**有且仅有一个域名**，不得随意创建；域名统一登记 `shared/config/domains.yaml`（详见 `AGENTS.md §10.4.5`）。
+> 📖 系统级 thunderbox 手册：[`docs/deployment-thunderbox.md`](../../../docs/deployment-thunderbox.md)
+
+**部署流程**（首次）：查重 `thunderbox_check` → 创建 `thunderbox_create`（携 `subdomain`）→ 登记 `domains.yaml` → `thunderbox_config` 注入环境变量 → `thunderbox_deploy`（GitHub 构建）→ `thunderbox_query` 验证。

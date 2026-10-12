@@ -101,6 +101,18 @@ python3 bin/status.py   # 健康检查可用性验证
 
 📖 完整部署手册（安装步骤 / .env / systemd / 日志 / 排障 / 备份）：[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)
 
+### ☁️ 部署到 thunderbox（雷石盒子）
+
+云平台部署统一走雷石 **thunderbox**：
+
+- **本模块域名（唯一）**：`legal-court.tbox.ktvsky.com` · `access_mode=internal`
+  - ⚠️ `legal-court` 当前被遗留应用占用，**待控制台回收**；回退候选：`legal-court-generator` / `legal-courtdocs`
+- **代码来源**：**仅支持 GitHub** —— 部署前须先把代码迁移到 GitHub 仓库
+- **平台信息**：控制台 `https://box.tbox.ktvsky.com/` · MCP 端点 `https://api-box.tbox.ktvsky.com/mcp`
+
+> 🔴 **域名规则**：每个模块**有且仅有一个域名**，不得随意创建；域名统一登记 `shared/config/domains.yaml`（详见 `AGENTS.md §10.4.5`）。
+> 📖 系统级部署手册：[docs/deployment-thunderbox.md](../../docs/deployment-thunderbox.md)
+
 ---
 
 ## 🧪 运行测试
@@ -200,6 +212,16 @@ court-doc-generator/
 | 前端界面 | 18502 | Vite dev server |
 
 端口注册表：`shared/config/ports.yaml`
+
+### 域名
+
+| 项 | 值 |
+|----|----|
+| subdomain | `legal-court`（⚠️ 待回收） |
+| FQDN | `legal-court.tbox.ktvsky.com` |
+| access_mode | `internal` |
+
+域名注册表：`shared/config/domains.yaml`
 
 ### 环境变量
 

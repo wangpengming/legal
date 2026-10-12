@@ -4,13 +4,18 @@ status: planning
 description: Legal 统一门户（注册表驱动子系统集成框架 + 系统健康监控总览，单文件交互原型已交付，正式版规划中）
 entry: prototype.html
 deps: [] # 不直接依赖其他模块；门户通过同源反代 + 健康心跳集成全部子系统（court/litigation/case）
+domain:
+  subdomain: legal-portal
+  fqdn: legal-portal.tbox.ktvsky.com
+  access_mode: internal             # thunderbox 一模块一域名，见 shared/config/domains.yaml
+  status: planned
 created: 2026-08-17
 integrated: 2026-08-17
 tech_stack:
   - 单文件 HTML+CSS+JS 原型（自包含无外部依赖；正式版建议静态多页或 Vite/React）
-  - nginx 同源反向代理（/court→18501、/litigation→8000、/case→8090+8091，仅内网 10.10.11.37）
+  - nginx 同源反向代理（/court→18501、/litigation→8000、/case→18503，仅内网）
   - apps.yaml 注册表（模块化索引，与 modules/index.yaml 同源同思想）
-  - 健康监控协议（端点 /court/_stcore/health、/litigation/api/health、/case/api/healthz；状态机 online/degraded/offline）
+  - 健康监控协议（端点 /court/_stcore/health、/litigation/api/health、/case/_stcore/health；状态机 online/degraded/offline）
 features:
   - 商务蓝庄重设计系统（#1F3A93 主色 / #B7984D 金点缀 / #C0392B 印章红告警 / 浅色 F5F7FA 背景）
   - 欢迎页 + 主框架（顶栏/侧栏/内容区四视图：工作台/子系统/日志/关于）

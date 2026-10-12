@@ -89,6 +89,18 @@ pytest tests -k clean       # 按域过滤
 | 结案周期 | 186 天 |
 | 脏标记 | 47 处 |
 
+## 部署（thunderbox / 雷石盒子）
+
+云平台部署统一走雷石 **thunderbox**：
+
+- **本模块域名（唯一）**：`legal-litigation.tbox.ktvsky.com` · `access_mode=internal`
+- **生产形态**：Docker Compose（api `:8000` + nginx web `:8080`）
+- **代码来源**：**仅支持 GitHub** —— 部署前须先把代码迁移到 GitHub 仓库
+- **平台信息**：控制台 `https://box.tbox.ktvsky.com/` · MCP 端点 `https://api-box.tbox.ktvsky.com/mcp`
+
+> 🔴 **域名规则**：每个模块**有且仅有一个域名**，不得随意创建；域名统一登记 `shared/config/domains.yaml`（详见 `AGENTS.md §10.4.5`）。
+> 📖 系统级部署手册：[docs/deployment-thunderbox.md](../../docs/deployment-thunderbox.md)
+
 ## 相关文档
 
 - `requirements/01` 需求规格 · `spec/SPEC.md` 系统规格 · `docs/03` 后端详细设计
