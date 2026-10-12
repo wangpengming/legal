@@ -89,9 +89,14 @@ downloads/
 tmp/
 temp/
 
-# ---- 运行时数据 / 生成产物----
-# case-intelligence 的 data/ 含已提取案例数据（case_registry.db），需要提交
-# outputs/
+# ---- 运行时数据 / 生成产物（提交源代码，不提交数据）----
+data/
+outputs/
+*.db
+
+# ---- 例外：case-intelligence 已提取案例数据（业务数据，随仓库提交）----
+!modules/case-intelligence/data/
+!modules/case-intelligence/data/**
 
 # ---- F-032 代理人上传材料（PII 防护：劳动合同 / 身份证 含敏感信息）----
 modules/*/static/agents/
