@@ -1,13 +1,13 @@
 ---
 type: requirements
 module: case-intelligence
-version: 3.2.0
-updated: 2026-09-27
+version: 3.3.0
+updated: 2026-10-12
 ---
 
-# case-intelligence 需求基线 v3.2.0
+# case-intelligence 需求基线 v3.3.0
 
-> **版本**: 3.2.0 | **更新**: 2026-09-27
+> **版本**: 3.3.0 | **更新**: 2026-10-12
 > **状态**: active
 > **模块**: case-intelligence
 
@@ -199,6 +199,7 @@ updated: 2026-09-27
 
 | 版本 | 日期 | 更新内容 |
 |------|------|---------|
+| 3.3.0 | 2026-10-12 | Streamlit Web UI + 目录扫描录入 + AI 引擎配置 + LangChain 文书生成 + prompts 固化 v1.2 + 飞书 Bot |
 | 3.2.0 | 2026-09-27 | 历史案件88个入库，OCR批量提取完善 |
 | 3.1.0 | 2026-09-22 | CLI框架、数据库、Prompts初始化 |
 | 3.0.0 | 2026-08-17 | 初始版本，并入legal工程 |

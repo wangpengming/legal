@@ -60,3 +60,18 @@
 | v1 | - | AI 辅助分析（LangChain + PyMuPDF + FAISS） |
 | v2 | 2026-08-10 | MaxKB + Ollama + Qwen3 8B RAG 方案 |
 | **v3** | **2026-08-12** | **结构化案件数据库 + 文档检索 + 规则/检查清单** |
+
+---
+
+## 部署与域名（thunderbox / 雷石盒子）
+
+> 本 README 为 v3 方案（NocoDB + Paperless 多容器）归档；模块现状已收敛为 **Python CLI + SQLite 轻量形态**（v3.3，`bin/extract.py` + Streamlit UI `:18503`）。
+
+云平台部署统一走雷石 **thunderbox**：
+
+- **本模块域名（唯一）**：`legal-case.tbox.ktvsky.com` · `access_mode=internal`
+- **代码来源**：**仅支持 GitHub** —— 部署前须先把代码迁移到 GitHub 仓库
+- **平台信息**：控制台 `https://box.tbox.ktvsky.com/` · MCP 端点 `https://api-box.tbox.ktvsky.com/mcp`
+
+> 🔴 **域名规则**：每个模块**有且仅有一个域名**，不得随意创建；域名统一登记 `shared/config/domains.yaml`（详见 `AGENTS.md §10.4.5`）。
+> 📖 系统级部署手册：[docs/deployment-thunderbox.md](../../docs/deployment-thunderbox.md)

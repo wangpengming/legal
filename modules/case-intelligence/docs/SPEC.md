@@ -1,8 +1,9 @@
-# case-intelligence 模块规格文档 v3.2.0
+# case-intelligence 模块规格文档 v3.3.0
 
-> **版本**: 3.2.0 | **更新**: 2026-09-22
+> **版本**: 3.3.0 | **更新**: 2026-10-12
 > **状态**: active
 > **架构**: 五维度提取 + prompts 驱动 + 固定模板输出
+> **部署/域名**: thunderbox · `legal-case.tbox.ktvsky.com`（唯一域名 / `internal`），代码来源 GitHub（见 `AGENTS.md §10.4.5`）
 
 ---
 
@@ -195,7 +196,33 @@ office-workflow-litigation-doc（诉讼文书生成）
 
 ---
 
-## 7. 暂不引入
+## 7. 健康检查
+
+本模块为 **CLI + Streamlit** 形态，HTTP 健康端点由 Streamlit 内置提供。
+
+| 方式 | 端点 / 命令 | 说明 |
+|------|------------|------|
+| HTTP（UI 运行时） | `GET /_stcore/health` → `200 ok` | Streamlit 内置；端口 `18503`（fallback `18504`）；符合 `AGENTS.md §10.4.4` |
+| 轻量探针（JSON） | `python bin/health.py` | 输出 `{status, module, version, ui, db}`；退出码 `0`=健康 / `1`=异常；**只读**，不创建数据库 |
+| 状态检查 | `python bin/status_ui.py` | 端口 + PID + `/_stcore/health` + 日志尾部 |
+
+### 7.1 bin/health.py 输出示例
+
+```json
+{
+  "status": "ok",
+  "module": "case-intelligence",
+  "version": "3.3.0",
+  "ui": { "running": true, "port": 18503, "endpoint": "/_stcore/health", "http_status": 200, "ok": true },
+  "db": { "ok": true, "initialized": true, "total_cases": 93, "total_artifacts": 12, "total_templates": 7 }
+}
+```
+
+> **portal 集成**：统一门户通过 `/case/_stcore/health`（nginx 同源反代）判定在线；`bin/health.py` 供无 HTTP 依赖的集成方（脚本 / CI）补充版本与数据库维度。
+
+---
+
+## 8. 暂不引入
 
 - RAG / 向量检索（未来引入）
 - 自动 OCR / 文档解析（人工手动）

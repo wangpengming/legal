@@ -1,6 +1,6 @@
 # case-intelligence 模块用户手册
 
-> **版本**: 3.2.0 | **更新**: 2026-09-27
+> **版本**: 3.3.0 | **更新**: 2026-10-12
 > **模块**: 案件智能分析系统
 
 ---
@@ -305,6 +305,21 @@ cp data/case_registry.db data/case_registry.db.bak
 
 | 版本 | 日期 | 更新内容 |
 |------|------|---------|
+| 3.3.0 | 2026-10-12 | Streamlit Web UI + 目录扫描录入 + AI 引擎配置 + LangChain 文书生成 + prompts 固化 v1.2 + 飞书 Bot |
 | 3.2.0 | 2026-09-27 | 历史案件88个入库，OCR批量提取 |
 | 3.1.0 | 2026-09-22 | CLI框架、数据库、Prompts初始化 |
 | 3.0.0 | 2026-08-17 | 初始版本 |
+
+---
+
+## 10. 部署与域名（thunderbox / 雷石盒子）
+
+- **本模块域名（唯一）**：`legal-case.tbox.ktvsky.com`（`access_mode=internal`）
+- **部署通道**：**GitHub（唯一）** → thunderbox 从 GitHub 构建
+- **平台信息**：控制台 `https://box.tbox.ktvsky.com/` · MCP 端点 `https://api-box.tbox.ktvsky.com/mcp`
+- **生产形态**：Python CLI + SQLite（`bin/extract.py`）+ Streamlit UI（`:18503`）
+
+> 🔴 一模块一域名，禁止随意创建；域名统一登记 `shared/config/domains.yaml`（`AGENTS.md §10.4.5`）。
+> 📖 系统级手册：[`docs/deployment-thunderbox.md`](../../../docs/deployment-thunderbox.md)
+>
+> **健康检查**：UI 运行时 `GET /_stcore/health`（200 ok，Streamlit 内置）；轻量 JSON 探针 `python bin/health.py`（版本 + UI + DB 统计，退出码 0/1）；状态检查 `python bin/status_ui.py`。
