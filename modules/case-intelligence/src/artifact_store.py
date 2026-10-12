@@ -63,8 +63,17 @@ def create_artifact(
     source_ref: str = "",
     extractor: str = "",
     db_path: Optional[Path] = None,
+    parent_id: str = None,
+    generation_method: str = None,
+    model_version: str = None,
 ) -> dict:
-    """创建提取物：写 DB + 写 Markdown 文件。"""
+    """创建提取物：写 DB + 写 Markdown 文件。
+    
+    Args:
+        parent_id: 上一个版本的 artifact_id（用于版本链）
+        generation_method: 生成方式（'llm' / 'template+llm' / 'manual'）
+        model_version: 模型版本（如 'MiniMax-Text-01'）
+    """
     # 入库
     artifact = db.create_artifact(
         case_id=case_id,
@@ -73,6 +82,9 @@ def create_artifact(
         content=content,
         source_ref=source_ref,
         db_path=db_path,
+        parent_id=parent_id,
+        generation_method=generation_method,
+        model_version=model_version,
     )
     # 获取案件名（用于 frontmatter）
     case = db.get_case(case_id, db_path)

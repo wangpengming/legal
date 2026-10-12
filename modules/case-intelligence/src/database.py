@@ -125,8 +125,11 @@ def create_case(
     plaintiff: str = "",
     defendant: str = "",
     cause: str = "",
+    court: str = "",
+    year: Optional[int] = None,
     result: str = "",
     source_path: str = "",
+    source_files: str = "",
     notes: str = "",
     entry_method: str = "CLI",
     scene: str = "",
@@ -142,13 +145,13 @@ def create_case(
         conn.execute(
             """
             INSERT INTO cases
-              (id, case_number, case_name, plaintiff, defendant, cause,
-               result, source_path, status, notes, created_at,
+              (id, case_number, case_name, plaintiff, defendant, cause, court,
+               year, result, source_path, status, notes, created_at,
                entry_method, scene, plaintiff_auth_level, defendant_auth_status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?)
             """,
-            (case_id, case_number, case_name, plaintiff, defendant, cause,
-             result, source_path, notes, now,
+            (case_id, case_number, case_name, plaintiff, defendant, cause, court,
+             year, result, source_path, notes, now,
              entry_method, scene, plaintiff_auth_level, defendant_auth_status),
         )
         conn.commit()
@@ -281,8 +284,17 @@ def create_artifact(
     content: str = "",
     source_ref: str = "",
     db_path: Optional[Path] = None,
+    parent_id: str = None,
+    generation_method: str = None,
+    model_version: str = None,
 ) -> dict:
-    """创建提取物，返回 dict（含 id）。"""
+    """创建提取物，返回 dict（含 id）。
+    
+    Args:
+        parent_id: 上一个版本的 artifact_id（用于版本链）
+        generation_method: 生成方式（'llm' / 'template+llm' / 'manual'）
+        model_version: 模型版本（如 'MiniMax-Text-01'）
+    """
     if artifact_type not in ARTIFACT_TYPES:
         raise ValueError(
             f"无效 artifact_type: {artifact_type}，有效值: {ARTIFACT_TYPES}"
@@ -290,13 +302,21 @@ def create_artifact(
     conn = _get_conn(db_path)
     now = datetime.now(timezone.utc).isoformat()
     artifact_id = str(uuid.uuid4())
+    
+    # 计算版本号
+    version = 1
+    if parent_id:
+        parent = get_artifact(parent_id, db_path)
+        if parent:
+            version = parent.get('version', 1) + 1
+    
     conn.execute(
         """
         INSERT INTO artifacts
-          (id, case_id, artifact_type, title, content, source_ref, version, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, 1, ?)
+          (id, case_id, artifact_type, title, content, source_ref, version, created_at, parent_id, generation_method, model_version)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
-        (artifact_id, case_id, artifact_type, title, content, source_ref, now),
+        (artifact_id, case_id, artifact_type, title, content, source_ref, version, now, parent_id, generation_method, model_version),
     )
     conn.commit()
     conn.close()

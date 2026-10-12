@@ -38,6 +38,7 @@ allocations:
     postgres_paperless: 5433 # Paperless 专用 PostgreSQL
     redis: 6379             # Paperless 缓存
     tika: 8093              # Apache Tika（备用 OCR）
+    ui: 18503               # Streamlit Web UI
 
 # 端口冲突解决策略
 conflict_resolution:

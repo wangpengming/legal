@@ -1,17 +1,19 @@
 name: case-intelligence
-version: 3.2.0
+version: 3.3.0
 status: active
-description: 案例智能分析模块（五维度提取+prompts驱动+固定模板输出，CLI工具，不引入RAG）
+description: 案例智能分析模块（五维度提取+目录扫描+AI辅助录入+prompts驱动+固定模板输出，CLI工具）
 entry: bin/extract.py
 deps: []
 created: 2026-08-10
 integrated: 2026-08-17
-updated: 2026-09-22
+updated: 2026-09-26
 tech_stack:
   - Python 3（CLI工具，无Web服务）
   - SQLite（case_registry.db，三表：cases/artifacts/templates）
   - Markdown（提取物/模板/提示词存储格式，含YAML frontmatter）
-  - prompts/（AI提示词规则库，8个提示词文件，v1.0.0）
+  - prompts/（AI提示词规则库，8个提示词文件，v1.2.0）
+  - python-docx（Word文档解析）
+  - pdfplumber/pymupdf（PDF解析）
 features:
   - 案源管理（注册+识别+画像标签，录入方式CLI/UI/AI）
   - 五维度提取（D1事实认定/D2法律依据/D3攻防策略/D4证据体系/D5赔偿裁量，固定维度内容随案由变化）
@@ -23,7 +25,13 @@ features:
   - 外部数据源引用（reference_index.yaml索引，不移动原文件）
   - 半自动CLI（register/extract/promote/complete/search/check/report/list/templates）
   - 提取操作日志（EXTRACTION_LOG.md）
-port: {}
+  - 目录扫描（scan命令，递归扫描+文件分类+OCR噪音过滤+元数据推断）
+  - 文件解析（docx/pdf/txt/md，支持 python-docx + pdfplumber）
+  - AI辅助录入（scan --ai --import，调用 LLM 按 D1-D5 提取结构化信息）
+  - AI引擎支持（Mock测试引擎 + Ollama本地引擎 + 抽象接口可扩展）
+port:
+  ui: 18503       # Streamlit Web UI（与 shared/config/ports.yaml 一致）
 readme: docs/README.md
 spec: docs/SPEC.md
+spec_scan: docs/SPEC-scan-intake.md
 reference: reference_index.yaml

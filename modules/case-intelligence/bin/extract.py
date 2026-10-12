@@ -10,6 +10,8 @@
 #   python bin/extract.py search --query "关键词"
 #   python bin/extract.py check --case-number "案号"
 #   python bin/extract.py report
+#   python bin/extract.py scan /path/to/case --dry-run
+#   python bin/extract.py scan /path/to/case --ai --import
 # =============================================
 import argparse
 import json
@@ -23,6 +25,10 @@ from src import database as db
 from src import case_recognizer as cr
 from src import artifact_store
 from src import template_store
+from src import scanner
+from src import parser
+from src import extractor
+from src import importer
 
 
 # =============================================
@@ -352,6 +358,84 @@ def cmd_check(args) -> None:
         print("🆕 新案件（未找到匹配）")
 
 
+
+# =============================================
+# health 命令（案件健康度检查）
+# =============================================
+
+def cmd_health(args) -> None:
+    """检查案件信息完整度"""
+    case = db.get_case(args.case_id)
+    if not case:
+        print(f"❌ 案件不存在: {args.case_id}")
+        sys.exit(1)
+    
+    checks = []
+    total = 0
+    
+    # 基本信息检查
+    total += 1
+    if case.get('case_number'):
+        checks.append(('✅', '案号', case['case_number']))
+    else:
+        checks.append(('❌', '案号', '缺失'))
+    
+    total += 1
+    if case.get('plaintiff'):
+        checks.append(('✅', '原告', case['plaintiff'][:30]))
+    else:
+        checks.append(('❌', '原告', '缺失'))
+    
+    total += 1
+    if case.get('defendant'):
+        checks.append(('✅', '被告', case['defendant'][:30]))
+    else:
+        checks.append(('❌', '被告', '缺失'))
+    
+    total += 1
+    if case.get('cause'):
+        checks.append(('✅', '案由', case['cause']))
+    else:
+        checks.append(('❌', '案由', '缺失'))
+    
+    total += 1
+    if case.get('court'):
+        checks.append(('✅', '法院', case['court']))
+    else:
+        checks.append(('❌', '法院', '缺失'))
+    
+    # 提取物检查
+    artifacts = db.list_artifacts_by_case(args.case_id)
+    total += 1
+    if len(artifacts) > 0:
+        checks.append(('✅', '提取物', f'{len(artifacts)}个'))
+    else:
+        checks.append(('❌', '提取物', '缺失'))
+    
+    # 统计健康度
+    passed = sum(1 for c in checks if c[0] == '✅')
+    health = int((passed / total) * 100)
+    
+    print(f"\n🏥 案件健康度检查")
+    print("=" * 50)
+    print(f"案件: {case['case_name']}")
+    print(f"ID: {case['id']}")
+    print()
+    
+    for status, key, value in checks:
+        print(f"  {status} {key}: {value}")
+    
+    print()
+    print(f"健康度: {health}%")
+    
+    if health < 50:
+        print("状态: 🔴 需要补充")
+    elif health < 80:
+        print("状态: 🟡 基本完整")
+    else:
+        print("状态: 🟢 良好")
+
+
 # =============================================
 # report 命令
 # =============================================
@@ -383,12 +467,99 @@ def cmd_report(args) -> None:
         for r in rows:
             print(f"    {r[0]}: {r[1]} 个")
 
+    # 按案由统计
+    conn = db._get_conn()
+    cause_rows = conn.execute(
+        """
+        SELECT cause, COUNT(*) as cnt
+        FROM cases
+        WHERE cause IS NOT NULL AND cause != ''
+        GROUP BY cause
+        ORDER BY cnt DESC
+        LIMIT 10
+        """
+    ).fetchall()
+    if cause_rows:
+        print("\n  按案由分布（Top 10）:")
+        for r in cause_rows:
+            bar = '█' * min(r[1], 20)
+            print(f"    {r[0][:15]:<15} {bar} {r[1]}")
+    conn.close()
+    
     # 待提取案件
     pending = db.list_cases(status="pending")
     if pending:
         print(f"\n  待提取案件（{len(pending)} 个）:")
         for c in pending[:5]:
-            print(f"    - {c['case_name']} | {c.get('case_number', 'N/A')}")
+            print(f"    - {c['case_name'][:30]} | {c.get('case_number', 'N/A')}")
+
+
+
+# =============================================
+# export 命令（导出文书）
+# =============================================
+
+def cmd_export(args) -> None:
+    """导出文书为指定格式"""
+    from docx import Document
+    
+    # 获取 artifact
+    artifact = db.get_artifact(args.artifact_id)
+    if not artifact:
+        print(f"❌ 提取物不存在: {args.artifact_id}")
+        sys.exit(1)
+    
+    # 确定输出格式
+    output_path = Path(args.output)
+    if output_path.suffix.lower() == '.docx':
+        # 导出为 DOCX
+        doc = Document()
+        
+        # 标题
+        doc.add_heading(artifact['title'], 0)
+        
+        # 内容（解析 Markdown）
+        content = artifact.get('content', '')
+        lines = content.split('\n')
+        for line in lines:
+            line = line.strip()
+            if not line:
+                doc.add_paragraph()
+            elif line.startswith('# '):
+                doc.add_heading(line[2:], 1)
+            elif line.startswith('## '):
+                doc.add_heading(line[3:], 2)
+            elif line.startswith('### '):
+                doc.add_heading(line[4:], 3)
+            elif line.startswith('- ') or line.startswith('* '):
+                doc.add_paragraph(line[2:], style='List Bullet')
+            elif line.startswith('| '):
+                # 表格行
+                continue  # 简化处理
+            else:
+                doc.add_paragraph(line)
+        
+        doc.save(str(output_path))
+        print(f"✅ 已导出为 DOCX: {output_path}")
+    
+    elif output_path.suffix.lower() == '.md':
+        # 导出为 Markdown
+        case = db.get_case(artifact['case_id'])
+        frontmatter = f"""---
+title: {artifact['title']}
+case: {case['case_name'] if case else 'N/A'}
+type: {artifact['artifact_type']}
+created: {artifact['created_at']}
+---
+
+"""
+        full_content = frontmatter + artifact.get('content', '')
+        output_path.write_text(full_content, encoding='utf-8')
+        print(f"✅ 已导出为 Markdown: {output_path}")
+    
+    else:
+        print(f"❌ 不支持的格式: {output_path.suffix}")
+        print("支持的格式: .docx, .md")
 
 
 # =============================================
@@ -478,6 +649,247 @@ def cmd_artifacts(args) -> None:
 
 
 # =============================================
+# import 命令（从JSON增量导入）
+# =============================================
+
+def cmd_import(args) -> None:
+    """从JSON文件增量导入案件。"""
+    import json
+    from src.extractor import ExtractedCase
+    
+    json_path = Path(args.json_path).resolve()
+    if not json_path.exists():
+        print(f"❌ 文件不存在: {json_path}")
+        sys.exit(1)
+    
+    print(f"\n📥 增量导入: {json_path}")
+    print("=" * 50)
+    
+    try:
+        with open(json_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+    except json.JSONDecodeError as e:
+        print(f"❌ JSON 解析失败: {e}")
+        sys.exit(1)
+    
+    # 支持单案件和多案件
+    cases = data if isinstance(data, list) else [data]
+    
+    success = 0
+    skipped = 0
+    errors = []
+    
+    total = len(cases)
+    for i, case_data in enumerate(cases, 1):
+        # 计算进度
+        progress = int((i / total) * 100)
+        bar_len = 30
+        filled = int((i / total) * bar_len)
+        bar = '█' * filled + '░' * (bar_len - filled)
+        
+        # 打印进度条（同一行）
+        case_name = case_data.get('case_name', '未命名')[:20]
+        print(f"\r[{bar}] {progress}% | {i}/{total} | {case_name}", end='', flush=True)
+        
+        # 构建 ExtractedCase
+        extracted = ExtractedCase()
+        extracted.case_number = case_data.get('case_number')
+        extracted.case_name = case_data.get('case_name', '')
+        extracted.court = case_data.get('court')
+        extracted.cause = case_data.get('cause', '')
+        extracted.source_files = case_data.get('source_files', [])
+        
+        # 当事人
+        for p in case_data.get('plaintiffs', []):
+            from src.extractor import Party
+            extracted.plaintiffs.append(Party(name=p.get('name', ''), role='原告'))
+        for d in case_data.get('defendants', []):
+            from src.extractor import Party
+            extracted.defendants.append(Party(name=d.get('name', ''), role='被告'))
+        
+        # 增量导入（跳过已存在）
+        if extracted.case_number:
+            existing = db.get_case_by_number(extracted.case_number)
+            if existing:
+                print(f"   ⏭️  跳过（案号已存在）: {existing['case_name']}")
+                skipped += 1
+                continue
+        
+        try:
+            imp = importer.CaseImporter()
+            result = imp.import_full(extracted)
+            print(f"   ✅ 导入成功 (ID: {result['case_id']})")
+            success += 1
+        except Exception as e:
+            print(f"   ❌ 导入失败: {e}")
+            errors.append(f"{case_data.get('case_name')}: {e}")
+    
+    print(f"\n{'=' * 50}")
+    print(f"📊 导入完成: 成功 {success}, 跳过 {skipped}, 失败 {len(errors)}")
+    if errors:
+        print("\n失败列表:")
+        for e in errors:
+            print(f"  - {e}")
+
+
+# =============================================
+# scan 命令
+# =============================================
+
+def cmd_scan(args) -> None:
+    """扫描目录并可选 AI 提取。"""
+    path = Path(args.path).resolve()
+    
+    if not path.exists():
+        print(f"❌ 目录不存在: {path}")
+        sys.exit(1)
+    
+    if not path.is_dir():
+        print(f"❌ 不是目录: {path}")
+        sys.exit(1)
+    
+    print(f"\n📁 扫描目录: {path}")
+    print("⏳ 扫描中...")
+    
+    # Step 1: 扫描目录
+    result = scanner.scan_directory(path, recursive=args.recursive, max_depth=args.max_depth)
+    
+    # 输出扫描结果
+    print()
+    print(scanner.format_scan_result(result))
+    
+    if args.dry_run:
+        print("\n✅ 扫描完成（dry-run 模式，未解析文件内容）")
+        return
+    
+    # Step 2: 解析文件内容
+    print("\n⏳ 解析文件内容...")
+    parsed_contents = parser.parse_files(result.files)
+    
+    if not parsed_contents:
+        print("⚠️  未找到可解析的文件")
+        return
+    
+    # 更新文件预览
+    for pc in parsed_contents:
+        for f in result.files:
+            if f.path == pc.file_info.path:
+                f.content_preview = pc.preview
+                break
+    
+    print(f"✅ 解析完成，共 {len(parsed_contents)} 个文件")
+    
+    # Step 2.5: 检查案件材料完整性
+    file_types = [f.category.value if hasattr(f.category, 'value') else str(f.category) for f in result.files]
+    has_plaint = any('起诉状' in ft or '诉状' in ft or 'plaint' in ft.lower() for ft in file_types)
+    has_defense = any('答辩' in ft or 'defense' in ft.lower() for ft in file_types)
+    has_evidence = any('证据' in ft or 'evidence' in ft.lower() for ft in file_types)
+    
+    if not has_plaint and not has_defense and not has_evidence:
+        print("\n💡 提示: 未发现标准案件文书（起诉状/答辩状/证据），建议:")
+        print("   - 检查目录是否包含正确的案件材料")
+        print("   - 如需 AI 提取，请使用 --ai 参数")
+    
+    if not args.ai:
+        print("\n✅ 扫描完成（未启用 AI 提取）")
+        print("   如需 AI 提取，请添加 --ai 参数")
+        return
+    
+    # Step 3: AI 提取
+    print(f"\n🤖 AI 提取中... (使用 {args.engine} 引擎)")
+    print("=" * 50)
+    
+    try:
+        extracted = extractor.extract_case(
+            contents=parsed_contents,
+            case_name=result.case_name,
+            engine_type=args.engine,
+        )
+        
+        # Step 3.5: 检查重复
+        if extracted.case_number:
+            existing = db.get_case_by_number(extracted.case_number)
+            if existing:
+                print(f"\n⚠️  案号已存在: {extracted.case_number}")
+                print(f"   现有案件: {existing['case_name']}")
+                print(f"   状态: {existing['status']} | ID: {existing['id']}")
+                
+                if args.yes:
+                    print("\n⚠️  案号重复，跳过入库（--yes 参数）")
+                    return
+                
+                print("\n请选择操作:")
+                print("   [s] 跳过此案件")
+                print("   [u] 更新现有案件")
+                print("   [q] 退出")
+                
+                while True:
+                    choice = input("\n> ").strip().lower()
+                    if choice == 's':
+                        print("已跳过")
+                        return
+                    elif choice == 'u':
+                        print("将更新现有案件")
+                        break
+                    elif choice == 'q':
+                        print("已退出")
+                        return
+        
+        # 输出提取结果摘要
+        print("\n✅ AI 提取完成")
+        print("=" * 50)
+        print(importer.preview_import(extracted))
+        
+        # 预览 Markdown
+        print("\n" + "=" * 50)
+        print("📄 提取结果预览 (Markdown):")
+        print("=" * 50)
+        print(extracted.to_markdown()[:1000] + "..." if len(extracted.to_markdown()) > 1000 else extracted.to_markdown())
+        
+        if not args.import_result:
+            print("\n⚠️  未入库（使用 --import 参数确认入库）")
+            return
+        
+        # Step 4: 入库
+        print("\n" + "=" * 50)
+        if not args.yes:
+            print("⚠️  确认入库?")
+            print("   [y] 确认入库")
+            print("   [n] 仅保存草稿，稍后确认")
+            print("   [q] 退出")
+            
+            while True:
+                choice = input("\n> ").strip().lower()
+                if choice == 'y':
+                    break
+                elif choice == 'n':
+                    print("已保存草稿（JSON 输出到当前目录）")
+                    with open(f"extracted_{result.case_name}.json", 'w', encoding='utf-8') as f:
+                        json.dump(extracted.to_dict(), f, ensure_ascii=False, indent=2)
+                    return
+                elif choice == 'q':
+                    print("已取消")
+                    return
+        else:
+            print("⚠️  自动确认入库（--yes 参数）")
+        
+        # 执行入库
+        imp = importer.CaseImporter()
+        result_import = imp.import_full(extracted)
+        
+        print("\n✅ 入库成功!")
+        print(f"   案件 ID: {result_import['case_id']}")
+        print(f"   提取物: {len(result_import['artifact_ids'])} 个")
+        
+    except extractor.ExtractionError as e:
+        print(f"\n❌ AI 提取失败: {e}")
+        sys.exit(1)
+    except importer.ImportError as e:
+        print(f"\n❌ 入库失败: {e}")
+        sys.exit(1)
+
+
+# =============================================
 # 主入口
 # =============================================
 
@@ -549,6 +961,11 @@ def main() -> None:
     p.add_argument("--cause", help="案由")
     p.set_defaults(func=cmd_check)
 
+    # health
+    p = sub.add_parser("health", help="检查案件健康度")
+    p.add_argument("case_id", help="案件ID")
+    p.set_defaults(func=cmd_health)
+
     # report
     p = sub.add_parser("report", help="生成统计报告")
     p.set_defaults(func=cmd_report)
@@ -557,6 +974,12 @@ def main() -> None:
     p = sub.add_parser("artifacts", help="列出案件下所有提取物")
     p.add_argument("--case-id", required=True, dest="case_id")
     p.set_defaults(func=cmd_artifacts)
+
+    # export
+    p = sub.add_parser("export", help="导出提取物为 DOCX/Markdown")
+    p.add_argument("artifact_id", help="提取物ID")
+    p.add_argument("output", help="输出文件路径（.docx 或 .md）")
+    p.set_defaults(func=cmd_export)
 
     # templates
     p = sub.add_parser("templates", help="模板管理（list/search/show）")
@@ -574,6 +997,23 @@ def main() -> None:
     p_show = sub_t.add_parser("show", help="查看模板详情")
     p_show.add_argument("--template-id", required=True, dest="template_id")
     p_show.set_defaults(func=cmd_templates)
+
+    # import
+    p = sub.add_parser("import", help="从JSON文件增量导入案件")
+    p.add_argument("json_path", help="JSON文件路径")
+    p.set_defaults(func=cmd_import)
+
+    # scan
+    p = sub.add_parser("scan", help="扫描目录并 AI 辅助录入案件")
+    p.add_argument("path", help="案件目录路径")
+    p.add_argument("--dry-run", action="store_true", help="仅扫描，不解析文件")
+    p.add_argument("--recursive", action="store_true", default=True, help="递归扫描子目录（默认开启）")
+    p.add_argument("--max-depth", type=int, default=3, help="最大递归深度（默认3）")
+    p.add_argument("--ai", action="store_true", help="启用 AI 提取")
+    p.add_argument("--engine", default="minimax", choices=["basic", "mock", "ollama", "minimax", "feishu", "openai"], help="AI 引擎（默认 minimax）")
+    p.add_argument("--import", dest="import_result", action="store_true", help="确认入库")
+    p.add_argument("--yes", "-y", action="store_true", help="跳过确认直接入库")
+    p.set_defaults(func=cmd_scan)
 
     args = parser.parse_args()
     args.func(args)

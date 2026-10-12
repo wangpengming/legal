@@ -1,56 +1,240 @@
-# case-intelligence 模块使用手册
+# case-intelligence 模块用户手册
 
-> **模块定位**：案件情报提取与文书生成系统。接收案件材料，按 5 维度提取结构化知识（Artifact），通过 prompts 驱动 AI 生成文书，输出 MD + DOCX 格式。
+> **版本**: 3.2.0 | **更新**: 2026-09-27
+> **模块**: 案件智能分析系统
 
 ---
 
-## 1. 核心概念
+## 1. 模块简介
+
+case-intelligence 是法务部工程化系统的案件智能分析模块，提供：
+
+- **案件管理**：历史案件批量入库、查询、统计
+- **结构化提取**：从案件材料中按 D1-D5 五维度提取结构化信息
+- **模板管理**：答辩状/质证意见/当庭陈述/证据目录 4 类文书模板
+- **Prompts 规则库**：AI 提示词统一管理，支持多引擎切换
+
+---
+
+## 2. 目录结构
 
 ```
-案源（Case）
-    ├── 录入方式（CLI / UI / AI）
-    ├── 画像标签（涉案场景 / 授权状态 / ...）
-    │
-    ├── 提取 → Artifact（按 5 维度 D1-D5）
-    │         └── 知识库积累（随案件增多）
-    │
-    └── 生成 → Template（固定 4 种文书格式）
-              └── MD 格式 + DOCX 输出
+modules/case-intelligence/
+├── bin/
+│   └── extract.py          # CLI 入口
+├── data/
+│   └── case_registry.db    # SQLite 数据库
+├── prompts/                 # AI 提示词规则库
+│   ├── prompts.yaml        # 索引 + 使用指南
+│   ├── 提取/              # D1-D5 提取提示词
+│   ├── 匹配/               # 相似案件匹配
+│   └── 生成/               # 文书生成提示词
+├── output_templates/        # 固定文书模板
+├── output/                 # 生成的文书
+├── scripts/                 # 工具脚本
+├── src/                     # 核心代码
+│   ├── database.py         # 数据库操作
+│   ├── scanner.py          # 目录扫描
+│   ├── parser.py          # 文件解析
+│   ├── extractor.py        # AI 提取
+│   └── importer.py         # 数据导入
+└── docs/                   # 文档
 ```
 
-### 三个核心对象
+---
 
-| 对象 | 定义 | 特征 |
-|------|------|------|
-| **案源** | 案件基本信息 + 画像标签 | 录入方式固定（CLI/UI/AI） |
-| **提取物** | 按 5 维度（D1-D5）提取的知识 | 内容随案由变化，维度固定 |
-| **模板** | 固定的文书格式 | 不随案由变化，4 种通用 |
+## 3. 快速开始
 
-### 5 个提取维度（D1-D5）
+### 3.1 安装依赖
+
+```bash
+cd modules/case-intelligence
+pip install -r requirements.txt
+```
+
+### 3.2 查看帮助
+
+```bash
+python bin/extract.py --help
+```
+
+输出：
+
+```
+usage: extract.py [-h] {scan,register,extract,promote,complete,check,search,list,report} ...
+
+案件智能分析 CLI
+
+positional arguments:
+  {scan,register,extract,promote,complete,check,search,list,report}
+    scan       扫描目录，发现案件材料
+    register   登记新案件
+    extract    从案件材料提取 D1-D5 维度
+    promote    将提取物提升为模板
+    complete   标记案件为已完成
+    check      查询案件详情
+    search     搜索案件
+    list       列出所有案件
+    report     生成统计报告
+```
+
+---
+
+## 4. CLI 命令详解
+
+### 4.1 scan - 扫描目录
+
+```bash
+# 扫描目录，列出发现的案件材料（dry-run）
+python bin/extract.py scan /path/to/case --dry-run
+
+# 扫描 + AI 提取（需配置 AI 引擎）
+python bin/extract.py scan /path/to/case --ai --engine basic
+
+# 扫描 + 预览提取结果（不入库）
+python bin/extract.py scan /path/to/case --ai --preview
+
+# 扫描 + 入库
+python bin/extract.py scan /path/to/case --ai --import
+```
+
+**参数说明**：
+
+| 参数 | 说明 |
+|------|------|
+| `--dry-run` | 仅扫描不入库 |
+| `--ai` | 启用 AI 提取 |
+| `--engine` | AI 引擎（basic/ollama/openai） |
+| `--preview` | 预览提取结果 |
+| `--import` | 入库 |
+
+### 4.2 register - 登记案件
+
+```bash
+# 登记新案件
+python bin/extract.py register \
+    --name '腾讯音乐诉北京雷石侵权纠纷案' \
+    --case-number '2023京0491民初23751号' \
+    --plaintiff '腾讯音乐' \
+    --defendant '北京雷石' \
+    --cause '著作权侵权'
+```
+
+### 4.3 extract - 提取 D1-D5
+
+```bash
+# 从案件材料提取 D1-D5 维度
+python bin/extract.py extract \
+    --case-id <case_id> \
+    --type D1
+```
+
+**D1-D5 维度说明**：
 
 | 维度 | 名称 | 说明 |
 |------|------|------|
 | D1 | 事实认定 | 当事人/背景/争议焦点/关键事实/权利基础/行为定性 |
 | D2 | 法律依据 | 适用法条/法律关系定性/权利基础/抗辩可行性 |
-| D3 | 攻防策略 | 原告诉请/被告抗辩/论证结构/主战场决策 |
+| D3 | 攻防策略 | 原告诉请/被告抗辩排序/论证结构/主战场决策 |
 | D4 | 证据体系 | 双方证据清单/质证要点/举证责任分配 |
 | D5 | 赔偿裁量 | 赔偿请求/抗辩理由/计算方式/裁量因素/预估区间 |
 
+### 4.4 list - 案件列表
+
+```bash
+# 列出所有案件
+python bin/extract.py list
+
+# 按年度筛选
+python bin/extract.py list --year 2024
+
+# 按质量筛选
+python bin/extract.py list --quality A
+```
+
+### 4.5 search - 搜索案件
+
+```bash
+# 关键词搜索
+python bin/extract.py search "腾讯"
+
+# 搜索原告
+python bin/extract.py search --plaintiff "腾讯"
+
+# 搜索案由
+python bin/extract.py search --cause "著作权"
+```
+
+### 4.6 report - 统计报告
+
+```bash
+# 生成统计报告
+python bin/extract.py report
+```
+
+输出示例：
+
+```
+============================================================
+案件智能分析统计报告
+============================================================
+
+📊 总体统计
+  总案件数：88
+  已完成：85
+  进行中：3
+
+📅 年度分布
+  2024：40
+  2025：40
+  2026：8
+
+🏷️ 质量分布
+  A级（完整）：51
+  B级（良好）：34
+  C级（一般）：3
+```
+
 ---
 
-## 2. prompts/ 目录（核心）
+## 5. 批量工具脚本
 
-**所有 AI 操作通过 prompts/ 目录的提示词驱动**，提示词是系统的"大脑"。
+### 5.1 历史案件批量入库
+
+```bash
+# 将 99 个历史案例批量入库
+python scripts/batch_import.py
+```
+
+### 5.2 OCR 批量提取
+
+```bash
+# 从 PDF 中 OCR 提取缺失信息
+python scripts/ocr_extract.py
+```
+
+### 5.3 批量审查
+
+```bash
+# 审查所有案例的提取质量
+python scripts/review_all_cases_final.py
+```
+
+---
+
+## 6. Prompts 规则库
+
+### 6.1 目录结构
 
 ```
 prompts/
-├── prompts.yaml              # 索引 + 使用指南
+├── prompts.yaml              # 索引
 ├── 提取/
-│   ├── 1_新案材料提取_D1-D5.md    # 从材料提取 5 维度
-│   ├── 2_跨案归纳_Artifact汇聚.md  # 从多个同类 artifact 归纳通用结构
-│   └── 3_质量检查_提取物审核.md   # 提取物质量审核
+│   ├── 1_新案材料提取_D1-D5.md    # 5维度提取
+│   ├── 2_跨案归纳_Artifact汇聚.md   # 跨案归纳
+│   └── 3_质量检查_提取物审核.md     # 质量审核
 ├── 匹配/
-│   └── 4_新案匹配_相似案源检索.md  # 新案匹配相似案件
+│   └── 4_新案匹配_相似案源检索.md  # 相似案件匹配
 └── 生成/
     ├── 5_答辩状生成.md
     ├── 6_质证意见生成.md
@@ -58,113 +242,69 @@ prompts/
     └── 8_证据目录生成.md
 ```
 
-### 使用流程A：建设知识库（历史案件 → artifacts）
+### 6.2 使用方法
 
-```
-1. 准备原始案件材料
-2. 复制 prompts/提取/1_新案材料提取_D1-D5.md
-3. AI 按 5 维度提取 → 输出结构化结果
-4. 人工复核 → 入库
+1. 复制提示词文件内容
+2. 粘贴到 AI 对话窗口
+3. 补充案件材料
+4. AI 输出结构化结果
+5. 人工审核后入库
+
+---
+
+## 7. 固定模板库
+
+### 7.1 模板类型
+
+| 类型 | 说明 | 数量 |
+|------|------|------|
+| 答辩状 | 四层递进/主观无过错等 | 2+ |
+| 质证意见 | 四性分别表述等 | 1+ |
+| 当庭陈述 | 四段式结构等 | 2+ |
+| 证据目录 | 三级分类清单等 | 1+ |
+
+### 7.2 使用方法
+
+1. 选择文书类型
+2. 查看模板列表
+3. 选择适用的模板
+4. 填充案件信息
+5. 生成文书
+
+---
+
+## 8. 常见问题
+
+### Q1: 如何配置 AI 引擎？
+
+创建 `ai_engines.yaml`：
+
+```yaml
+engines:
+  ollama:
+    enabled: true
+    base_url: "http://localhost:11434"
+    model: "qwen2.5:14b"
 ```
 
-### 使用流程B：生成文书（新案 → output/）
+### Q2: OCR 提取失败怎么办？
 
-```
-1. 输入新案基本信息
-2. 复制 prompts/匹配/4_新案匹配_相似案源检索.md
-3. AI 匹配相似案件 + 列出相关 artifact
-4. 选择文书类型 → 复制对应 prompts/生成/5-8_*.md
-5. AI 生成文书 → 导出 MD + DOCX
+1. 检查 PDF 是否为扫描件
+2. 确认 Tesseract 已安装：`tesseract --version`
+3. 安装中文语言包：`brew install tesseract/tesseract/tesseract-lang`
+
+### Q3: 如何备份数据库？
+
+```bash
+cp data/case_registry.db data/case_registry.db.bak
 ```
 
 ---
 
-## 3. CLI 命令参考
+## 9. 更新日志
 
-### 3.1 案源管理
-
-```bash
-# 注册案源（支持画像标签）
-python3 bin/extract.py register \
-  --name "腾讯音乐诉北京雷石侵权纠纷案" \
-  --case-number "2023京0491民初23751号" \
-  --plaintiff "腾讯音乐" \
-  --defendant "北京雷石" \
-  --cause "侵害作品信息网络传播权纠纷" \
-  --entry-method "CLI" \
-  --scene "实体KTV" \
-  --defendant-auth-status "已获音集协授权"
-
-# 列出所有案源
-python3 bin/extract.py list
-python3 bin/extract.py list --status pending
-
-# 搜索案源
-python3 bin/extract.py search --query "腾讯"
-
-# 检查重复
-python3 bin/extract.py check --case-number "2023京0491民初23751号"
-```
-
-### 3.2 提取物管理（D1-D5）
-
-```bash
-# 提取 Artifact（5 维度）
-python3 bin/extract.py extract \
-  --case-id <案件ID> \
-  --type D1 \
-  --title "腾讯案事实认定"
-
-# 列出案件下所有提取物
-python3 bin/extract.py artifacts --case-id <案件ID>
-```
-
-### 3.3 模板管理
-
-```bash
-# 列出所有模板
-python3 bin/extract.py templates list
-python3 bin/extract.py templates list --category "答辩状"
-
-# 搜索模板
-python3 bin/extract.py templates search --query "主体不适格"
-
-# 查看模板详情
-python3 bin/extract.py templates show --template-id <模板ID>
-```
-
-### 3.4 统计报告
-
-```bash
-python3 bin/extract.py report
-```
-
----
-
-## 4. 目录说明
-
-| 目录 | 用途 |
-|------|------|
-| `src/` | 源代码（database / artifact_store / template_store / case_recognizer / extractor_cli） |
-| `data/artifacts/` | 提取物文件（按案件 ID 目录组织） |
-| `prompts/` | AI 提示词规则库（系统大脑） |
-| `output_templates/` | 固定模板（答辩状/质证意见/当庭陈述/证据目录） |
-| `output/` | 生成的文书（按案件 ID + 日期组织，MD + DOCX） |
-| `templates_extracted/` | 历史案件归档 |
-
----
-
-## 5. 数据统计
-
-- 案源总数: 3
-- 提取物总数: 12（D1:1 / D2:1 / D3:2 / D4:2 / D5:6）
-- 模板总数: 7
-
----
-
-## 6. 注意事项
-
-- **Prompts 是核心**：所有 AI 操作通过 prompts/ 驱动，修改需谨慎
-- **维度固定，内容变化**：5 个维度（D1-D5）适用于所有案由
-- **原文件不移动**：原始案件文件留在原位，通过 reference_index.yaml 索引引用
-- **暂不 RAG**：当前版本使用结构化字段匹配，不引入向量检索
+| 版本 | 日期 | 更新内容 |
+|------|------|---------|
+| 3.2.0 | 2026-09-27 | 历史案件88个入库，OCR批量提取 |
+| 3.1.0 | 2026-09-22 | CLI框架、数据库、Prompts初始化 |
+| 3.0.0 | 2026-08-17 | 初始版本 |
