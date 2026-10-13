@@ -84,8 +84,9 @@ class DocumentGenerator:
         self.ai_engine = None  # 延迟初始化
     
     def _get_default_db_path(self) -> Path:
-        """获取默认数据库路径"""
-        return PROJECT_ROOT / "data" / "case_registry.db"
+        """获取默认数据库路径（DATA_DIR 可覆盖，部署时落卷）"""
+        data_dir = Path(os.environ.get("DATA_DIR") or PROJECT_ROOT / "data")
+        return data_dir / "case_registry.db"
     
     def _init_ai_engine(self):
         """初始化 AI 引擎"""

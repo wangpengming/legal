@@ -4,6 +4,7 @@
 # 数据库操作委托给 database.py
 # =============================================
 import json
+import os
 import shutil
 from datetime import datetime, timezone
 from pathlib import Path
@@ -13,7 +14,9 @@ from . import database as db
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-ARTIFACTS_ROOT = PROJECT_ROOT / "data" / "artifacts"
+# 与 database.py 一致：提取物目录随 DATA_DIR 走（部署时落卷）
+DATA_DIR = Path(os.environ.get("DATA_DIR") or PROJECT_ROOT / "data")
+ARTIFACTS_ROOT = DATA_DIR / "artifacts"
 
 
 def _artifact_dir(case_id: str) -> Path:

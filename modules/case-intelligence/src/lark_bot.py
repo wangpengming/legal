@@ -6,6 +6,7 @@
 import re
 import json
 import logging
+import os
 from typing import Optional, Dict, Any, List
 from pathlib import Path
 
@@ -41,8 +42,10 @@ class CaseBot:
         self.db_path = db_path or self._get_default_db_path()
     
     def _get_default_db_path(self) -> Path:
-        """获取默认数据库路径"""
-        return Path(__file__).parent.parent / "data" / "case_registry.db"
+        """获取默认数据库路径（DATA_DIR 可覆盖，部署时落卷）"""
+        project_root = Path(__file__).parent.parent
+        data_dir = Path(os.environ.get("DATA_DIR") or project_root / "data")
+        return data_dir / "case_registry.db"
     
     def handle_message(self, message: str) -> str:
         """

@@ -25,7 +25,9 @@ def load_llm_config() -> Dict[str, Any]:
 
 
 def get_minimax_api_key() -> Optional[str]:
-    """获取 MiniMax API Key"""
+    """获取 MiniMax API Key（优先环境变量，回落 ai_engines.yaml）"""
+    if os.environ.get("MINIMAX_API_KEY"):
+        return os.environ["MINIMAX_API_KEY"]
     config = load_llm_config()
     engines = config.get("engines", {})
     minimax = engines.get("minimax", {})

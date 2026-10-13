@@ -3,6 +3,7 @@
 # SQLite: data/case_registry.db
 # 包含: cases / artifacts / templates 三张表
 # =============================================
+import os
 import sqlite3
 import uuid
 from pathlib import Path
@@ -10,7 +11,9 @@ from datetime import datetime, timezone
 from typing import Optional
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-DB_PATH = PROJECT_ROOT / "data" / "case_registry.db"
+# DATA_DIR 可被环境变量覆盖：部署时指向卷挂载点（/data），本地默认 PROJECT_ROOT/data
+DATA_DIR = Path(os.environ.get("DATA_DIR") or PROJECT_ROOT / "data")
+DB_PATH = DATA_DIR / "case_registry.db"
 
 # 提取维度（5个固定维度，适用于所有案由类型）
 ARTIFACT_TYPES = ["D1", "D2", "D3", "D4", "D5"]

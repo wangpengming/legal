@@ -9,6 +9,7 @@
 #       数据库维度，供无 HTTP 依赖的集成方使用。
 # =============================================
 import json
+import os
 import socket
 import sys
 import urllib.request
@@ -18,6 +19,8 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 MODULE_NAME = "case-intelligence"
 UI_PORTS = [18503, 18504]
 UI_HEALTH_PATH = "/_stcore/health"
+# 与 src/database.py 一致：DATA_DIR 可覆盖（部署时指向卷挂载点）
+DATA_DIR = Path(os.environ.get("DATA_DIR") or PROJECT_ROOT / "data")
 
 
 def _module_version() -> str:
@@ -60,7 +63,7 @@ def _ui_health() -> dict:
 
 
 def _db_health() -> dict:
-    db_file = PROJECT_ROOT / "data" / "case_registry.db"
+    db_file = DATA_DIR / "case_registry.db"
     if not db_file.exists():
         # 只读探针：不因健康检查而创建数据库
         return {"ok": True, "initialized": False, "note": "数据库尚未创建"}
