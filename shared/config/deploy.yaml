@@ -1,0 +1,64 @@
+# =============================================
+# 部署注册表（thunderbox · 方案 A：一仓多分支快照）
+# 与 ports.yaml / domains.yaml 同套路 —— 单一真值
+# 规则见 AGENTS.md §10.4.5 与 docs/deployment-thunderbox.md
+#
+# 约定：GitHub 仓库只承载 deploy/* 部署分支（机器生成，永不手改），
+#       不推 master（避免整仓 + data 上 GitHub）。
+#       同步工具：tools/deploy_sync.py
+# =============================================
+
+platform:
+  provider: thunderbox
+  # thunderbox_create 的 source_url 只接受 HTTPS（SSH 不支持）
+  source_url: https://github.com/wangpengming/legal.git
+  # 本地推送目标（SSH，需本机 GitHub key；不通则用 HTTPS + PAT）
+  git_push_url: git@github.com:wangpengming/legal.git
+  # 本地 remote 名（git remote add github <git_push_url>）
+  git_remote: github
+  branch_prefix: deploy/
+  access_mode_default: internal
+
+allocations:
+  # ---------------------------------------------------------------
+  # 当前部署目标（court 已部署不动，portal 待定）
+  # ---------------------------------------------------------------
+  case-intelligence:
+    enabled: true
+    branch: deploy/case-intelligence
+    subdomain: legal-case
+    access_mode: internal
+    build_pack: dockerfile
+    port: 18503
+    health_path: /_stcore/health
+    # 数据持久化：卷挂 /data；容器首启时空卷从镜像内 data/ 播种（docker-entrypoint.sh）
+    # 新增案例写入 /data（卷），重新部署不丢
+    volumes:
+      - case-data:/data
+    # 快照排除项（模块内相对路径；目录用尾部 /，其余按 glob）
+    exclude:
+      - tests/
+      - docs/
+      - spec/
+      - requirements/
+      - __pycache__/
+      - pytest.ini
+      - SPEC-UI.md
+    env_required:
+      - DATA_DIR          # /data（容器内）
+      - MINIMAX_API_KEY   # 优先于 ai_engines.yaml（get_minimax_api_key 已改为 env 优先）
+      - AUTH_USERS        # 覆盖 config.py 的默认口令，格式 user:pass,user2:pass2
+    env_optional:
+      - MINIMAX_MODEL
+      # 飞书 Bot（独立自建应用，见 backlog「飞书 Bot 独立应用申请与上线」）
+      - LARK_APP_ID
+      - LARK_APP_SECRET
+      - LARK_VERIFY_TOKEN
+    notes: >
+      密钥走环境变量：MINIMAX_API_KEY（env 优先，ai_engines.yaml 明文作为本地回落，
+      用户已接受，可随时更换）；data/ 的持久化依赖 src/database.py 等读 DATA_DIR
+      （已一致化，含 lark_bot / health）；飞书 Bot 为独立自建应用，凭证走 secret。
+
+  # 其余模块暂不部署（court-doc-generator 已部署；portal 规划中）
+  # court-doc-generator: { enabled: false, ... }
+  # portal:              { enabled: false, ... }

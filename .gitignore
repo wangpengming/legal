@@ -87,6 +87,8 @@ coverage/
 uploads/
 downloads/
 tmp/
+# temp/：本地信息存储（任务状态 / 临时脚本 / 不便上传的信息），永不入库
+# 详见 temp/README.md
 temp/
 
 # ---- 运行时数据 / 生成产物（提交源代码，不提交数据）----

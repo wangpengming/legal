@@ -7,7 +7,8 @@
 ```
 shared/config/
 ├── ports.yaml        # 模块端口注册表（启动前冲突检测，详见 AGENTS.md §10.4.2）
-└── domains.yaml      # 模块域名注册表（thunderbox 一模块一域名，详见 AGENTS.md §10.4.5）
+├── domains.yaml      # 模块域名注册表（thunderbox 一模块一域名，详见 AGENTS.md §10.4.5）
+└── deploy.yaml       # 模块部署注册表（部署分支 / 构建 / 卷 / 环境变量，详见 AGENTS.md §10.4.6）
 ```
 
 ## 注册表说明
@@ -16,6 +17,7 @@ shared/config/
 |------|------|---------|
 | `ports.yaml` | 每个模块端口分配（Streamlit/FastAPI/前端/容器等） | `module.yaml` 的 `port` 字段须与本表一致 |
 | `domains.yaml` | 每个模块在 thunderbox 上的唯一域名 | `module.yaml` 的 `domain` 字段须与本表一致 |
+| `deploy.yaml` | 每个模块的部署分支 / subdomain / 构建方式 / 卷 / 环境变量 | 与 `domains.yaml` 的 subdomain、`module.yaml` 的 `domain` 一致；分支由 `tools/deploy_sync.py` 生成 |
 
 ## 配置规范
 
