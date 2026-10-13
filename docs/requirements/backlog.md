@@ -41,8 +41,8 @@
 - [x] **EX-06** `scripts/audit_extraction.py`：质量审计（回传通道）
 - [x] **EX-07** `prompts/提取/1_…`：强制填满叙述型小节 + 表格需数据行；新增 `4_提取质量自检.md`
 - [x] **EX-08** 单测：`tests/test_markdown_utils.py`（4）+ `tests/test_court_resolver.py`（4）
-- [ ] **EX-09**（待异地回传）代字→法院权威映射补表
-- [ ] **EX-10**（待异地确认）孤儿提取物归位（腾讯案 → 9ba215f8 待定 / 广电案已归位 97686b3a）
+- [~] **EX-09** 代字→法院映射：本机已补 **10 条已核验映射**（沪0112/津0101/川0104/川0193/豫0191/鲁0481/琼0271/粤0115/粤0192/粤0402，来源公开裁判文书核验）；**余 18 个未映射 token 待异地/法律同事确认**（清单见 R2 交接单）
+- [x] **EX-10** 孤儿提取物归位：本机 apply 后孤儿 **1→0**（腾讯案 7 条重挂 `9ba215f8`，去重跳过 3 条重复 type；广电案已于 1.14.0 归位 `97686b3a`）
 - [x] **EX-11** 消除四套 artifact 命名（`database.py` 常量 = 唯一真值；CLI 支持 `--type D1`）
 - [x] **EX-12** 写 `generation_method`（llm/rule-based/manual）+ `model_version`；importer 经 `artifact_store` 双写 MD
 - [x] **EX-14** `src/database.py`：`_init_schema` 全列 + `_ensure_columns` 幂等迁移（修 fresh DB 报错）
@@ -50,17 +50,27 @@
 - [x] **EX-16** 单测 3 个（stdlib 可跑）：schema/迁移/透传、提示词完整性、归位匹配
 - [x] **EX-13** `document_generator` 接口放宽：参考提取物 5→20 个、500→4000 字（补回归测试）
 
+### 三、R2 深度修复（2026-10-13，本机，异地复测后）
+
+> 异地重跑提取后暴露 3 个残留缺陷，本机全部修复：
+
+- [x] **EX-17** `quality` 缺失根因：LLM 路径（MiniMax/Ollama `_parse_response`）从不设 `quality`（仅规则引擎设）→ 抽取 `derive_quality(ExtractedCase)` 单一真值（按 D1–D5 实质完整度 A/B/C），三条路径（MiniMax/Ollama/BasicEngine）统一调用；存量 `backfill_cases.py` 回填 167 行（A:160 / B:6 / C:1，缺失 0/167）
+- [~] **EX-09**（补）`court_resolver` 扩充 10 条已核验映射 + 修 `extract_court_token` **空格 bug**（`（2025）鲁 0281…` 原误判省高院 → `.lstrip()` 修正）；回归测试补 1；court 可派生 **64→106/167**、court 缺失 67→43
+- [x] **EX-10**（补）孤儿归位 apply（见上）+ `relink_artifacts.py` **按 (case_id, artifact_type) 去重**（补 4 条、跳过 3 条重复），`backfill_cases.py` 改**非破坏式**（filled-only-when-empty + 差异报告，不再覆盖更优 LLM 值）
+- [x] **EX-18** 单测补齐：`test_extraction_prompt.py` 补 3 个 quality 用例（→8）；`test_court_resolver.py` 补空格回归（→5）
+- [ ] **EX-19**（待异地回传）剩余未映射代字清单确认（18 token / 32 案）；4 处派生差异裁决（3 个 year + 1 个 court，见 R2 交接单）
+
 ### 验收标准
 
 - [x] 本地：stdlib 单测 3 个全绿；三脚本 dry-run/apply 通过；importer 全链落库 + MD 双写验证
-- [ ] 异地：空小节率较基线 50% 下降（本机修复后 0%）
-- [ ] 异地：court 可派生案件数较基线 50 上升
-- [ ] 异地：孤儿提取物可被 `list_artifacts` / 详情页 / 生成链路检索到
-- [ ] 交接单 R1 回执齐备（含审计 JSON + 代字清单 + 归位意见）
+- [x] 本机：空小节率较基线 50% → **0%**
+- [x] 本机：court 可派生案件数 50 → **106/167**（缺失 25%）；quality 缺失 0/167
+- [x] 本机：孤儿提取物 2 目录 → **0**（全部归位，可被 `list_artifacts` / 详情页 / 生成链路检索）
+- [ ] 异地：R1/R2 回执齐备（含审计 JSON + 代字清单 + 4 处差异裁决 + 归位确认 + 质量判读）
 
 ### 交接单
 
-- `docs/handoff/H-20261013-extraction.md`（R1）
+- `docs/handoff/H-20261013-extraction.md`（R1 + R2 续）
 
 ---
 

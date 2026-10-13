@@ -461,6 +461,35 @@ def _strip_json_fence(text: str) -> str:
     return text.strip()
 
 
+def _dim_substantive(dim) -> bool:
+    """维度是否含实质内容（任一字符串字段非空，或任一列表字段有元素）。"""
+    if dim is None:
+        return False
+    for name in getattr(dim, "__dataclass_fields__", {}):
+        value = getattr(dim, name)
+        if isinstance(value, str) and value.strip():
+            return True
+        if isinstance(value, list) and any(value):
+            return True
+    return False
+
+
+def derive_quality(case: "ExtractedCase") -> str:
+    """按 D1-D5 完整度 + 基本信息评质量等级 A/B/C（AI 与规则引擎共用唯一真值）。
+
+    A：5 个维度均有实质内容（LLM 全维提取）
+    B：≥3 个维度有内容，或案号已识别（基本身份可定）
+    C：其余
+    """
+    dims = (case.d1_facts, case.d2_legal, case.d3_strategy, case.d4_evidence, case.d5_damages)
+    filled = sum(1 for d in dims if _dim_substantive(d))
+    if filled >= 5:
+        return "A"
+    if filled >= 3 or case.case_number:
+        return "B"
+    return "C"
+
+
 # =============================================
 # AI 引擎接口
 # =============================================
@@ -522,6 +551,7 @@ class MiniMaxAdapter(AIEngine):
             case.plaintiffs = _party_list(data.get("plaintiffs"), "原告")
             case.defendants = _party_list(data.get("defendants"), "被告")
             _apply_dims(case, data)
+            case.quality = derive_quality(case)
             case.confidence = 0.7
         except Exception:
             case.cause = case.cause or "待提取"
@@ -586,6 +616,7 @@ class OllamaEngine:
         case.plaintiffs = _party_list(data.get("plaintiffs"), "原告")
         case.defendants = _party_list(data.get("defendants"), "被告")
         _apply_dims(case, data)
+        case.quality = derive_quality(case)
         return case
 
 
@@ -619,7 +650,7 @@ class BasicEngine:
         # 提取证据（从质证意见中）
         evidence_points = self._extract_evidence_points(contents)
         
-        return ExtractedCase(
+        case = ExtractedCase(
             case_number=case_number,
             case_name=dir_info.get("full_name", case_name),
             court=court,
@@ -627,7 +658,6 @@ class BasicEngine:
             result=result or "",
             scene=scene,
             year=year,
-            quality="B" if case_number else "C",
             defendant_auth_status=auth_status,
             plaintiffs=plaintiffs,
             defendants=defendants,
@@ -647,6 +677,8 @@ class BasicEngine:
                 burden_of_proof="待补充",
             ),
         )
+        case.quality = derive_quality(case)
+        return case
 
     def _extract_scene(self, case_name: str, text: str) -> str:
         """推断涉案场景（映射到 SCENE 词表；未知留空）。"""

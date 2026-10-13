@@ -1,0 +1,253 @@
+{
+  "ok": true,
+  "db_path": "/home/pengming/code/me/legal/modules/case-intelligence/data/case_registry.db",
+  "counts": {
+    "cases": 167,
+    "artifacts": 838,
+    "templates": 7
+  },
+  "case_missing": {
+    "case_number": 14,
+    "case_name": 0,
+    "plaintiff": 5,
+    "defendant": 7,
+    "cause": 1,
+    "court": 43,
+    "result": 126,
+    "scene": 100,
+    "quality": 0,
+    "year": 10
+  },
+  "case_total": 167,
+  "artifact_len": {
+    "case_key_facts": {
+      "n": 167,
+      "avg": 430,
+      "min": 12,
+      "max": 972
+    },
+    "contingency_response": {
+      "n": 2,
+      "avg": 261,
+      "min": 137,
+      "max": 386
+    },
+    "court_statement": {
+      "n": 2,
+      "avg": 444,
+      "min": 442,
+      "max": 446
+    },
+    "cross_exam_strategy": {
+      "n": 1,
+      "avg": 557,
+      "min": 557,
+      "max": 557
+    },
+    "defense_argument_chain": {
+      "n": 168,
+      "avg": 315,
+      "min": 0,
+      "max": 636
+    },
+    "evidence_structure": {
+      "n": 167,
+      "avg": 319,
+      "min": 0,
+      "max": 615
+    },
+    "legal_reasoning_chain": {
+      "n": 168,
+      "avg": 334,
+      "min": 14,
+      "max": 720
+    },
+    "liability_calculation": {
+      "n": 161,
+      "avg": 220,
+      "min": 0,
+      "max": 483
+    },
+    "quantitative_analysis": {
+      "n": 1,
+      "avg": 166,
+      "min": 166,
+      "max": 166
+    },
+    "reverse_strategy": {
+      "n": 1,
+      "avg": 546,
+      "min": 546,
+      "max": 546
+    }
+  },
+  "artifact_type_distinct": [
+    "case_key_facts",
+    "contingency_response",
+    "court_statement",
+    "cross_exam_strategy",
+    "defense_argument_chain",
+    "evidence_structure",
+    "legal_reasoning_chain",
+    "liability_calculation",
+    "quantitative_analysis",
+    "reverse_strategy"
+  ],
+  "artifact_len_buckets": {
+    "200-1k": 672,
+    "<200": 163,
+    "0(空)": 3
+  },
+  "generation_method_dist": {
+    "ai": 514,
+    "manual": 9,
+    "llm": 315
+  },
+  "empty_sections": {
+    "total": 2481,
+    "empty": 0,
+    "rate_pct": 0
+  },
+  "orphans": {
+    "artifact_dirs": 65,
+    "orphan_dirs": 0,
+    "orphan_ids": [],
+    "cases_with_md_files": 65,
+    "cases_total": 167
+  },
+  "court_tokens": {
+    "京0491": {
+      "n": 45,
+      "mapped": true
+    },
+    "京0105": {
+      "n": 9,
+      "mapped": true
+    },
+    "川0193": {
+      "n": 8,
+      "mapped": true
+    },
+    "川0104": {
+      "n": 6,
+      "mapped": true
+    },
+    "津0101": {
+      "n": 6,
+      "mapped": true
+    },
+    "沪0115": {
+      "n": 5,
+      "mapped": true
+    },
+    "琼0271": {
+      "n": 5,
+      "mapped": true
+    },
+    "粤0402": {
+      "n": 5,
+      "mapped": true
+    },
+    "鲁0481": {
+      "n": 5,
+      "mapped": true
+    },
+    "粤0115": {
+      "n": 3,
+      "mapped": true
+    },
+    "鲁0281": {
+      "n": 3,
+      "mapped": false
+    },
+    "晋": {
+      "n": 2,
+      "mapped": true
+    },
+    "粤0111": {
+      "n": 2,
+      "mapped": false
+    },
+    "豫0191": {
+      "n": 2,
+      "mapped": true
+    },
+    "京仲": {
+      "n": 2,
+      "mapped": false
+    },
+    "津0319": {
+      "n": 2,
+      "mapped": false
+    },
+    "粤0106": {
+      "n": 2,
+      "mapped": false
+    },
+    "粤0192": {
+      "n": 2,
+      "mapped": true
+    },
+    "粤1403": {
+      "n": 2,
+      "mapped": false
+    },
+    "鲁0891": {
+      "n": 2,
+      "mapped": false
+    },
+    "鲁1691": {
+      "n": 2,
+      "mapped": false
+    },
+    "京0307": {
+      "n": 2,
+      "mapped": false
+    },
+    "京0419": {
+      "n": 2,
+      "mapped": false
+    },
+    "沪0112": {
+      "n": 2,
+      "mapped": true
+    },
+    "渝0192": {
+      "n": 2,
+      "mapped": false
+    },
+    "鲁1311": {
+      "n": 2,
+      "mapped": false
+    },
+    "内0402": {
+      "n": 2,
+      "mapped": false
+    },
+    "京0103": {
+      "n": 1,
+      "mapped": false
+    },
+    "黔2701": {
+      "n": 1,
+      "mapped": false
+    },
+    "粤0307": {
+      "n": 1,
+      "mapped": false
+    },
+    "粤": {
+      "n": 1,
+      "mapped": true
+    },
+    "鲁0202": {
+      "n": 1,
+      "mapped": false
+    },
+    "粤0306": {
+      "n": 1,
+      "mapped": false
+    }
+  },
+  "court_resolvable_cases": 106
+}

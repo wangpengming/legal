@@ -128,8 +128,12 @@ def _suggest_match(con, case_name: str):
     return {"mode": "none", "candidates": cands}
 
 
-def _move_orphan_files(orphan_id: str, target_id: str) -> int:
-    """把孤儿目录下的 .md 迁到目标案件目录，并改写 frontmatter 的 case_id。"""
+def _move_orphan_files(orphan_id: str, target_id: str, keep_files=None) -> int:
+    """把孤儿目录下的 .md 迁到目标案件目录，并改写 frontmatter 的 case_id。
+
+    keep_files 为 None 时迁移全部；否则仅迁移文件名在该集合中的文件
+    （用于跳过与目标案件同类型的重复项）。
+    """
     src = ARTIFACTS_DIR / orphan_id
     dst = ARTIFACTS_DIR / target_id
     if not src.is_dir():
@@ -137,6 +141,8 @@ def _move_orphan_files(orphan_id: str, target_id: str) -> int:
     dst.mkdir(parents=True, exist_ok=True)
     moved = 0
     for f in sorted(src.glob("*.md")):
+        if keep_files is not None and f.name not in keep_files:
+            continue
         text = f.read_text(encoding="utf-8", errors="replace")
         text = re.sub(r"^case_id:.*$", f"case_id: {target_id}", text, count=1, flags=re.M)
         (dst / f.name).write_text(text, encoding="utf-8")
@@ -212,20 +218,32 @@ def main():
             else:
                 print(f"跳过 {oid[:8]}（无匹配案件，未指定 --create-missing）")
                 continue
+        # 按 (case_id, artifact_type) 去重：目标已有同类型的提取物时不重复插入，
+        # 保证「每种提取物类型在单案内唯一」（唯一真值原则）。
+        existing_types = {r[0] for r in con.execute(
+            "select artifact_type from artifacts where case_id=?", (target,))}
+        skipped = []
         for i in o["items"]:
+            at = i["artifact_type"] or "note"
             if i["in_db"]:
+                continue
+            if at in existing_types:
+                skipped.append(f"{at}/{i['title']}")
                 continue
             con.execute(
                 "insert into artifacts (id, case_id, artifact_type, title, content, "
                 "source_ref, version, created_at, generation_method) "
                 "values (?, ?, ?, ?, ?, ?, 1, ?, 'manual')",
-                (i["artifact_id"], target, i["artifact_type"] or "note", i["title"],
+                (i["artifact_id"], target, at, i["title"],
                  i["content"], i["source_ref"], i["extracted_at"] or "2026-09-22T00:00:00+00:00"),
             )
+            existing_types.add(at)
             written += 1
         moved = _move_orphan_files(oid, target)
         if moved:
             print(f"文件层已迁移 {moved} 个 → {target[:8]}/")
+        if skipped:
+            print(f"  跳过同类型重复 {len(skipped)} 个（目标已有该类型，未插入 DB）: " + ", ".join(skipped))
     con.commit()
     print(f"✅ 写入提取物 {written} 条")
     con.close()

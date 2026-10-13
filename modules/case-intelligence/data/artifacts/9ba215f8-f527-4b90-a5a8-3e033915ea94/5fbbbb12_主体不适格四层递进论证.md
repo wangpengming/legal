@@ -1,6 +1,6 @@
 ---
 artifact_id: 5fbbbb12-12d2-4431-9f1b-919e123b214a
-case_id: f843bae6-3c1d-4bb7-8c52-b37ce7744ce4
+case_id: 9ba215f8-f527-4b90-a5a8-3e033915ea94
 case_name: 腾讯音乐诉北京雷石侵权纠纷案
 artifact_type: defense_argument_chain
 title: 主体不适格四层递进论证

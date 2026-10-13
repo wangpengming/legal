@@ -2,12 +2,12 @@
 
 | 项 | 值 |
 |----|----|
-| 轮次 | R1 |
+| 轮次 | R1 + R2（续） |
 | 日期 | 2026-10-13 |
 | 发起 | 本机（修复方） |
 | 执行 | 异地（测试方） |
 | 关联 backlog | 「case-intelligence 提取功能缺陷修复与验证闭环」 |
-| 关联提交 | `7fceaeb`（本机 master） |
+| 关联提交 | R1 `7fceaeb` · R2 `ef45de3`（异地复测）→ 本机修复（本卡 R2 段） |
 
 ---
 
@@ -104,6 +104,90 @@ python3 scripts/relink_artifacts.py
   ```
 - 产物路径：`docs/handoff/artifacts/R1-audit.json`（已提交？✅/❌）
 - 观察/异常：__________
+- 结论：**通过 / 部分通过 / 阻塞**
+
+<!-- 提示：本卡不含密钥、不含部署；回执勿贴真实姓名/身份证/手机号。 -->
+
+---
+
+# R2 · 异地复测后残留缺陷修复（本机）
+
+> 异地 `ef45de3` 重跑提取（167 案 / 834 artifact / D1–D5 全部有实质内容）后，本机回归发现 3 个残留缺陷并已全部修复。
+
+## ① R2 改了什么
+
+| 缺陷 | 根因 | 修复 |
+|------|------|------|
+| `quality` 全空（0/167） | LLM 路径（MiniMax/Ollama `_parse_response`）**从不设 quality**，仅规则引擎设 → 经 LLM 提取的案件 quality 恒空 | 抽出 **`derive_quality(ExtractedCase)`** 单一真值（按 D1–D5 实质完整度 A/B/C）；三条路径统一调用；存量回填 **167 行（A:160 / B:6 / C:1）** |
+| `court` 可派生仅 64/167 | 代字映射表偏小；且 `extract_court_token` 存在**空格 bug**（`（2025）鲁 0281…` 尾段未 lstrip，误判为省高院，会覆盖正确 LLM 值） | 补 **10 条已核验映射**（沪0112/津0101/川0104/川0193/豫0191/鲁0481/琼0271/粤0115/粤0192/粤0402）；修 `.lstrip()`；court 可派生 **64→106/167** |
+| 腾讯案孤儿未归位 + 回填/归位有副作用 | 孤儿目录 1 个未处理；`backfill_cases` 原会**覆盖更优 LLM 值**；`relink` 会**插入重复 (case_id, artifact_type)** | 孤儿 apply 归位（1→0）；`backfill` 改**非破坏式**（only-when-empty + 差异报告）；`relink` 按 type **去重**（补 4 / 跳 3 重复） |
+
+**本机修复后关键指标**：空小节率 **0%**；court 可派生 **106/167**、缺失 43（25%）；quality 缺失 **0/167**；孤儿 **0**；artifacts **838**；`generation_method` 分布 `{ai:514, llm:315, manual:9}`。
+
+## ② R2 请执行（本机已跑，异地复核）
+
+```bash
+cd modules/case-intelligence
+
+# 单测（预期全 PASS：database_schema 4 / extraction_prompt 8 / relink_match 5 / court_resolver 5 / markdown_utils 4）
+python3 tests/test_database_schema.py
+python3 tests/test_extraction_prompt.py
+python3 tests/test_relink_match.py
+python3 tests/test_court_resolver.py
+python3 tests/test_markdown_utils.py
+
+# 三脚本复核（均默认 dry-run；本机已 apply，异地复核应报「无待更新/无孤儿」）
+python3 scripts/backfill_cases.py
+python3 scripts/relink_artifacts.py
+python3 scripts/audit_extraction.py --out docs/handoff/artifacts/R2-audit.json
+```
+
+## ③ R2 请回传（异地）
+
+### 回执 · R2
+
+- [ ] 命令均执行通过（否则注明报错原文）
+- **审计关键数字**（照抄）：
+  - 空小节率 = ______% （本机 0%）
+  - court 可派生 = ______ / ______ （本机 106/167，缺失 43）
+  - quality 缺失 = ______ / ______ （本机 0/167）
+  - 孤儿 = ______ 个（本机 0）
+  - generation_method 分布 = ____________ （本机 `{ai:514, llm:315, manual:9}`）
+- **剩余未映射代字**（18 token / 32 案 → 请法律同事给权威法院名，本机据此补表）：
+  ```
+  代字        出现次数    法院名（请确认）
+  鲁0281      n=3        ?
+  京0307      n=2        ?
+  京0419      n=2        ?
+  京仲        n=2        ?（疑仲裁机构代字，非法院）
+  内0402      n=2        ?
+  津0319      n=2        ?
+  渝0192      n=2        ?
+  粤0106      n=2        ?
+  粤0111      n=2        ?
+  粤1403      n=2        ?
+  鲁0891      n=2        ?
+  鲁1311      n=2        ?
+  鲁1691      n=2        ?
+  京0103      n=1        ?
+  粤0306      n=1        ?
+  粤0307      n=1        ?
+  鲁0202      n=1        ?
+  黔2701      n=1        ?
+  ```
+- **4 处派生差异裁决**（本机**未覆盖**，保留原 LLM 值，请确认以哪方为准）：
+  ```
+  case_id    字段   现有值(LLM)    案号派生值
+  2bb378ad   year   2024           2023
+  31e22b08   year   2024           2023
+  eb89a9e7   year   2024           2025
+  b68f67a6   court  北京互联网法院（一审），北京知识产权法院（二审）  北京互联网法院
+  ```
+  > 本机判断：`b68f67a6` 的 LLM 值（含二审）信息量更大，宜保留；3 个 year 差异疑为案号受理年 vs 审理年，请裁决。
+- **孤儿归位确认**：
+  - 腾讯案 7 条孤儿已重挂 `9ba215f8`（去重跳过 3 条重复 type）；广电案 5 条已于 R1 归位 `97686b3a`。异地请确认 `relink_artifacts.py` 报「孤儿=0」且两条链路可检索到。
+  - 遗留：`9ba215f8` 磁盘目录仍有 3 个**重复 type** 的 MD 文件（未删，非破坏保留），是否清理？________
+- 产物路径：`docs/handoff/artifacts/R2-audit.json`（已提交？✅/❌）
 - 结论：**通过 / 部分通过 / 阻塞**
 
 <!-- 提示：本卡不含密钥、不含部署；回执勿贴真实姓名/身份证/手机号。 -->

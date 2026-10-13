@@ -1,6 +1,6 @@
 ---
 artifact_id: 5afea8f6-d7e3-4c9d-a40f-8fc200506dd3
-case_id: f843bae6-3c1d-4bb7-8c52-b37ce7744ce4
+case_id: 9ba215f8-f527-4b90-a5a8-3e033915ea94
 case_name: 腾讯音乐诉北京雷石侵权纠纷案
 artifact_type: contingency_response
 title: 庭审应变话术体系
