@@ -7,7 +7,7 @@
 | 发起 | 本机（修复方） |
 | 执行 | 异地（测试方） |
 | 关联 backlog | 「case-intelligence 提取功能缺陷修复与验证闭环」 |
-| 关联提交 | `<fill-after-commit>` |
+| 关联提交 | `7fceaeb`（本机 master） |
 
 ---
 
