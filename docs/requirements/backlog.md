@@ -226,12 +226,15 @@
 - [ ] **dl09** 容器本地 build 验证（⛔ 阻塞：Docker Hub 不可达，待镜像源/权限）
 - [ ] **dl10** `git push` 到 GitHub `deploy/case-intelligence`（待用户逐次授权）
 - [ ] **dl11** thunderbox 创建应用（`reviewed` 后、用户授权、先 `thunderbox_check` 查重）
+- [x] **dl12** `bin/` 服务控制补齐：新增 `restart_ui.py`；修 `start_ui.py`（**写 PID 文件** + 已运行守卫 + 去跨模块 venv 硬依赖）；`stop_ui.py` 跨平台（lsof/netstat + taskkill）
+- [x] **dl13** 服务 4 件套对齐 §10.4.1：`bin/start|stop|restart|status.py` 由 CLI 语义改为**控制 Streamlit 服务**（委托 `*_ui.py`），并各加 `.sh`/`.bat` 跨平台壳层（对齐 court-doc-generator 形态）
 
 ### 验收标准
 
 - [x] `deploy.yaml` 存在且与 `domains.yaml` subdomain 一致
 - [x] `deploy_sync.py` 默认不推送；`-z` 路径处理正确（中文文件名不丢）
 - [x] `DATA_DIR` 覆盖生效（默认不变，`DATA_DIR=/data` 生效）
+- [x] `bin/` 4 件套（`.py`+`.sh`+`.bat`）齐备，`start.py` 可后台启 UI 并写 PID/日志（§10.4.1/§10.4.4）
 - [ ] 容器可 build 且空卷播种后新增案例不被覆盖（待镜像源）
 - [ ] `deploy/case-intelligence` 分支根 = 模块内容（待推送后核验）
 

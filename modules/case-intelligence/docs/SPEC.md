@@ -204,7 +204,7 @@ office-workflow-litigation-doc（诉讼文书生成）
 |------|------------|------|
 | HTTP（UI 运行时） | `GET /_stcore/health` → `200 ok` | Streamlit 内置；端口 `18503`（fallback `18504`）；符合 `AGENTS.md §10.4.4` |
 | 轻量探针（JSON） | `python bin/health.py` | 输出 `{status, module, version, ui, db}`；退出码 `0`=健康 / `1`=异常；**只读**，不创建数据库 |
-| 状态检查 | `python bin/status_ui.py` | 端口 + PID + `/_stcore/health` + 日志尾部 |
+| 状态检查 | `python bin/status.py`（= `status_ui.py`） | 服务 4 件套（`start|stop|restart|status`，含 `.sh`/`.bat`）：端口 + PID + `/_stcore/health` + 日志尾部 |
 
 ### 7.1 bin/health.py 输出示例
 

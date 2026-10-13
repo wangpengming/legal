@@ -21,7 +21,10 @@ case-intelligence 是法务部工程化系统的案件智能分析模块，提�
 ```
 modules/case-intelligence/
 ├── bin/
-│   └── extract.py          # CLI 入口
+│   ├── extract.py          # CLI 入口（register/scan/search/report…）
+│   ├── start|stop|restart|status.py     # 服务 4 件套（另有 .sh/.bat 跨平台壳层）
+│   ├── start_ui|stop_ui|restart_ui|status_ui.py  # Streamlit UI 服务实现（被 4 件套委托）
+│   └── health.py           # 健康探针（JSON，只读）
 ├── data/
 │   └── case_registry.db    # SQLite 数据库
 ├── prompts/                 # AI 提示词规则库
@@ -52,7 +55,23 @@ cd modules/case-intelligence
 pip install -r requirements.txt
 ```
 
-### 3.2 查看帮助
+### 3.2 一键启停（Web UI · 服务 4 件套）
+
+本模块的“服务”为 Streamlit Web UI（`:18503`）。`bin/` 提供跨平台 4 件套
+（`.py` + `.sh` + `.bat`），`start|stop|restart|status.py` 直接控制该服务：
+
+```bash
+cd modules/case-intelligence
+python bin/start.py          # 启动 UI（后台，写 PID/日志到 .run/）
+python bin/status.py         # 端口 + PID + /_stcore/health + 日志尾部
+python bin/restart.py        # 先停后启
+python bin/stop.py           # 三重定位停止（PID / lsof·netstat / 兜底）
+```
+
+> macOS/Linux 用 `./bin/start.sh`；Windows 用 `bin\start.bat`。
+> 纯 CLI 操作（register/scan/search…）仍走 `bin/extract.py`，与本服务控制相互独立。
+
+### 3.3 查看帮助
 
 ```bash
 python bin/extract.py --help
@@ -322,4 +341,4 @@ cp data/case_registry.db data/case_registry.db.bak
 > 🔴 一模块一域名，禁止随意创建；域名统一登记 `shared/config/domains.yaml`（`AGENTS.md §10.4.5`）。
 > 📖 系统级手册：[`docs/deployment-thunderbox.md`](../../../docs/deployment-thunderbox.md)
 >
-> **健康检查**：UI 运行时 `GET /_stcore/health`（200 ok，Streamlit 内置）；轻量 JSON 探针 `python bin/health.py`（版本 + UI + DB 统计，退出码 0/1）；状态检查 `python bin/status_ui.py`。
+> **健康检查**：UI 运行时 `GET /_stcore/health`（200 ok，Streamlit 内置）；轻量 JSON 探针 `python bin/health.py`（版本 + UI + DB 统计，退出码 0/1）；状态检查 `python bin/status.py`（= `status_ui.py`，服务 4 件套）。

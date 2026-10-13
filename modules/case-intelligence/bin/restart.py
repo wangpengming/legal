@@ -1,16 +1,15 @@
 #!/usr/bin/env python3
 # =============================================
-# 重启脚本（CLI 模块，等效于 start）
+# 重启脚本（case-intelligence · Streamlit Web UI）
+# 委托 bin/restart_ui.py：先停后启
 # =============================================
-import subprocess
 import sys
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-def main() -> None:
-    print("🔄 case-intelligence 重启（CLI 工具，等效于 start）")
-    subprocess.run([sys.executable, str(PROJECT_ROOT / "bin" / "start.py")])
+from restart_ui import main as _restart_main  # noqa: E402
+
 
 if __name__ == "__main__":
-    main()
+    sys.exit(_restart_main())
