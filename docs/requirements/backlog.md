@@ -4,6 +4,169 @@
 
 ---
 
+## 2026-10-12 case-intelligence 飞书 Bot 独立应用申请与上线（含命名）
+
+**类型**: feat（通道接入）
+**模块**: case-intelligence
+**状态**: proposed
+**优先级**: P1
+**关联**: 本案复用 2026-08-24「飞书Bot集成」已就绪代码（`src/lark_bot.py`，7 命令本地自测通过）；本条聚焦**通道与独立应用**，不重复代码需求。
+
+### 背景
+
+`CaseBot` 代码已就绪（list / search / register / detail / artifacts / report / help），但**通道暂停**：无飞书企业应用凭证、无事件回调入口。经确认，**本模块需单独申请一个飞书自建应用（Bot）**，与 court-doc-generator / litigation-system 的飞书应用**相互隔离**——独立凭证、独立权限、独立回调，避免权限与配额耦合。
+
+### Bot 命名提案（待用户定稿）
+
+飞书机器人**显示名**（面向群聊 @ 与头像旁展示），建议中文拟人化、专业且上口：
+
+| 候选 | 释义 | 风格 | 备注 |
+|------|------|------|------|
+| **律知** ✅推荐 | 「律」=法律 · 「知」=智知/知情 | 专业简洁，两字上口 | 与模块「案例智能分析」定位契合 |
+| 案鉴 | 「案」+「鉴」（明镜/借鉴） | 专业 | 呼应「以案为鉴」 |
+| 案小智 | 亲切助手风（小X 命名法） | 亲和 | 弱专业感 |
+| 律小助 | 亲切助手风 | 亲和 | 同上 |
+| 明案 | 明察案件 | 简洁 | 歧义（“明白的案子”） |
+
+> **内部 slug**（代码/配置用英文）：`case-bot`（Bot 标识）/ `legal-case-bot`（应用英文名）；显示名与 slug 分离，改显示名不影响凭证。
+> 参照：本工程模块资源命名一律 `legal-*` 前缀（§10.4.5）。
+
+### 申请清单（飞书开放平台 · 企业自建应用）
+
+1. **创建自建应用**：应用名 = 显示名定稿（如「律知」）；描述「法务案例智能分析助手」。
+2. **凭证**：获取 `app_id` / `app_secret` → 走 `.env` / thunderbox secret（**严禁入库**，§6.2）。
+3. **开启机器人能力** + 权限：`im:message`（收消息）、`im:message:send_as_bot`（回消息）。
+4. **事件订阅**：`im.message.receive_v1`（接收消息）→ 配置**回调 URL**。
+5. **回调入口**：`https://legal-case.tbox.ktvsky.com/lark/event`（thunderbox `access_mode=internal`，仅内网可达）；若无外网回调，回退评估**长连接模式**或内网反代。
+6. **发布版本** → 企业管理员审核通过后生效。
+
+### 落地清单
+
+- [ ] **fb01** 命名定稿（用户选定显示名，登记于本条目）
+- [ ] **fb02** 飞书开放平台创建自建应用，记录 `app_id`（`app_secret` 入 secret，不入库）
+- [ ] **fb03** 开通权限（im:message / im:message:send_as_bot）+ 事件 `im.message.receive_v1`
+- [ ] **fb04** 回调 URL 落地（与 `legal-case` 部署联动；确认内网可达或走长连接）
+- [ ] **fb05** 环境变量注入 `LARK_APP_ID` / `LARK_APP_SECRET` / `LARK_VERIFY_TOKEN`（与 `shared/config/deploy.yaml` `env_optional` 对齐）
+- [ ] **fb06** `/case generate` 接入（复用 `src/document_generator.py`，当前 Bot 未接生成）
+- [ ] **fb07**（P2）自然语言模糊匹配（当前仅显式 `/case <cmd>`）
+- [ ] **fb08** 端到端联调（§7.5：使用 `e2e_*` 专用验证账号，禁真实账号演练）
+
+### 验收标准
+
+- [ ] 飞书内 @Bot 可返回 `list/search/register/detail/artifacts/report/help` 结果
+- [ ] `/case generate` 可生成并回传文书（或给出下载链接）
+- [ ] 凭证仅存于 secret / `.env`，仓库内无明文（grep 校验）
+- [ ] 与 court-doc-generator / litigation-system 飞书应用凭证**无复用**
+
+---
+
+## 2026-10-12 case-intelligence 遗留项收口（数据质量 / 模板库 / 安全配置）
+
+**类型**: chore + fix
+**模块**: case-intelligence
+**状态**: proposed
+**优先级**: P1
+**关联**: 承接 v3.3.0 功能盘点（2026-10-12）暴露的遗留项。
+
+### 一、数据质量（DB 实测 2026-10-12：104 案 / 514 提取物 / 7 模板）
+
+| 项 | 现状 | 处置 |
+|----|------|------|
+| `court`（法院） | **104/104 全空** | 待确认：数据源无该字段 → 补 `prompts/提取` 提取项；或补数据 |
+| `defendant`（被告） | 缺 7 | 补数据 / 复核提取 |
+| `plaintiff`（原告） | 缺 5 | 同上 |
+| `cause`（案由） | 缺 1 | 同上 |
+| `liability_calculation`（D5 赔偿裁量） | 缺 6 案 | 补提取 |
+
+### 二、模板库去重
+
+`templates` 表 7 条含重复类别（「答辩状」×2、「当庭陈述」×2、「其他」×1），与 `module.yaml`「4 种固定模板」不符 → 去重并统一 YAML 元数据。
+
+### 三、安全与配置
+
+| 项 | 现状 | 处置 |
+|----|------|------|
+| UI 账号 | `config.py` 硬编码 `admin/admin123`、`test/test123` | 改读 `AUTH_USERS` 环境变量（与 deploy.yaml `env_required` 对齐），默认值仅本地 |
+| `config.py` `PROJECT_ROOT` | 派生为 `modules/`（少一层），当前未被使用 | 修正或删除（避免误用） |
+| MiniMax key | `ai_engines.yaml` 明文 | 用户已接受，可随时更换；后续如需要改走 env |
+| `scripts/` 一次性脚本 | 16 个 review/batch（`review_all_cases_v2/v4` 等） | 归档/清理，保留现役 |
+
+### 四、部署路径一致性（本轮已修）
+
+- [x] `src/lark_bot.py` / `bin/health.py` 数据路径改读 `DATA_DIR`（此前硬编码，部署后读不到卷）
+- [x] 复核：默认路径不变；`DATA_DIR=/data` 生效；`test_lark_bot` 12 passed；`bin/health.py` 正常
+
+### 落地清单
+
+- [ ] **ci01** 确认 `court` 空值根因（数据源 or 提取漏项）→ 补数据 / 补 prompt
+- [ ] **ci02** 补全 defendant/plaintiff/cause/D5 缺项
+- [ ] **ci03** templates 去重 + 元数据规范化
+- [ ] **ci04** UI 账号改 `AUTH_USERS` 环境变量
+- [ ] **ci05** 修/删 `config.py` PROJECT_ROOT bug
+- [ ] **ci06** `scripts/` 归档
+- [x] **ci07** 数据路径 DATA_DIR 一致化（lark_bot / health）
+
+### 验收标准
+
+- [ ] `court` 缺失率显著下降（或明确数据源不含该字段并记录）
+- [ ] `templates` 表无重复类别，与 module.yaml 声明的 4 类一致
+- [ ] 仓库内无硬编码真实账号/密钥明文（grep 校验）
+
+---
+
+## 2026-10-12 系统级：部署分支模型（方案 A 一仓多分支快照）+ case-intelligence 部署就绪
+
+**类型**: feat（工程能力）
+**模块**: 系统级（`tools/` + `shared/config/deploy.yaml`）· 首个落地模块 case-intelligence
+**状态**: in-progress
+**优先级**: P0（部署通道：thunderbox 只支持 GitHub 源且无 base-dir 参数，Monorepo 子目录无法直接部署）
+
+### 背景与约束（实证）
+
+| 约束 | 来源 | 影响 |
+|------|------|------|
+| thunderbox 代码来源**仅 GitHub**（HTTPS） | platform | Gitee 代码须先同步到 GitHub |
+| `thunderbox_create` / `thunderbox_config` **无 base/root-directory 参数** | MCP schema | **应用仓库根必须=模块根**，Monorepo 子目录不能直接部署 |
+| 本工程为 Monorepo（模块在 `modules/<name>/`） | 工程结构 | 需"把子目录提升为仓库根"的机制 |
+| 一模块一域名（§10.4.5） | AGENTS | 部署须沿用既有 `legal-*` 域名 |
+| 用户：**无删除已部署服务权限**，不得擅自部署 | 用户 | 本轮只准备、不部署 |
+
+### 方案 A：一仓多分支快照
+
+- **一个 GitHub 仓库**（`wangpengming/legal`），**每模块一条 `deploy/<module>` 分支**；
+- 分支的**根目录 = `modules/<module>/` 的内容**（无 `modules/` 前缀）→ 满足「仓库根=模块根」；
+- thunderbox 应用以 `ref=deploy/<module>` 构建；**master 不推 GitHub**（避免整仓+数据外泄）；
+- 分支内容**只由 `tools/deploy_sync.py` 生成**（`git ls-files -z` 精确取文件 → 快照 → `push --force` 到 `deploy/*`）。
+
+### 数据持久化（新增案例不丢）
+
+- 镜像内 `data/` 复制为 `/app/seed-data`；运行时挂卷 `case-data:/data`；`docker-entrypoint.sh` **空卷自动播种**；
+- 三个数据路径源头改读 `DATA_DIR`（`src/database.py` / `src/artifact_store.py` / `src/document_generator.py`）→ 新提取案例写卷，**重新部署不丢**。
+
+### 落地清单
+
+- [x] **dl01** 新建 `shared/config/deploy.yaml` 部署注册表（platform + case-intelligence 条目：branch/subdomain/build_pack/port/volumes/env）
+- [x] **dl02** 新建 `tools/deploy_sync.py` + `tools/deploy_sync.sh`（默认 dry-run，`--push` 显式推送；`-z` 防中文路径丢失）
+- [x] **dl03** `DATA_DIR` 环境变量化（3 文件），单测通过
+- [x] **dl04** case-intelligence 新增 `Dockerfile` / `.dockerignore` / `docker-entrypoint.sh` / `requirements.txt`
+- [x] **dl05** `docs/deployment-thunderbox.md` 新增 §8 部署分支模型 + §9 本地 temp/ 目录
+- [x] **dl06** `AGENTS.md` 新增 §10.4.6 部署分支模型 + §3 导航（tools/ + temp/）+ §10.2 禁令（禁手改 deploy/* / 禁推 master / 禁擅自部署）+ §11.3
+- [x] **dl07** `shared/config/README.md` 登记 deploy.yaml；根 `temp/` 目录建立（gitignore 已含，补注释）
+- [x] **dl08** dry-run 验证快照（103 文件 / 1998 KB，四关键目录齐备，中文名保留）
+- [ ] **dl09** 容器本地 build 验证（⛔ 阻塞：Docker Hub 不可达，待镜像源/权限）
+- [ ] **dl10** `git push` 到 GitHub `deploy/case-intelligence`（待用户逐次授权）
+- [ ] **dl11** thunderbox 创建应用（`reviewed` 后、用户授权、先 `thunderbox_check` 查重）
+
+### 验收标准
+
+- [x] `deploy.yaml` 存在且与 `domains.yaml` subdomain 一致
+- [x] `deploy_sync.py` 默认不推送；`-z` 路径处理正确（中文文件名不丢）
+- [x] `DATA_DIR` 覆盖生效（默认不变，`DATA_DIR=/data` 生效）
+- [ ] 容器可 build 且空卷播种后新增案例不被覆盖（待镜像源）
+- [ ] `deploy/case-intelligence` 分支根 = 模块内容（待推送后核验）
+
+---
+
 ## 2026-10-12 系统级：thunderbox 部署平台接入 + 模块域名规划（一模块一域名）
 
 **类型**: chore（工程规范）

@@ -118,7 +118,115 @@ mcp_servers:
 
 ---
 
-## 8. 相关文档
+## 8. 部署分支模型（方案 A：一仓多分支快照）🔧
+
+> 适用范围：**case-intelligence**（当前部署目标）。court-doc-generator 已部署、暂不动；portal 待定。
+
+### 8.1 一句话流程
+
+```
+本地开发（Gitee monorepo）→ tools/deploy_sync.py 生成模块分支快照
+  → 推到 GitHub 的 deploy/<module> 分支 → thunderbox 按 ref 部署
+```
+
+thunderbox **没有 root/base-directory 参数**（只能从仓库根构建），所以部署分支的**根目录 = 模块本体**（不带 `modules/` 前缀）。
+
+### 8.2 分支模型与目录对照
+
+| monorepo（Gitee origin） | GitHub 部署分支 | 分支根内容 |
+|---|---|---|
+| `modules/case-intelligence/` | `deploy/case-intelligence` | 模块本体：`app.py` `src/` `pages/` `ui/` `data/` `prompts/` `output_templates/` `templates_extracted/` … |
+
+- GitHub 仓库 `https://github.com/wangpengming/legal.git`（私有）**只承载 `deploy/*` 分支**；**不推 `master`**（避免整个 monorepo 连同 `data/` 复制到 GitHub）。
+- `deploy/*` 为**机器生成的镜像分支，禁止手改**；一切改动回 monorepo，再重新同步。
+
+### 8.3 本地如何放置 GitHub 代码
+
+**不需要**在本地 clone GitHub 仓库，也不需要第二份代码。在唯一工作副本 `/home/pengming/code/me/legal` 上加一个 remote 即可：
+
+```
+origin   git@gitee.com:wpmdpzch/legal.git          # 源码主库：日常开发、提交、推送
+github   git@github.com:wangpengming/legal.git     # 部署目标：只推、不拉、不直接开发
+```
+
+```bash
+git remote add github git@github.com:wangpengming/legal.git   # 一次性
+```
+
+- GitHub 侧那份代码由脚本生成，本机**从不 checkout**，因此不存在「放哪」的问题，也不会与 Gitee 副本漂移。
+- SSH 不通时，改用 HTTPS + PAT（`https://github.com/wangpengming/legal.git`）。
+
+### 8.4 同步命令（`tools/deploy_sync.py`）
+
+```bash
+# 预览（默认 dry-run：打印快照清单 + 将执行的推送命令，不推送）
+python3 tools/deploy_sync.py --module case-intelligence
+
+# 真正推送（受 §10.2 push 红线约束，需用户逐次明确授权）
+python3 tools/deploy_sync.py --module case-intelligence --push
+
+# 备选：推 Gitee，交由服务端镜像同步到 GitHub（绕开本机 GitHub 直连受限）
+python3 tools/deploy_sync.py --module case-intelligence --push --via-gitee
+```
+
+- 注册表：`shared/config/deploy.yaml`（分支名 / 子域 / build_pack / 端口 / 卷 / 环境变量 / 快照排除项）。
+- 快照集：模块内 tracked + untracked(非忽略) 文件（含已提炼数据与模板），按 `exclude` 剔除 `tests/ docs/ spec/ requirements/ __pycache__/` 等。
+- ⚠️ 实现注意：取文件用 `git ls-files -z`——否则 git 会对中文名加引号转义，导致数据/模板文件被静默丢弃。
+
+### 8.5 数据持久化（case-intelligence，硬需求）
+
+需求：**新增案例提取后，重新部署不能丢数据**。
+
+| 层 | 做法 |
+|---|---|
+| 镜像内 | `data/`（已提炼数据 + 模板 + 案库）在构建时拷为 `/app/seed-data`，作为**首次种子** |
+| 运行期 | 挂卷 `case-data:/data`，环境变量 `DATA_DIR=/data` |
+| 首启 | `docker-entrypoint.sh`：空卷 → 从 `/app/seed-data` 播种；非空卷 → 原样保留 |
+| 代码 | `src/database.py` / `src/artifact_store.py` / `src/document_generator.py` 读 `DATA_DIR`（本地不设时默认 `PROJECT_ROOT/data`，行为不变）|
+
+效果：运行期新增案例写入**卷**，镜像换代时卷保留 → 数据不丢；仓库中的 `data/` 仅作种子与版本基线。
+
+### 8.6 环境变量与密钥
+
+- 一律经 `thunderbox_config` 的 `env_vars` 注入：`DATA_DIR` / `AUTH_USERS` / `MINIMAX_*` / `LARK_*`，**不写回分支**。
+- 现状：`ai_engines.yaml` 内含 MiniMax **明文 key**（用户已知悉并接受，可随时轮换）——推 GitHub 前请自行评估暴露面。
+- `config.py` 默认口令 `admin/admin123` / `test/test123` 仅为本地默认；部署必须用 `AUTH_USERS` 覆盖。
+
+### 8.7 case-intelligence 部署清单（MCP）
+
+```bash
+thunderbox_check(target=domain, value=legal-case)          # available?
+thunderbox_create(name=legal-case, subdomain=legal-case,
+                  source_type=git_repo,
+                  source_url=https://github.com/wangpengming/legal.git,
+                  ref=deploy/case-intelligence,
+                  git_token=<PAT>, build_pack=dockerfile, port=18503)
+thunderbox_config(app_id, access_mode=internal,
+                  env_vars={DATA_DIR: "/data", AUTH_USERS: "..."},
+                  volumes=["case-data:/data"])
+thunderbox_deploy(app_id) → thunderbox_query(app_id, health=true)   # /_stcore/health
+```
+
+> ⚠️ thunderbox **无删除应用的 MCP 工具**，创建即绑定域名，删除只能控制台人工操作——**未确认前不要 create**。
+
+### 8.8 部署前自检
+
+- [ ] `python3 tools/deploy_sync.py --module case-intelligence` 快照含 `data/ prompts/ output_templates/ templates_extracted/` 且无 `modules/` 前缀
+- [ ] 分支内容无意外 secrets（当前 minimax key 为已知例外）
+- [ ] `deploy/<module>` 分支已推送
+- [ ] 卷 + `DATA_DIR` 已在 `thunderbox_config` 设置
+- [ ] 域名在 `shared/config/domains.yaml` 登记（`legal-case`）
+
+---
+
+## 9. 本地 `temp/` 目录（不入库）
+
+项目根 `temp/` 为**本地专用**信息存储（已 gitignore）：任务状态、临时脚本、不便上传的信息等。
+用途与约定见 `temp/README.md`，当前进度见 `temp/STATUS.md`。
+
+---
+
+## 10. 相关文档
 
 - `AGENTS.md §10.4.5` — 域名管理规则（一模块一域名 / 禁止随意创建 / 查重 / 双登记）
 - `shared/config/domains.yaml` — 域名注册表

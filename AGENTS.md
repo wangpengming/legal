@@ -75,8 +75,9 @@ legal/
 ├── shared/
 │   ├── common/            🚧 规划中：跨模块共享代码
 │   ├── templates/         🚧 规划中：跨模块共享模板
-│   └── config/            跨模块共享配置
-├── tools/                 🚧 规划中：工程脚本
+│   └── config/            跨模块共享配置（ports / domains / deploy 三注册表）
+├── tools/                 工程脚本（`deploy_sync.py` 部署分支同步，§10.4.6）
+├── temp/                  🔒 本地信息存储（任务状态 / 临时脚本），已 gitignore，永不入库
 └── .qoder/
     ├── agents.md          Qoder 专用工作指南
     └── projects/          🚧 各模块独立 Qoder 项目配置（待建）
@@ -268,6 +269,9 @@ modules/<name>/docs/
 | ❌ 将 thunderbox token 写入仓库（项目 scope 会被提交） | 密钥泄露，违反 §6.2 |
 | ❌ 模块无 `/health` 健康检查端点 | 启动状态不可观测，违反 §10.4.4 |
 | ❌ 跨模块 `from modules.<other>.xxx import ...` | 破坏 §4 跨模块接口约定，违反 §10.4.3 |
+| ❌ 手工编辑 `deploy/<module>` 分支（或直接推 GitHub） | 分支须由 `tools/deploy_sync.py` 生成，手改会脱离单一真值，违反 §10.4.6 |
+| 🔴 **把 `master` 推到 GitHub** | 会把整仓 + 其他模块 + 数据外泄；GitHub 仅承载 `deploy/*` 分支，违反 §10.4.6 |
+| ❌ 未经授权在 thunderbox 创建 / 部署应用 | 无删除 MCP 工具，会产生不可回收的孤儿应用（用户已明确禁止） |
 
 ### 10.3 响应规范
 
@@ -482,6 +486,53 @@ domain:
 
 ---
 
+### 10.4.6 部署分支模型（方案 A：一仓多分支快照）🔴
+
+> thunderbox **只支持从 GitHub 拉取构建**，且**无 base/root-directory 参数**（`thunderbox_create` / `thunderbox_config` 均无），因此**应用仓库根必须就是模块根**。本工程为 Monorepo（代码在 `modules/<name>/` 子目录），故采用**一仓多分支快照**：
+> **一个 GitHub 仓库，每个模块一条 `deploy/<module>` 分支，该分支的根即模块内容**；thunderbox 应用 `ref=deploy/<module>`。
+
+#### 部署注册表：`shared/config/deploy.yaml`
+
+```yaml
+platform:
+  provider: thunderbox
+  source_url: https://github.com/wangpengming/legal.git   # HTTPS（thunderbox 只收 HTTPS）
+  git_push_url: git@github.com:wangpengming/legal.git     # SSH（本地推送）
+  git_remote: github
+  branch_prefix: deploy/
+allocations:
+  case-intelligence:
+    branch: deploy/case-intelligence
+    subdomain: legal-case
+    build_pack: dockerfile
+    volumes: [case-data:/data]
+    env_required: [DATA_DIR, MINIMAX_API_KEY, AUTH_USERS]
+```
+
+#### 核心规则
+
+| 规则 | 说明 |
+|------|------|
+| **一模块一分支** | 模块 ↔ `deploy/<module>` 分支**一一对应**，分支根 = `modules/<module>/` 内容（**无** `modules/` 前缀） |
+| **快照由脚本生成** | 分支内容**只能由 `tools/deploy_sync.py` 从 `modules/<module>/` 生成**；**禁止手工编辑 `deploy/*` 分支**（会被下次同步覆盖，且脱离单一真值） |
+| **master 不入 GitHub** | 🔴 **禁止把 `master` 推到 GitHub**（会把整仓 + 其他模块 + 数据一并外泄）；GitHub 仓库仅承载 `deploy/*` 分支 |
+| **默认 dry-run** | `deploy_sync.py` 默认只预览，**必须显式 `--push`** 才推送（联动 Push 红线 §10.2） |
+| **数据不丢** | 容器内 `data/` 作为种子（`/app/seed-data`），运行时挂卷 `case-data:/data`；代码读 `DATA_DIR`；空卷自动播种 → **重新部署不丢新增案例** |
+| **双登记一致** | `deploy.yaml` 的 `branch` / `subdomain` 必须与 `domains.yaml`、`module.yaml` 一致 |
+| **token 安全** | GitHub / thunderbox token **严禁写入仓库**（§6.2） |
+
+#### 同步流程
+
+```text
+本地开发(modules/<name>/) → tools/deploy_sync.py --module <name>  (dry-run 预览)
+                         → tools/deploy_sync.py --module <name> --push  (用户授权后推 deploy/<name>)
+                         → thunderbox 应用 ref=deploy/<name> 构建部署
+```
+
+> 详细操作见 `docs/deployment-thunderbox.md §8`；脚本实现见 `tools/deploy_sync.py`。
+
+---
+
 ## 11. 关联文档速查
 
 | 文档 | 何时读 |
@@ -496,9 +547,11 @@ domain:
 | `modules/<name>/README.md` | 模块使用说明 |
 | `.qoder/agents.md` | Qoder 特定配置 |
 | `.gitignore` | 屏蔽规则 |
-| [`shared/config/ports.yaml`](file:///Users/zhangyang/Desktop/code/legal/shared/config/ports.yaml) | 模块端口注册表（§10.4.2） |
+| `shared/config/ports.yaml` | 模块端口注册表（§10.4.2） |
 | `shared/config/domains.yaml` | 模块域名注册表（thunderbox，§10.4.5） |
-| `docs/deployment-thunderbox.md` | thunderbox 部署手册（GitHub 通道 / MCP / 域名申请） |
+| `shared/config/deploy.yaml` | 部署注册表（部署分支 / 构建 / 卷 / 环境变量，§10.4.6） |
+| `tools/deploy_sync.py` | 部署分支同步脚本（生成并推送 `deploy/*` 分支，§10.4.6） |
+| `docs/deployment-thunderbox.md` | thunderbox 部署手册（GitHub 通道 / MCP / 域名申请 / 部署分支模型） |
 
 ---
 
@@ -526,6 +579,21 @@ domain:
 | 域名变更 | 改 `domains.yaml` + 对应 `module.yaml` `domain` 字段（两处必须一致） |
 
 > 关联部署手册：`docs/deployment-thunderbox.md`。
+
+---
+
+## 11.3 部署注册表（联动）
+
+所有模块部署配置统一登记在 `shared/config/deploy.yaml`（thunderbox 方案 A）。
+
+| 何时读 | 场景 |
+|--------|------|
+| 部署某模块 | 查 `deploy.yaml` 确认该模块 `branch` / `subdomain` / `build_pack` / `volumes` / 环境变量 |
+| 同步部署分支 | `tools/deploy_sync.py --module <name>`（先 dry-run，再 `--push`，需授权） |
+| 新增模块部署 | 先在 `deploy.yaml` 登记条目 → 再同步分支 → 再在 thunderbox 创建应用 |
+| 数据持久化 | 查 `deploy.yaml` 的 `volumes`（如 `case-data:/data`）+ 模块 `DATA_DIR` 约定 |
+
+> 关联部署手册：`docs/deployment-thunderbox.md §8`（部署分支模型）。
 
 ---
 
