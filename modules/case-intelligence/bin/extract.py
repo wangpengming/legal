@@ -15,6 +15,7 @@
 # =============================================
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -29,6 +30,28 @@ from src import scanner
 from src import parser
 from src import extractor
 from src import importer
+
+
+# 引擎 → artifact generation_method（写入 artifacts.generation_method）
+ENGINE_GENERATION_METHOD = {
+    "minimax": "llm",
+    "ollama": "llm",
+    "feishu": "llm",
+    "openai": "llm",
+    "basic": "rule-based",
+    "mock": "mock",
+}
+
+
+def _resolve_artifact_type(value: str) -> str:
+    """解析 artifact_type：支持语义名或 D1-D5 别名。"""
+    v = (value or "").strip()
+    if v.upper() in db.DIMENSION_ARTIFACT_TYPES:
+        return db.DIMENSION_ARTIFACT_TYPES[v.upper()]
+    if v in db.ARTIFACT_TYPES:
+        return v
+    print(f"❌ 无效类型: {value}，有效值: D1-D5 或 {', '.join(db.ARTIFACT_TYPES)}")
+    sys.exit(1)
 
 
 # =============================================
@@ -191,14 +214,14 @@ def cmd_extract(args) -> None:
     print(f"案件: {case['case_name']}")
     print("=" * 50)
 
-    # 确认类型
+    # 确认类型（支持语义名或 D1-D5 别名）
     if args.type:
-        artifact_type = args.type
+        artifact_type = _resolve_artifact_type(args.type)
     else:
         artifact_type = _select_one(
-            db.ARTIFACT_TYPES,
+            [f"{t} · {db.ARTIFACT_TYPE_NAMES.get(t, '')}" for t in db.ARTIFACT_TYPES],
             "选择提取物类型（数字）: ",
-        )
+        ).split(" · ")[0]
 
     # 标题
     title = args.title or _input_required("提取物标题: ")
@@ -211,19 +234,12 @@ def cmd_extract(args) -> None:
         content = args.content
     else:
         content_map = {
-            "D1": "## 1.1 当事人信息\n\n## 1.2 案件背景\n\n## 1.3 争议焦点\n\n## 1.4 关键事实清单\n\n## 1.5 权利基础分析\n\n## 1.6 行为定性\n",
-            "D2": "## 2.1 适用法律\n\n## 2.2 法律关系定性\n\n## 2.3 权利基础分析\n\n## 2.4 被告抗辩的法律可行性\n",
-            "D3": "## 3.1 原告诉请\n\n## 3.2 被告抗辩（按优先级排序）\n\n## 3.3 抗辩论证结构\n\n## 3.4 主战场决策\n",
-            "D4": "## 4.1 原告证据清单\n\n## 4.2 被告证据清单\n\n## 4.3 证据质证要点\n\n## 4.4 举证责任分配\n",
-            "D5": "## 5.1 赔偿请求\n\n## 5.2 被告抗辩理由\n\n## 5.3 计算方式分析\n\n## 5.4 裁量因素\n\n## 5.5 预估结论\n",
+            "case_key_facts": "## 1.1 当事人信息\n\n## 1.2 案件背景\n\n## 1.3 争议焦点\n\n## 1.4 关键事实清单\n\n## 1.5 权利基础分析\n\n## 1.6 行为定性\n",
+            "legal_reasoning_chain": "## 2.1 适用法律\n\n## 2.2 法律关系定性\n\n## 2.3 权利基础分析\n\n## 2.4 被告抗辩的法律可行性\n",
+            "defense_argument_chain": "## 3.1 原告诉请\n\n## 3.2 被告抗辩（按优先级排序）\n\n## 3.3 抗辩论证结构\n\n## 3.4 主战场决策\n",
+            "evidence_structure": "## 4.1 原告证据清单\n\n## 4.2 被告证据清单\n\n## 4.3 证据质证要点\n\n## 4.4 举证责任分配\n",
+            "liability_calculation": "## 5.1 赔偿请求\n\n## 5.2 被告抗辩理由\n\n## 5.3 计算方式分析\n\n## 5.4 裁量因素\n\n## 5.5 预估结论\n",
         }
-        type_names = {}
-        for k, v in db.ARTIFACT_TYPE_NAMES.items():
-            type_names[k] = f"{k}: {v}"
-        options = [type_names.get(t, t) for t in db.ARTIFACT_TYPES]
-        if args.type and args.type not in db.ARTIFACT_TYPES:
-            print(f"❌ 无效类型: {args.type}，有效值: {', '.join(db.ARTIFACT_TYPES)}")
-            sys.exit(1)
         content = _input_multiline(
             content_map.get(artifact_type, "## 内容\n\n")
         )
@@ -654,9 +670,6 @@ def cmd_artifacts(args) -> None:
 
 def cmd_import(args) -> None:
     """从JSON文件增量导入案件。"""
-    import json
-    from src.extractor import ExtractedCase
-    
     json_path = Path(args.json_path).resolve()
     if not json_path.exists():
         print(f"❌ 文件不存在: {json_path}")
@@ -691,21 +704,15 @@ def cmd_import(args) -> None:
         case_name = case_data.get('case_name', '未命名')[:20]
         print(f"\r[{bar}] {progress}% | {i}/{total} | {case_name}", end='', flush=True)
         
-        # 构建 ExtractedCase
-        extracted = ExtractedCase()
-        extracted.case_number = case_data.get('case_number')
-        extracted.case_name = case_data.get('case_name', '')
-        extracted.court = case_data.get('court')
-        extracted.cause = case_data.get('cause', '')
-        extracted.source_files = case_data.get('source_files', [])
-        
-        # 当事人
-        for p in case_data.get('plaintiffs', []):
-            from src.extractor import Party
-            extracted.plaintiffs.append(Party(name=p.get('name', ''), role='原告'))
-        for d in case_data.get('defendants', []):
-            from src.extractor import Party
-            extracted.defendants.append(Party(name=d.get('name', ''), role='被告'))
+        # 构建 ExtractedCase（共用解析器，保证字段与 AI 提取一致）
+        extracted = extractor.ExtractedCase()
+        extractor._apply_case_scalars(extracted, case_data)
+        extracted.source_files = case_data.get("source_files", [])
+        extracted.plaintiffs = extractor._party_list(case_data.get("plaintiffs"), "原告")
+        extracted.defendants = extractor._party_list(case_data.get("defendants"), "被告")
+        extractor._apply_dims(extracted, case_data)
+        if case_data.get("quality"):
+            extracted.quality = str(case_data.get("quality"))
         
         # 增量导入（跳过已存在）
         if extracted.case_number:
@@ -717,7 +724,7 @@ def cmd_import(args) -> None:
         
         try:
             imp = importer.CaseImporter()
-            result = imp.import_full(extracted)
+            result = imp.import_full(extracted, generation_method="import-json")
             print(f"   ✅ 导入成功 (ID: {result['case_id']})")
             success += 1
         except Exception as e:
@@ -874,8 +881,12 @@ def cmd_scan(args) -> None:
             print("⚠️  自动确认入库（--yes 参数）")
         
         # 执行入库
+        gen_method = ENGINE_GENERATION_METHOD.get(args.engine, "llm")
+        model_version = os.environ.get("MINIMAX_MODEL", "") if args.engine == "minimax" else ""
         imp = importer.CaseImporter()
-        result_import = imp.import_full(extracted)
+        result_import = imp.import_full(
+            extracted, generation_method=gen_method, model_version=model_version
+        )
         
         print("\n✅ 入库成功!")
         print(f"   案件 ID: {result_import['case_id']}")

@@ -7,7 +7,10 @@ from pathlib import Path
 from typing import Optional
 
 from . import database as db
+from . import artifact_store
 from .extractor import ExtractedCase
+from .court_resolver import resolve_court, year_from_case_number as _year_from_case_number
+from .markdown_utils import strip_empty_sections
 
 
 class ImportError(Exception):
@@ -36,7 +39,12 @@ class CaseImporter:
                     f"案号已存在: {extracted.case_number}\n"
                     f"现有案件: {existing['case_name']} (ID: {existing['id']})"
                 )
-        
+
+        # 法院：优先用提取器结果（目录名/LLM 更可靠），回落案号派生
+        court = (extracted.court or "").strip() or resolve_court(extracted.case_number)
+        # 年份：优先提取器结果，回落案号派生
+        year = extracted.year or _year_from_case_number(extracted.case_number)
+
         # 创建案件
         case = db.create_case(
             case_name=extracted.case_name,
@@ -44,97 +52,117 @@ class CaseImporter:
             plaintiff=", ".join(p.name for p in extracted.plaintiffs),
             defendant=", ".join(p.name for p in extracted.defendants),
             cause=extracted.cause,
-            result="",  # 待补充
+            court=court,
+            year=year,
+            result=extracted.result,
             source_path="",  # 待设置
+            source_files=", ".join(extracted.source_files),
             notes="",
             entry_method="AI",
-            scene="",  # 待推断
+            scene=extracted.scene,
             plaintiff_auth_level=extracted.plaintiffs[0].auth_level if extracted.plaintiffs else "",
-            defendant_auth_status="",  # 待推断
+            defendant_auth_status=extracted.defendant_auth_status,
+            quality=extracted.quality,
             db_path=self.db_path,
         )
-        
+
         return case["id"]
     
-    def import_artifacts(self, case_id: str, extracted: ExtractedCase) -> list[str]:
+    def import_artifacts(
+        self,
+        case_id: str,
+        extracted: ExtractedCase,
+        generation_method: str = "",
+        model_version: str = "",
+    ) -> list[str]:
         """
         导入提取物到数据库
+        
+        Args:
+            generation_method: 生成方式（llm / rule-based / mock / import-json）
+            model_version: 模型版本（如 MiniMax-Text-01）
         
         Returns:
             artifact_ids: 创建的提取物 ID 列表
         """
         artifact_ids = []
-        
+        source_ref = ", ".join(extracted.source_files)
+        common = dict(
+            source_ref=source_ref,
+            db_path=self.db_path,
+            generation_method=generation_method or None,
+            model_version=model_version or None,
+        )
+
         # D1: 事实认定 -> case_key_facts
         if extracted.d1_facts:
-            content = self._format_d1(extracted.d1_facts)
-            artifact = db.create_artifact(
+            artifact = artifact_store.create_artifact(
                 case_id=case_id,
                 artifact_type="case_key_facts",
                 title="D1: 事实认定",
-                content=content,
-                source_ref=", ".join(extracted.source_files),
-                db_path=self.db_path,
+                content=self._format_d1(extracted.d1_facts),
+                **common,
             )
             artifact_ids.append(artifact["id"])
-        
+
         # D2: 法律依据 -> legal_reasoning_chain
         if extracted.d2_legal:
-            content = self._format_d2(extracted.d2_legal)
-            artifact = db.create_artifact(
+            artifact = artifact_store.create_artifact(
                 case_id=case_id,
                 artifact_type="legal_reasoning_chain",
                 title="D2: 法律依据",
-                content=content,
-                source_ref=", ".join(extracted.source_files),
-                db_path=self.db_path,
+                content=self._format_d2(extracted.d2_legal),
+                **common,
             )
             artifact_ids.append(artifact["id"])
-        
+
         # D3: 攻防策略 -> defense_argument_chain
         if extracted.d3_strategy:
-            content = self._format_d3(extracted.d3_strategy)
-            artifact = db.create_artifact(
+            artifact = artifact_store.create_artifact(
                 case_id=case_id,
                 artifact_type="defense_argument_chain",
                 title="D3: 攻防策略",
-                content=content,
-                source_ref=", ".join(extracted.source_files),
-                db_path=self.db_path,
+                content=self._format_d3(extracted.d3_strategy),
+                **common,
             )
             artifact_ids.append(artifact["id"])
-        
+
         # D4: 证据体系 -> evidence_structure
         if extracted.d4_evidence:
-            content = self._format_d4(extracted.d4_evidence)
-            artifact = db.create_artifact(
+            artifact = artifact_store.create_artifact(
                 case_id=case_id,
                 artifact_type="evidence_structure",
                 title="D4: 证据体系",
-                content=content,
-                source_ref=", ".join(extracted.source_files),
-                db_path=self.db_path,
+                content=self._format_d4(extracted.d4_evidence),
+                **common,
             )
             artifact_ids.append(artifact["id"])
-        
+
         # D5: 赔偿裁量 -> liability_calculation
         if extracted.d5_damages:
-            content = self._format_d5(extracted.d5_damages)
-            artifact = db.create_artifact(
+            artifact = artifact_store.create_artifact(
                 case_id=case_id,
                 artifact_type="liability_calculation",
                 title="D5: 赔偿裁量",
-                content=content,
-                source_ref=", ".join(extracted.source_files),
-                db_path=self.db_path,
+                content=self._format_d5(extracted.d5_damages),
+                **common,
             )
             artifact_ids.append(artifact["id"])
-        
+
         return artifact_ids
     
-    def import_full(self, extracted: ExtractedCase) -> dict:
+    def import_full(
+        self,
+        extracted: ExtractedCase,
+        generation_method: str = "",
+        model_version: str = "",
+    ) -> dict:
         """
         完整导入（案件 + 提取物）
+        
+        Args:
+            generation_method: 生成方式（llm / rule-based / mock / import-json）
+            model_version: 模型版本
         
         Returns:
             {"case_id": ..., "artifact_ids": [...]}
@@ -142,8 +170,12 @@ class CaseImporter:
         # 导入案件
         case_id = self.import_case(extracted)
         
-        # 导入提取物
-        artifact_ids = self.import_artifacts(case_id, extracted)
+        # 导入提取物（含 Markdown 文件落盘）
+        artifact_ids = self.import_artifacts(
+            case_id, extracted,
+            generation_method=generation_method,
+            model_version=model_version,
+        )
         
         # 标记为已提取
         db.update_case_status(case_id, "extracted", self.db_path)
@@ -179,7 +211,7 @@ class CaseImporter:
             "## 5. 行为定性",
             d1.behavior,
         ])
-        return "\n".join(lines)
+        return strip_empty_sections("\n".join(lines))
     
     def _format_d2(self, d2) -> str:
         """格式化 D2 法律依据"""
@@ -201,7 +233,7 @@ class CaseImporter:
             "## 4. 被告抗辩的法律可行性",
             d2.defense_feasibility,
         ])
-        return "\n".join(lines)
+        return strip_empty_sections("\n".join(lines))
     
     def _format_d3(self, d3) -> str:
         """格式化 D3 攻防策略"""
@@ -223,7 +255,7 @@ class CaseImporter:
             "## 4. 主战场决策",
             d3.main_battlefield,
         ])
-        return "\n".join(lines)
+        return strip_empty_sections("\n".join(lines))
     
     def _format_d4(self, d4) -> str:
         """格式化 D4 证据体系"""
@@ -253,7 +285,7 @@ class CaseImporter:
             "## 4. 举证责任分配",
             d4.burden_of_proof,
         ])
-        return "\n".join(lines)
+        return strip_empty_sections("\n".join(lines))
     
     def _format_d5(self, d5) -> str:
         """格式化 D5 赔偿裁量"""
@@ -278,7 +310,7 @@ class CaseImporter:
             "## 5. 预估结论",
             d5.estimate,
         ])
-        return "\n".join(lines)
+        return strip_empty_sections("\n".join(lines))
 
 
 # =============================================
@@ -288,10 +320,14 @@ class CaseImporter:
 def import_extracted_case(
     extracted: ExtractedCase,
     db_path: Optional[Path] = None,
+    generation_method: str = "",
+    model_version: str = "",
 ) -> dict:
     """导入提取的案件"""
     importer = CaseImporter(db_path)
-    return importer.import_full(extracted)
+    return importer.import_full(
+        extracted, generation_method=generation_method, model_version=model_version
+    )
 
 
 def preview_import(extracted: ExtractedCase) -> str:

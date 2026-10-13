@@ -1,6 +1,6 @@
 ---
 artifact_id: b8bd2a5c-d250-4b0e-9922-1fb778c29d45
-case_id: 0bf66137-731a-4359-b60d-628239d14346
+case_id: 97686b3a-46d1-4515-b532-300e5749c9c0
 case_name: 浙江广电诉雷石:广汽埃安案件
 artifact_type: court_statement
 title: 双主线当庭陈述四段式

@@ -15,14 +15,43 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = Path(os.environ.get("DATA_DIR") or PROJECT_ROOT / "data")
 DB_PATH = DATA_DIR / "case_registry.db"
 
-# 提取维度（5个固定维度，适用于所有案由类型）
-ARTIFACT_TYPES = ["D1", "D2", "D3", "D4", "D5"]
+# 提取维度（5 个固定维度，适用于所有案由类型）
+DIMENSIONS = ["D1", "D2", "D3", "D4", "D5"]
+
+# 维度 → artifact_type（唯一真值映射：importer / CLI / UI 共用，禁止各处再写死）
+DIMENSION_ARTIFACT_TYPES = {
+    "D1": "case_key_facts",          # 事实认定
+    "D2": "legal_reasoning_chain",   # 法律依据
+    "D3": "defense_argument_chain",  # 攻防策略
+    "D4": "evidence_structure",      # 证据体系
+    "D5": "liability_calculation",   # 赔偿裁量
+}
+
+# 提取物类型（唯一真值：语义名；后 5 个为 v3.2 遗留的文件层类型）
+ARTIFACT_TYPES = [
+    "case_key_facts",
+    "legal_reasoning_chain",
+    "defense_argument_chain",
+    "evidence_structure",
+    "liability_calculation",
+    "quantitative_analysis",
+    "cross_exam_strategy",
+    "contingency_response",
+    "reverse_strategy",
+    "court_statement",
+]
+
 ARTIFACT_TYPE_NAMES = {
-    "D1": "事实认定",
-    "D2": "法律依据",
-    "D3": "攻防策略",
-    "D4": "证据体系",
-    "D5": "赔偿裁量",
+    "case_key_facts": "事实认定",
+    "legal_reasoning_chain": "法律依据",
+    "defense_argument_chain": "攻防策略",
+    "evidence_structure": "证据体系",
+    "liability_calculation": "赔偿裁量",
+    "quantitative_analysis": "量化分析",
+    "cross_exam_strategy": "质证策略",
+    "contingency_response": "应变话术",
+    "reverse_strategy": "反向维权路径",
+    "court_statement": "当庭陈述",
 }
 
 # 录入方式
@@ -70,33 +99,60 @@ def _get_conn(db_path: Optional[Path] = None) -> sqlite3.Connection:
     return conn
 
 
+def _ensure_columns(
+    conn: sqlite3.Connection, table: str, columns: dict[str, str]
+) -> None:
+    """对已存在的老表补齐缺失列（CREATE TABLE IF NOT EXISTS 不会改老表）。"""
+    have = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
+    for name, ddl in columns.items():
+        if name not in have:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {ddl}")
+
+
 def _init_schema(conn: sqlite3.Connection) -> None:
-    """建表（幂等）。"""
+    """建表（幂等）+ 对旧库补齐缺失列（幂等迁移）。
+
+    注：新库/容器首启必须能直接 INSERT 全部字段，故 CASES/ARTIFACTS 列
+    必须与 create_case / create_artifact 的 SQL 完全一致；老库由
+    _ensure_columns 兜底补列（历史事故：_init_schema 与代码脱节，
+    fresh DB 一建就 OperationalError）。
+    """
     conn.executescript("""
     CREATE TABLE IF NOT EXISTS cases (
-        id           TEXT PRIMARY KEY,
-        case_number  TEXT UNIQUE,
-        case_name    TEXT NOT NULL,
-        plaintiff    TEXT,
-        defendant    TEXT,
-        cause        TEXT,
-        result       TEXT,
-        source_path  TEXT,
-        status       TEXT DEFAULT 'pending',
-        notes        TEXT,
-        extracted_at TEXT,
-        created_at   TEXT NOT NULL
+        id                     TEXT PRIMARY KEY,
+        case_number            TEXT UNIQUE,
+        case_name              TEXT NOT NULL,
+        plaintiff              TEXT,
+        defendant              TEXT,
+        cause                  TEXT,
+        court                  TEXT,
+        year                   INTEGER,
+        result                 TEXT,
+        source_path            TEXT,
+        source_files           TEXT,
+        status                 TEXT DEFAULT 'pending',
+        notes                  TEXT,
+        entry_method           TEXT,
+        scene                  TEXT,
+        plaintiff_auth_level   TEXT,
+        defendant_auth_status  TEXT,
+        quality                TEXT,
+        extracted_at           TEXT,
+        created_at             TEXT NOT NULL
     );
 
     CREATE TABLE IF NOT EXISTS artifacts (
-        id            TEXT PRIMARY KEY,
-        case_id       TEXT NOT NULL,
-        artifact_type TEXT NOT NULL,
-        title         TEXT NOT NULL,
-        content       TEXT,
-        source_ref    TEXT,
-        version       INTEGER DEFAULT 1,
-        created_at    TEXT NOT NULL,
+        id                TEXT PRIMARY KEY,
+        case_id           TEXT NOT NULL,
+        artifact_type     TEXT NOT NULL,
+        title             TEXT NOT NULL,
+        content           TEXT,
+        source_ref        TEXT,
+        version           INTEGER DEFAULT 1,
+        parent_id         TEXT,
+        generation_method TEXT,
+        model_version     TEXT,
+        created_at        TEXT NOT NULL,
         FOREIGN KEY (case_id) REFERENCES cases(id)
     );
 
@@ -116,6 +172,39 @@ def _init_schema(conn: sqlite3.Connection) -> None:
     CREATE INDEX IF NOT EXISTS idx_artifacts_case_id ON artifacts(case_id);
     CREATE INDEX IF NOT EXISTS idx_templates_category ON templates(category);
     """)
+    _ensure_columns(conn, "cases", {
+        # 基础列（历史最小库兜底）
+        "case_number": "TEXT",
+        "case_name": "TEXT",
+        "plaintiff": "TEXT",
+        "defendant": "TEXT",
+        "cause": "TEXT",
+        "result": "TEXT",
+        "source_path": "TEXT",
+        "status": "TEXT",
+        "notes": "TEXT",
+        "extracted_at": "TEXT",
+        # v3.3+ 新增列
+        "court": "TEXT",
+        "year": "INTEGER",
+        "source_files": "TEXT",
+        "entry_method": "TEXT",
+        "scene": "TEXT",
+        "plaintiff_auth_level": "TEXT",
+        "defendant_auth_status": "TEXT",
+        "quality": "TEXT",
+    })
+    _ensure_columns(conn, "artifacts", {
+        "case_id": "TEXT",
+        "artifact_type": "TEXT",
+        "title": "TEXT",
+        "content": "TEXT",
+        "source_ref": "TEXT",
+        "version": "INTEGER",
+        "parent_id": "TEXT",
+        "generation_method": "TEXT",
+        "model_version": "TEXT",
+    })
 
 
 # =============================================
@@ -138,6 +227,7 @@ def create_case(
     scene: str = "",
     plaintiff_auth_level: str = "",
     defendant_auth_status: str = "",
+    quality: str = "",
     db_path: Optional[Path] = None,
 ) -> dict:
     """注册新案件，返回案件记录 dict（含 id）。"""
@@ -149,13 +239,13 @@ def create_case(
             """
             INSERT INTO cases
               (id, case_number, case_name, plaintiff, defendant, cause, court,
-               year, result, source_path, status, notes, created_at,
-               entry_method, scene, plaintiff_auth_level, defendant_auth_status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?)
+               year, result, source_path, source_files, status, notes, created_at,
+               entry_method, scene, plaintiff_auth_level, defendant_auth_status, quality)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?)
             """,
             (case_id, case_number, case_name, plaintiff, defendant, cause, court,
-             year, result, source_path, notes, now,
-             entry_method, scene, plaintiff_auth_level, defendant_auth_status),
+             year, result, source_path, source_files, notes, now,
+             entry_method, scene, plaintiff_auth_level, defendant_auth_status, quality),
         )
         conn.commit()
     except sqlite3.IntegrityError as e:
@@ -255,19 +345,6 @@ def count_artifacts_by_case(
 # =============================================
 # Artifacts 表操作
 # =============================================
-
-ARTIFACT_TYPES = [
-    "defense_argument_chain",    # 抗辩论证链
-    "cross_exam_strategy",       # 质证策略
-    "evidence_structure",        # 证据结构
-    "legal_reasoning_chain",     # 法律推理链
-    "quantitative_analysis",     # 量化分析
-    "liability_calculation",     # 责任计算
-    "contingency_response",      # 应变话术
-    "reverse_strategy",          # 反向维权路径
-    "court_statement",           # 当庭陈述
-    "case_key_facts",            # 关键事实清单
-]
 
 TEMPLATE_CATEGORIES = [
     "答辩状",

@@ -4,6 +4,66 @@
 
 ---
 
+## 2026-10-13 case-intelligence 提取功能缺陷修复 + 异地验证闭环
+
+**类型**: fix + feat（工程质量 + 协作机制）
+**模块**: case-intelligence（横切 `docs/handoff/` + `AGENTS.md §13`）
+**状态**: in-progress
+**优先级**: P0（提取是全部下游生成/检索的"案源"，当前质量不达标）
+
+### 背景：提取功能回归结论（基于 `data/` 实测）
+
+| 缺陷 | 证据（2026-10-13 实测） |
+|------|------------------------|
+| **数据分层断裂** | 2 案的手工精提炼提取物（12 条富内容 MD）**孤儿**——case_id 不在 `cases`、提取物不在 `artifacts`；DB 内 514 条 D1–D5 则无对应 MD 文件（102/104 案无文件层） |
+| **提取深度＝骨架** | 514 条全部 <1000 字（均值 191–386）；**空壳小节 50%+**（1081/2154） |
+| **字段缺失** | `court` 0/104、`result` 0/104、`scene`/`quality`/`year` 0/104；defendant 缺 7 / plaintiff 缺 5 / cause 缺 1；D5 缺 6 案 |
+| **治理字段空转** | `generation_method` 514 全 NULL、`version` 全 1；`entry_method` 全 AI |
+| **命名分裂** | artifact_type 四套命名（D1 常量 / 英文 DB 值 / 语义型 / 中文 title） |
+| **下游接口错配** | `document_generator._build_context` 取 `court`（空→未知）、artifacts 截断 500 字/最多 5 个 |
+
+### 一、异地测试反馈闭环（机制，新）
+
+| 项 | 内容 |
+|----|------|
+| 交接单 | `docs/handoff/H-<date>-<slug>.md` 三段（意图/请执行/请回传），随 git 走 |
+| 回执 | 异地填同卡"回执"区；大产物落 `docs/handoff/artifacts/` |
+| 数据通道 | `scripts/audit_extraction.py`（机读 JSON+MD） |
+| 规则 | `AGENTS.md §13`（强制）+ `docs/handoff/README.md` |
+
+### 二、提取缺陷修复（本轮）
+
+- [x] **EX-01** `src/markdown_utils.py`：`strip_empty_sections` 空小节/空表格抑制（宁缺毋滥）
+- [x] **EX-02** `src/importer.py`：入库时套用 EX-01；`court` 由案号派生、`year` 回填
+- [x] **EX-03** `src/court_resolver.py`：案号→法院（已核验子集，未知留空）
+- [x] **EX-04** `scripts/backfill_cases.py`：存量回填 court/year/scene（dry-run 默认）
+- [x] **EX-05** `scripts/relink_artifacts.py`：孤儿归位（报告 + 可选 apply）
+- [x] **EX-06** `scripts/audit_extraction.py`：质量审计（回传通道）
+- [x] **EX-07** `prompts/提取/1_…`：强制填满叙述型小节 + 表格需数据行；新增 `4_提取质量自检.md`
+- [x] **EX-08** 单测：`tests/test_markdown_utils.py`（4）+ `tests/test_court_resolver.py`（4）
+- [ ] **EX-09**（待异地回传）代字→法院权威映射补表
+- [ ] **EX-10**（待异地确认）孤儿提取物归位（腾讯案 → 9ba215f8 待定 / 广电案已归位 97686b3a）
+- [x] **EX-11** 消除四套 artifact 命名（`database.py` 常量 = 唯一真值；CLI 支持 `--type D1`）
+- [x] **EX-12** 写 `generation_method`（llm/rule-based/manual）+ `model_version`；importer 经 `artifact_store` 双写 MD
+- [x] **EX-14** `src/database.py`：`_init_schema` 全列 + `_ensure_columns` 幂等迁移（修 fresh DB 报错）
+- [x] **EX-15** `scripts/rescrub_artifacts.py`：存量 514 条空壳回洗 + generation_method 回填（本机 49%→0%）
+- [x] **EX-16** 单测 3 个（stdlib 可跑）：schema/迁移/透传、提示词完整性、归位匹配
+- [x] **EX-13** `document_generator` 接口放宽：参考提取物 5→20 个、500→4000 字（补回归测试）
+
+### 验收标准
+
+- [x] 本地：stdlib 单测 3 个全绿；三脚本 dry-run/apply 通过；importer 全链落库 + MD 双写验证
+- [ ] 异地：空小节率较基线 50% 下降（本机修复后 0%）
+- [ ] 异地：court 可派生案件数较基线 50 上升
+- [ ] 异地：孤儿提取物可被 `list_artifacts` / 详情页 / 生成链路检索到
+- [ ] 交接单 R1 回执齐备（含审计 JSON + 代字清单 + 归位意见）
+
+### 交接单
+
+- `docs/handoff/H-20261013-extraction.md`（R1）
+
+---
+
 ## 2026-10-12 case-intelligence 飞书 Bot 独立应用申请与上线（含命名）
 
 **类型**: feat（通道接入）

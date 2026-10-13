@@ -126,6 +126,11 @@ class ExtractedCase:
     court: Optional[str] = None
     cause: str = ""
     filing_date: Optional[str] = None
+    result: str = ""
+    scene: str = ""
+    year: Optional[int] = None
+    quality: str = ""
+    defendant_auth_status: str = ""
     
     # 当事人
     plaintiffs: list[Party] = field(default_factory=list)
@@ -259,6 +264,204 @@ class ExtractedCase:
 
 
 # =============================================
+# 提取提示词（MiniMax / Ollama 共用，唯一真值）
+# 字段集对齐 prompts/提取/1_新案材料提取_D1-D5.md（含 result/scene/year）
+# =============================================
+
+EXTRACTION_JSON_TEMPLATE = """{{
+  "case_number": "案号（如 (2024)京0491民初7776号）",
+  "case_name": "案件名称",
+  "court": "受理法院全称",
+  "cause": "案由",
+  "result": "案件结果（判决/调解/撤诉/驳回），未知留空",
+  "scene": "涉案场景（实体KTV/车载KTV/线上平台/实体场所/线上应用/混合场景/其他），未知留空",
+  "year": 2024,
+  "defendant_auth_status": "被告授权状态（已获音集协+音著协双授权/已获音集协授权/已获音著协授权/部分授权/未获授权/待核实）",
+  "plaintiffs": [{{"name": "原告名称", "role": "原告", "company": "所属公司", "auth_level": "授权层级（原始权利人/独家被授权方/间接授权(2级)/间接授权(3级+)/集体管理组织/待核实）"}}],
+  "defendants": [{{"name": "被告名称", "role": "被告", "company": "所属公司"}}],
+  "d1_facts": {{
+    "background": "案件背景（起因/经过/时间线）",
+    "dispute_points": ["争议焦点1", "争议焦点2"],
+    "key_facts": [{{"description": "事实描述", "source": "来源文件或段落", "status": "已证/待核/推论"}}],
+    "rights_basis": "1.5 权利基础分析（权属链是否完整）",
+    "behavior": "1.6 行为定性（行为内容/是否落入权利范围）"
+  }},
+  "d2_legal": {{
+    "laws": [{{"law_name": "法律名称", "article": "条款号", "content": "条款内容", "applicability": "适用说明"}}],
+    "legal_relationship": "2.2 法律关系定性",
+    "rights_analysis": "2.3 权利基础分析",
+    "defense_feasibility": "2.4 被告抗辩的法律可行性"
+  }},
+  "d3_strategy": {{
+    "plaintiff_claims": "3.1 原告诉请",
+    "defenses": [{{"rank": 1, "argument_type": "抗辩类型", "content": "抗辩内容", "evidence": "证据支撑", "priority": "主力/辅助/备用"}}],
+    "argument_chain": "3.3 抗辩论证结构（论点→事实→法条→结论）",
+    "main_battlefield": "3.4 主战场决策"
+  }},
+  "d4_evidence": {{
+    "plaintiff_evidence": [{{"seq": 1, "name": "证据名称", "purpose": "证明目的", "evidence_type": "原件/复印件/电子数据", "status": "有效/存疑"}}],
+    "defendant_evidence": [{{"seq": 1, "name": "证据名称", "purpose": "证明目的", "evidence_type": "原件/复印件/电子数据", "status": "有效/存疑"}}],
+    "cross_exam_points": "4.3 证据质证要点（四性：真实/合法/关联/证明力）",
+    "burden_of_proof": "4.4 举证责任分配"
+  }},
+  "d5_damages": {{
+    "total_claim": "5.1 赔偿请求（金额+依据）",
+    "defense_arguments": "5.2 被告对赔偿数额的抗辩",
+    "calculation": [{{"claim_type": "实际损失/违法所得/许可费倍数/法定赔偿", "plaintiff_amount": "原告主张", "defendant_argument": "被告抗辩", "reasonable_range": "合理区间"}}],
+    "factors": "5.4 裁量因素（传播范围/持续时间/获利/过错程度）",
+    "estimate": "5.5 预估结论（预计支持的赔偿区间）"
+  }}
+}}"""
+
+
+def build_extraction_prompt(case_name: str, text: str, max_chars: int = 15000) -> str:
+    """构建提取 prompt（全字段集，MiniMax/Ollama 共用，避免各自精简导致空壳）。"""
+    return f"""你是一位资深民商法律师，擅长从案件材料中提取结构化的法律分析要素。
+你必须严格遵循"5 维度提取法"，覆盖 D1-D5 全部维度，不可遗漏。
+
+案件名称: {case_name}
+
+材料内容:
+{text[:max_chars]}
+
+请严格按以下 JSON 结构输出（字段名不可改；无信息时该字段留空字符串 ""，不得整段省略）：
+{EXTRACTION_JSON_TEMPLATE}
+
+强制要求：
+1. 5 个维度全部覆盖；叙述型字段（rights_basis/behavior/rights_analysis/defense_feasibility/argument_chain/main_battlefield/cross_exam_points/burden_of_proof/factors/estimate）必须写完整句子，禁止留空
+2. 表格类字段（key_facts/laws/defenses/原告与被告证据/calculation）必须有数据行，禁止只有表头
+3. 关键论点必须有原文支撑；事实与推论分离（标注 status）
+4. 只返回纯 JSON，不含 markdown 代码块或额外说明
+"""
+
+
+def _coerce_year(value) -> Optional[int]:
+    """宽松把 year 字段转 int（容忍 '2024' / '2024年' / 2024）。"""
+    if value is None:
+        return None
+    if isinstance(value, int):
+        return value
+    m = re.search(r"(19|20)\d{2}", str(value))
+    return int(m.group(0)) if m else None
+
+
+def _party_list(items, default_role: str) -> list[Party]:
+    """把 LLM 返回的当事人列表稳健转成 Party（容忍缺失/多余字段）。"""
+    out = []
+    for p in items or []:
+        if not isinstance(p, dict):
+            continue
+        out.append(Party(
+            name=str(p.get("name", "") or ""),
+            role=str(p.get("role") or default_role),
+            company=p.get("company"),
+            id_type=p.get("id_type"),
+            id_number=p.get("id_number"),
+            auth_level=p.get("auth_level"),
+        ))
+    return out
+
+
+def _apply_case_scalars(case: ExtractedCase, data: dict) -> ExtractedCase:
+    """把基本信息字段写入 ExtractedCase（含 result/scene/year/auth）。"""
+    case.case_number = data.get("case_number") or case.case_number
+    case.case_name = data.get("case_name") or case.case_name
+    case.court = data.get("court") or case.court
+    case.cause = data.get("cause") or case.cause
+    case.filing_date = data.get("filing_date") or case.filing_date
+    case.result = str(data.get("result") or "")
+    case.scene = str(data.get("scene") or "")
+    case.defendant_auth_status = str(data.get("defendant_auth_status") or "")
+    case.year = _coerce_year(data.get("year")) or case.year
+    return case
+
+
+def _apply_dims(case: ExtractedCase, data: dict) -> ExtractedCase:
+    """解析 D1-D5 五个维度（MiniMax/Ollama 共用）。"""
+    if "d1_facts" in data and data["d1_facts"]:
+        d1 = data["d1_facts"]
+        case.d1_facts = DFacts(
+            background=d1.get("background", ""),
+            dispute_points=d1.get("dispute_points", []),
+            key_facts=[KeyFact(
+                description=kf.get("description", ""),
+                source=kf.get("source", ""),
+                status=kf.get("status", "已证"),
+            ) for kf in d1.get("key_facts", []) if isinstance(kf, dict)],
+            rights_basis=d1.get("rights_basis", ""),
+            behavior=d1.get("behavior", ""),
+        )
+    if "d2_legal" in data and data["d2_legal"]:
+        d2 = data["d2_legal"]
+        case.d2_legal = DLegal(
+            laws=[LegalBasis(
+                law_name=lb.get("law_name", ""),
+                article=lb.get("article", ""),
+                content=lb.get("content", ""),
+                applicability=lb.get("applicability", ""),
+            ) for lb in d2.get("laws", []) if isinstance(lb, dict)],
+            legal_relationship=d2.get("legal_relationship", ""),
+            rights_analysis=d2.get("rights_analysis", ""),
+            defense_feasibility=d2.get("defense_feasibility", ""),
+        )
+    if "d3_strategy" in data and data["d3_strategy"]:
+        d3 = data["d3_strategy"]
+        case.d3_strategy = DStrategy(
+            plaintiff_claims=d3.get("plaintiff_claims", ""),
+            defenses=[DefenseArgument(
+                rank=da.get("rank", 0),
+                argument_type=da.get("argument_type", ""),
+                content=da.get("content", ""),
+                evidence=da.get("evidence", ""),
+                priority=da.get("priority", "辅助"),
+            ) for da in d3.get("defenses", []) if isinstance(da, dict)],
+            argument_chain=d3.get("argument_chain", ""),
+            main_battlefield=d3.get("main_battlefield", ""),
+        )
+    if "d4_evidence" in data and data["d4_evidence"]:
+        d4 = data["d4_evidence"]
+        def _ev(items):
+            return [Evidence(
+                seq=e.get("seq", 0),
+                name=e.get("name", ""),
+                purpose=e.get("purpose", ""),
+                evidence_type=e.get("evidence_type", "原件"),
+                status=e.get("status", "有效"),
+            ) for e in items or [] if isinstance(e, dict)]
+        case.d4_evidence = DEvidence(
+            plaintiff_evidence=_ev(d4.get("plaintiff_evidence")),
+            defendant_evidence=_ev(d4.get("defendant_evidence")),
+            cross_exam_points=d4.get("cross_exam_points", ""),
+            burden_of_proof=d4.get("burden_of_proof", ""),
+        )
+    if "d5_damages" in data and data["d5_damages"]:
+        d5 = data["d5_damages"]
+        case.d5_damages = DDamages(
+            total_claim=d5.get("total_claim", ""),
+            defense_arguments=d5.get("defense_arguments", ""),
+            calculation=[DamageClaim(
+                claim_type=dc.get("claim_type", ""),
+                plaintiff_amount=dc.get("plaintiff_amount", ""),
+                defendant_argument=dc.get("defendant_argument", ""),
+                reasonable_range=dc.get("reasonable_range", ""),
+            ) for dc in d5.get("calculation", []) if isinstance(dc, dict)],
+            factors=d5.get("factors", ""),
+            estimate=d5.get("estimate", ""),
+        )
+    return case
+
+
+def _strip_json_fence(text: str) -> str:
+    """去掉 ```json ... ``` 围栏，返回纯 JSON 文本。"""
+    text = (text or "").strip()
+    if text.startswith("```"):
+        text = text.split("```")[1]
+        if text.startswith("json"):
+            text = text[4:]
+    return text.strip()
+
+
+# =============================================
 # AI 引擎接口
 # =============================================
 
@@ -305,162 +508,24 @@ class MiniMaxAdapter(AIEngine):
         return self._parse_response(response, contents)
     
     def _build_prompt(self, text: str, case_name: str) -> str:
-        """构建提取 prompt"""
-        return f"""请从以下案件材料中提取结构化信息（JSON格式）：
+        """构建提取 prompt（与 Ollama 共用完整字段集，避免精简导致空壳）"""
+        return build_extraction_prompt(case_name, text, max_chars=8000)
 
-案件名称：{case_name}
-
-材料内容：
-{text[:8000]}
-
-请提取以下信息（JSON格式）：
-{{
-  "case_number": "案号",
-  "case_name": "案件名称",
-  "court": "法院",
-  "cause": "案由",
-  "plaintiffs": [{{"name": "当事人名称", "role": "原告"}}],
-  "defendants": [{{"name": "当事人名称", "role": "被告"}}],
-  "d1_facts": {{"background": "背景", "dispute_points": ["争议点"], "key_facts": [{{"description": "事实", "source": "来源"}}]}},
-  "d2_legal": {{"legal_relationship": "法律关系", "laws": [{{"law_name": "法律名称", "article": "条款", "content": "内容"}}]}},
-  "d3_strategy": {{"plaintiff_claims": "原告诉求", "defenses": [{{"rank": 1, "argument_type": "类型", "content": "内容", "evidence": "证据", "priority": "优先级"}}]}},
-  "d4_evidence": {{"plaintiff_evidence": [{{"seq": 1, "name": "证据名称", "purpose": "证明目的"}}], "burden_of_proof": "举证责任"}},
-  "d5_damages": {{"total_claim": "总诉求金额", "calculation": [{{"claim_type": "类型", "plaintiff_amount": "金额"}}]}}
-}}
-
-只返回 JSON，不要其他内容。"""
-    
     def _parse_response(self, response: str, contents: list) -> ExtractedCase:
-        """解析 LLM 响应"""
-        import json
-        
-        # 尝试提取 JSON
+        """解析 LLM 响应（与 Ollama 共用字段解析）"""
+        case = ExtractedCase()
+        case.source_files = [c.file_info.name for c in contents]
+        case.extracted_at = str(Path.cwd())
         try:
-            # 去掉 markdown 代码块
-            json_str = response.strip()
-            if json_str.startswith("```"):
-                json_str = json_str.split("```")[1]
-                if json_str.startswith("json"):
-                    json_str = json_str[4:]
-            json_str = json_str.strip()
-            
-            data = json.loads(json_str)
-            
-            # 构建 ExtractedCase
-            case = ExtractedCase()
-            case.case_number = data.get("case_number")
-            case.case_name = data.get("case_name", "")
-            case.court = data.get("court")
-            case.cause = data.get("cause", "")
-            
-            # 当事人
-            for p in data.get("plaintiffs", []):
-                case.plaintiffs.append(Party(name=p.get("name", ""), role="原告"))
-            for d in data.get("defendants", []):
-                case.defendants.append(Party(name=d.get("name", ""), role="被告"))
-            
-            # D1: 事实认定
-            if "d1_facts" in data:
-                d1_data = data["d1_facts"]
-                key_facts = [KeyFact(
-                    description=kf.get("description", ""),
-                    source=kf.get("source", ""),
-                    status=kf.get("status", "已证")
-                ) for kf in d1_data.get("key_facts", [])]
-                case.d1_facts = DFacts(
-                    background=d1_data.get("background", ""),
-                    dispute_points=d1_data.get("dispute_points", []),
-                    key_facts=key_facts,
-                    rights_basis=d1_data.get("rights_basis", ""),
-                    behavior=d1_data.get("behavior", "")
-                )
-            
-            # D2: 法律依据
-            if "d2_legal" in data:
-                d2_data = data["d2_legal"]
-                laws = [LegalBasis(
-                    law_name=lb.get("law_name", ""),
-                    article=lb.get("article", ""),
-                    content=lb.get("content", ""),
-                    applicability=lb.get("applicability", "")
-                ) for lb in d2_data.get("laws", [])]
-                case.d2_legal = DLegal(
-                    laws=laws,
-                    legal_relationship=d2_data.get("legal_relationship", ""),
-                    rights_analysis=d2_data.get("rights_analysis", ""),
-                    defense_feasibility=d2_data.get("defense_feasibility", "")
-                )
-            
-            # D3: 攻防策略
-            if "d3_strategy" in data:
-                d3_data = data["d3_strategy"]
-                defenses = [DefenseArgument(
-                    rank=da.get("rank", 0),
-                    argument_type=da.get("argument_type", ""),
-                    content=da.get("content", ""),
-                    evidence=da.get("evidence", ""),
-                    priority=da.get("priority", "辅助")
-                ) for da in d3_data.get("defenses", [])]
-                case.d3_strategy = DStrategy(
-                    plaintiff_claims=d3_data.get("plaintiff_claims", ""),
-                    defenses=defenses,
-                    argument_chain=d3_data.get("argument_chain", ""),
-                    main_battlefield=d3_data.get("main_battlefield", "")
-                )
-            
-            # D4: 证据体系
-            if "d4_evidence" in data:
-                d4_data = data["d4_evidence"]
-                p_evidence = [Evidence(
-                    seq=e.get("seq", 0),
-                    name=e.get("name", ""),
-                    purpose=e.get("purpose", ""),
-                    evidence_type=e.get("evidence_type", "原件"),
-                    status=e.get("status", "有效")
-                ) for e in d4_data.get("plaintiff_evidence", [])]
-                d_evidence = [Evidence(
-                    seq=e.get("seq", 0),
-                    name=e.get("name", ""),
-                    purpose=e.get("purpose", ""),
-                    evidence_type=e.get("evidence_type", "原件"),
-                    status=e.get("status", "有效")
-                ) for e in d4_data.get("defendant_evidence", [])]
-                case.d4_evidence = DEvidence(
-                    plaintiff_evidence=p_evidence,
-                    defendant_evidence=d_evidence,
-                    cross_exam_points=d4_data.get("cross_exam_points", ""),
-                    burden_of_proof=d4_data.get("burden_of_proof", "")
-                )
-            
-            # D5: 赔偿裁量
-            if "d5_damages" in data:
-                d5_data = data["d5_damages"]
-                calculations = [DamageClaim(
-                    claim_type=dc.get("claim_type", ""),
-                    plaintiff_amount=dc.get("plaintiff_amount", ""),
-                    defendant_argument=dc.get("defendant_argument", ""),
-                    reasonable_range=dc.get("reasonable_range", "")
-                ) for dc in d5_data.get("calculation", [])]
-                case.d5_damages = DDamages(
-                    total_claim=d5_data.get("total_claim", ""),
-                    defense_arguments=d5_data.get("defense_arguments", ""),
-                    calculation=calculations,
-                    factors=d5_data.get("factors", ""),
-                    estimate=d5_data.get("estimate", "")
-                )
-            
-            case.source_files = [c.file_info.name for c in contents]
-            case.extracted_at = str(Path.cwd())
+            data = json.loads(_strip_json_fence(response))
+            _apply_case_scalars(case, data)
+            case.plaintiffs = _party_list(data.get("plaintiffs"), "原告")
+            case.defendants = _party_list(data.get("defendants"), "被告")
+            _apply_dims(case, data)
             case.confidence = 0.7
-            
-            return case
         except Exception:
-            # 解析失败，返回基本信息
-            case = ExtractedCase()
-            case.case_name = ""
-            case.cause = "待提取"
-            case.source_files = [c.file_info.name for c in contents]
-            return case
+            case.cause = case.cause or "待提取"
+        return case
 
 
 class OllamaEngine:
@@ -500,161 +565,28 @@ class OllamaEngine:
             raise ExtractionError(f"Ollama 调用失败: {e}") from e
     
     def _build_prompt(self, text: str, case_name: str) -> str:
-        """构建提取 prompt"""
-        return f"""你是一位资深民商法律师，擅长从案件材料中提取结构化的法律分析要素。
-
-案件名称: {case_name}
-
-请从以下材料中提取结构化信息，输出 JSON：
-
-材料内容:
-{text[:15000]}
-
-输出格式（JSON）:
-{{
-    "case_number": "案号",
-    "case_name": "{case_name}",
-    "court": "法院名称",
-    "cause": "案由",
-    "plaintiffs": [
-        {{"name": "原告名称", "role": "原告", "company": "所属公司", "auth_level": "授权层级"}}
-    ],
-    "defendants": [
-        {{"name": "被告名称", "role": "被告", "company": "所属公司"}}
-    ],
-    "d1_facts": {{
-        "background": "案件背景",
-        "dispute_points": ["争议焦点1", "争议焦点2"],
-        "key_facts": [
-            {{"description": "事实描述", "source": "来源文件", "status": "已证/待核/推论"}}
-        ],
-        "rights_basis": "权利基础分析",
-        "behavior": "行为定性"
-    }},
-    "d2_legal": {{
-        "laws": [
-            {{"law_name": "法律名称", "article": "条款号", "content": "条款内容摘要", "applicability": "适用说明"}}
-        ],
-        "legal_relationship": "法律关系定性",
-        "rights_analysis": "权利基础分析",
-        "defense_feasibility": "被告抗辩的法律可行性"
-    }},
-    "d3_strategy": {{
-        "plaintiff_claims": "原告诉请",
-        "defenses": [
-            {{"rank": 1, "argument_type": "抗辩类型", "content": "抗辩内容", "evidence": "证据支撑", "priority": "主力/辅助/备用"}}
-        ],
-        "argument_chain": "抗辩论证结构",
-        "main_battlefield": "主战场决策"
-    }},
-    "d4_evidence": {{
-        "plaintiff_evidence": [
-            {{"seq": 1, "name": "证据名称", "purpose": "证明目的", "evidence_type": "原件/复印件/电子数据", "status": "有效/存疑"}}
-        ],
-        "defendant_evidence": [],
-        "cross_exam_points": "质证要点",
-        "burden_of_proof": "举证责任分配"
-    }},
-    "d5_damages": {{
-        "total_claim": "总赔偿请求",
-        "defense_arguments": "被告抗辩理由",
-        "calculation": [
-            {{"claim_type": "类型", "plaintiff_amount": "原告主张", "defendant_argument": "被告抗辩", "reasonable_range": "合理区间"}}
-        ],
-        "factors": "裁量因素",
-        "estimate": "预估结论"
-    }}
-}}
-
-注意：
-1. 所有维度必须完整提取，不可遗漏
-2. 关键论点必须有原文支撑
-3. 输出纯 JSON，不含 markdown 代码块"""
+        """构建提取 prompt（与 MiniMax 共用完整字段集）"""
+        return build_extraction_prompt(case_name, text, max_chars=15000)
 
     def _parse_response(self, text: str, contents: list[ParsedContent]) -> ExtractedCase:
-        """解析 AI 响应"""
+        """解析 AI 响应（与 MiniMax 共用字段解析）"""
         from datetime import datetime, timezone
-        
-        # 提取 JSON
-        text = text.strip()
-        if text.startswith("```"):
-            text = text.split("```")[1]
-            if text.startswith("json"):
-                text = text[4:]
-        text = text.strip()
-        
+
         try:
-            data = json.loads(text)
+            data = json.loads(_strip_json_fence(text))
         except json.JSONDecodeError:
             raise ExtractionError("AI 返回格式错误，无法解析 JSON")
-        
-        # 构建结果
-        result = ExtractedCase(
-            case_number=data.get("case_number"),
-            case_name=data.get("case_name", ""),
-            court=data.get("court"),
-            cause=data.get("cause", ""),
-            filing_date=data.get("filing_date"),
+
+        case = ExtractedCase(
             source_files=[c.file_info.path.name for c in contents],
-            confidence=0.8,  # 暂时固定
+            confidence=0.8,
             extracted_at=datetime.now(timezone.utc).isoformat(),
         )
-        
-        # 解析当事人
-        for p in data.get("plaintiffs", []):
-            result.plaintiffs.append(Party(**p))
-        for p in data.get("defendants", []):
-            result.defendants.append(Party(**p))
-        
-        # 解析 D1-D5
-        if "d1_facts" in data:
-            d1 = data["d1_facts"]
-            result.d1_facts = DFacts(
-                background=d1.get("background", ""),
-                dispute_points=d1.get("dispute_points", []),
-                key_facts=[KeyFact(**f) for f in d1.get("key_facts", [])],
-                rights_basis=d1.get("rights_basis", ""),
-                behavior=d1.get("behavior", ""),
-            )
-        
-        if "d2_legal" in data:
-            d2 = data["d2_legal"]
-            result.d2_legal = DLegal(
-                laws=[LegalBasis(**l) for l in d2.get("laws", [])],
-                legal_relationship=d2.get("legal_relationship", ""),
-                rights_analysis=d2.get("rights_analysis", ""),
-                defense_feasibility=d2.get("defense_feasibility", ""),
-            )
-        
-        if "d3_strategy" in data:
-            d3 = data["d3_strategy"]
-            result.d3_strategy = DStrategy(
-                plaintiff_claims=d3.get("plaintiff_claims", ""),
-                defenses=[DefenseArgument(**d) for d in d3.get("defenses", [])],
-                argument_chain=d3.get("argument_chain", ""),
-                main_battlefield=d3.get("main_battlefield", ""),
-            )
-        
-        if "d4_evidence" in data:
-            d4 = data["d4_evidence"]
-            result.d4_evidence = DEvidence(
-                plaintiff_evidence=[Evidence(**e) for e in d4.get("plaintiff_evidence", [])],
-                defendant_evidence=[Evidence(**e) for e in d4.get("defendant_evidence", [])],
-                cross_exam_points=d4.get("cross_exam_points", ""),
-                burden_of_proof=d4.get("burden_of_proof", ""),
-            )
-        
-        if "d5_damages" in data:
-            d5 = data["d5_damages"]
-            result.d5_damages = DDamages(
-                total_claim=d5.get("total_claim", ""),
-                defense_arguments=d5.get("defense_arguments", ""),
-                calculation=[DamageClaim(**c) for c in d5.get("calculation", [])],
-                factors=d5.get("factors", ""),
-                estimate=d5.get("estimate", ""),
-            )
-        
-        return result
+        _apply_case_scalars(case, data)
+        case.plaintiffs = _party_list(data.get("plaintiffs"), "原告")
+        case.defendants = _party_list(data.get("defendants"), "被告")
+        _apply_dims(case, data)
+        return case
 
 
 class BasicEngine:
@@ -677,6 +609,9 @@ class BasicEngine:
         cause = dir_info.get("cause") or self._extract_cause(combined_text, case_name)
         court = dir_info.get("court") or self._extract_court(combined_text)
         result = self._extract_result(combined_text)
+        year = dir_info.get("year") or _coerce_year(case_number)
+        scene = self._extract_scene(case_name, combined_text)
+        auth_status = self._extract_auth_status(combined_text)
         
         # 提取 D3 攻防策略（从答辩状中）
         defenses = self._extract_defenses(contents)
@@ -689,6 +624,11 @@ class BasicEngine:
             case_name=dir_info.get("full_name", case_name),
             court=court,
             cause=cause,
+            result=result or "",
+            scene=scene,
+            year=year,
+            quality="B" if case_number else "C",
+            defendant_auth_status=auth_status,
             plaintiffs=plaintiffs,
             defendants=defendants,
             source_files=[c.file_info.path.name for c in contents],
@@ -707,6 +647,35 @@ class BasicEngine:
                 burden_of_proof="待补充",
             ),
         )
+
+    def _extract_scene(self, case_name: str, text: str) -> str:
+        """推断涉案场景（映射到 SCENE 词表；未知留空）。"""
+        hay = f"{case_name} {text[:3000]}"
+        rules = [
+            ("车载KTV", ("车载", "车机", "汽车KTV")),
+            ("线上平台", ("线上平台", "网站", "APP", "app", "小程序", "网络平台")),
+            ("线上应用", ("线上应用", "在线", "云KTV")),
+            ("实体KTV", ("KTV", "ktv", "歌房", "包厢")),
+            ("实体场所", ("实体场所", "门店", "商场", "酒吧", "酒店")),
+        ]
+        for scene, keys in rules:
+            if any(k in hay for k in keys):
+                return scene
+        return ""
+
+    def _extract_auth_status(self, text: str) -> str:
+        """从材料推断被告授权状态（未知返回空，不猜）。"""
+        has_jy = "音集协" in text
+        has_zx = "音著协" in text
+        if has_jy and has_zx:
+            return "已获音集协+音著协双授权"
+        if has_jy:
+            return "已获音集协授权"
+        if has_zx:
+            return "已获音著协授权"
+        if "合法来源" in text or "授权" in text:
+            return "部分授权"
+        return ""
     
     def _parse_directory_name(self, case_name: str) -> dict:
         """从目录名解析案件信息
@@ -720,6 +689,7 @@ class BasicEngine:
             "defendant": None,
             "cause": None,
             "court": None,
+            "year": None,
             "full_name": case_name,
         }
         
@@ -851,6 +821,14 @@ class BasicEngine:
                 if re.match(r"^\d{6,8}$", part.strip()):
                     date_part = part.strip()
                     break
+
+            # 1.1 目录日期前缀 → 年份（240507 → 2024）
+            if date_part:
+                if len(date_part) == 8:
+                    info["year"] = int(date_part[:4])
+                elif len(date_part) == 6:
+                    yy = int(date_part[:2])
+                    info["year"] = 2000 + yy if yy <= 60 else 1900 + yy
             
             # 2. 提取案号（包含特定关键词的部分）
             # 优先从目录名提取，目录名格式：日期-案号-其他

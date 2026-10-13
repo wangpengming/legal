@@ -17,6 +17,10 @@ logger = logging.getLogger(__name__)
 # 项目路径
 PROJECT_ROOT = Path(__file__).parent.parent
 
+# 参考提取物注入上限（防止 prompt 爆炸，同时避免历史 5个/500字 的过度截断）
+_MAX_ARTIFACTS = 20
+_MAX_ARTIFACT_CHARS = 4000
+
 
 @dataclass
 class CaseContext:
@@ -313,14 +317,14 @@ class DocumentGenerator:
         if case.scene:
             parts.append(f"涉案场景: {case.scene}")
         
-        # 添加相关 artifacts
+        # 添加相关 artifacts（放宽截断：历史 5 个/500 字导致文书缺料）
         if request.reference_artifacts:
             parts.append("")
             parts.append("=== 参考信息 ===")
-            for artifact in request.reference_artifacts[:5]:  # 最多5个
+            for artifact in request.reference_artifacts[:_MAX_ARTIFACTS]:
                 artifact_type = artifact.get("artifact_type", "")
                 title = artifact.get("title", "")
-                content = artifact.get("content", "")[:500]  # 限制长度
+                content = artifact.get("content", "")[:_MAX_ARTIFACT_CHARS]
                 parts.append(f"\n[{artifact_type}] {title}:\n{content}")
         
         return "\n".join(parts)

@@ -83,6 +83,20 @@ def test_build_context_includes_reference_artifacts():
     assert "四层递进论证" in ctx_text
 
 
+def test_build_context_not_over_truncated():
+    """EX-13：历史限制 5个/500字 导致文书缺料，现应放宽。"""
+    gen = _gen()
+    long_content = "长" * 1200            # 超过历史 500 字截断
+    arts = [
+        {"artifact_type": f"D{i}", "title": f"t{i}", "content": long_content}
+        for i in range(8)                    # 超过历史 5 个上限
+    ]
+    req = GenerationRequest(doc_type="defense", case_context=_ctx(), reference_artifacts=arts)
+    ctx_text = gen._build_context(req)
+    assert "D7" in ctx_text                 # 第 8 个仍在
+    assert ("长" * 600) in ctx_text          # 500 字之后的正文仍在
+
+
 def test_generate_fallback_when_no_template_no_llm():
     gen = _gen()
     req = GenerationRequest(doc_type="defense", case_context=_ctx())
