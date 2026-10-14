@@ -34,8 +34,8 @@ modules:
   - name: case-intelligence
     path: modules/case-intelligence
     status: active
-    version: 3.3.0
-    description: 案例智能分析模块（CLI工具，案件注册+提取物管理+模板归纳，半自动不引入RAG，v3.3 active）
+    version: 3.4.1
+    description: 案例智能分析模块（五维度提取+文件/ZIP上传录入+一键文书生成+目录扫描+AI辅助录入，CLI + Streamlit Web UI，v3.4.1）
     entry: bin/extract.py
     domain:
       subdomain: legal-case

@@ -29,21 +29,14 @@ allocations:
     web: 8080           # 前端 Nginx 容器对外端口
     fallback_api: 18000 # 后端端口被占用时备选
 
-  # Docker Compose 模块
+  # Streamlit 单进程模块（v3.4.1：无 Docker Compose 依赖，历史 NocoDB/Paperless 端口已废弃移除）
   case-intelligence:
-    nocodb: 8090            # NocoDB Web UI
-    paperless: 8091         # Paperless-ngx Web UI
-    gotenberg: 8092         # Gotenberg（PDF/文档转换）
-    postgres_nocodb: 5432   # NocoDB 专用 PostgreSQL
-    postgres_paperless: 5433 # Paperless 专用 PostgreSQL
-    redis: 6379             # Paperless 缓存
-    tika: 8093              # Apache Tika（备用 OCR）
-    ui: 18503               # Streamlit Web UI
-
+    ui: 18503               # Streamlit Web UI（对外唯一端口，含上传/提取/生成全链路）
+  
   # 雷盒控制台（Thunderbox MCP 可视化管理系统）
   thunderbox-console:
     backend: 18504     # FastAPI 网关（MCP 13 工具 → REST）
-    frontend: 18503    # 单文件 HTML SPA（直接 serve index.html，无需独立前端服务）
+    frontend: 18506    # 单文件 HTML SPA（18503 已归 case-intelligence UI，避免冲突）
 
 # 端口冲突解决策略
 conflict_resolution:

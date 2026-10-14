@@ -1,13 +1,20 @@
 # =============================================
 # case-intelligence 测试配置
 # =============================================
-import pytest
+import os
 import sys
 from pathlib import Path
+
+import pytest
 
 # 项目根目录
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
+
+# ▓§7.5 数据隔离（强制）：所有 src 模块（database/artifact_store 等）在 import 时
+# 读取 DATA_DIR → 必须在任何 src 导入前指向独立测试目录，禁止直连生产 data/
+# （历史事故：未隔离时测试曾向真实库写入 TestUser 垃圾数据）。
+os.environ.setdefault("DATA_DIR", str(PROJECT_ROOT / ".pytest-data"))
 
 # 测试数据目录
 TEST_DATA_DIR = PROJECT_ROOT / "tests" / "data"

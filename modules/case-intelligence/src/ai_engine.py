@@ -16,6 +16,26 @@ logger = logging.getLogger(__name__)
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 CONFIG_PATH = PROJECT_ROOT / "ai_engines.yaml"
 
+ENV_REF_PREFIX = "env://"
+
+
+def resolve_env_ref(value: str) -> str:
+    """解析密钥环境引用：`env://VAR` → 环境变量值；其余字符串原样直通。
+
+    安全红线 §6.2：密钥不明文入库。变量缺失时抛 KeyError 并提示修复路径。
+    """
+    if not isinstance(value, str) or not value.startswith(ENV_REF_PREFIX):
+        return value
+    var = value[len(ENV_REF_PREFIX):]
+    if not var:
+        return value
+    val = os.environ.get(var)
+    if val is None:
+        raise KeyError(
+            f"环境变量 {var} 未设置：请导出 {var}（或修改 ai_engines.yaml 使用其他密钥来源）"
+        )
+    return val
+
 
 @dataclass
 class EngineConfig:

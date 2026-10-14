@@ -1,0 +1,6 @@
+# case-intelligence Streamlit 全局配置
+# 端口/认证由启动命令与 config.py 管理，此处仅设上传限制等专项配置
+
+[server]
+# 上传大小上限（MB）：ZIP 包总体积守护（upload_ingest 另有解压后 512MB 校验）
+maxUploadSize = 500

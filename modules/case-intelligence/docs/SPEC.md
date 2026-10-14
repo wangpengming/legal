@@ -1,9 +1,10 @@
-# case-intelligence 模块规格文档 v3.4.0
+# case-intelligence 模块规格文档 v3.4.1
 
-> **版本**: 3.4.0 | **更新**: 2026-10-13
+> **版本**: 3.4.1 | **更新**: 2026-10-14
 > **状态**: active
-> **架构**: 五维度提取 + prompts 驱动 + 固定模板输出 + Streamlit Web UI
+> **架构**: 五维度提取 + prompts 驱动 + 固定模板输出 + Streamlit Web UI + 文件/ZIP 上传录入
 > **部署/域名**: thunderbox · `legal-case.tbox.ktvsky.com`（唯一域名 / `internal`），代码来源 GitHub（见 `AGENTS.md §10.4.5`）
+> **增补规格**: UI 上传提取与生成链路见 [SPEC-ui-upload.md](./SPEC-ui-upload.md)（v3.4.1）
 
 ---
 

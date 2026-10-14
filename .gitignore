@@ -103,3 +103,5 @@ outputs/
 # ---- F-032 代理人上传材料（PII 防护：劳动合同 / 身份证 含敏感信息）----
 modules/*/static/agents/
 .streamlit/
+!**/.streamlit/
+!**/.streamlit/config.toml    # 唯一例外：上传限制等专项配置（v3.4.1，部署分支需携带）

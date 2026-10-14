@@ -4,6 +4,55 @@
 
 ---
 
+## 2026-10-14 case-intelligence UI 上传提取 + 一键生成（v3.4.1，飞书后置）
+
+**类型**: feat + chore（UI 上传链路 + 密钥治理 + 注册表/文档收口）
+**模块**: case-intelligence
+**状态**: done
+**优先级**: P0（UI 上传提取 / 密钥）/ P1（注册表治理 / 文档 / 部署就绪）
+**版本**: 3.4.0 → 3.4.1
+**关联 SPEC**: `modules/case-intelligence/docs/SPEC-ui-upload.md`
+**关联提交**: 见 `CHANGELOG.md` 1.18.0
+
+### 背景
+
+用户裁决：对外界面仅 **UI + 飞书 Bot**，不提供对外 REST API；thunderbox 单应用单端口
+（`port: number`）故不引入 nginx/FastAPI 薄壳。原「服务器路径」录入在 thunderbox
+部署后失效（浏览器读不到服务器目录），必须补浏览器直传链路。
+
+### 落地清单
+
+- [x] **UI 上传录入**：`pages/3_扫描录入.py` 双签改造（📤 上传文件[推荐] / 📂 服务器路径）
+      + `src/upload_ingest.py`（上传落盘 + ZIP 安全解压：路径穿越/符号链接/大小/文件数四重校验）
+      + `.streamlit/config.toml`（`maxUploadSize=500MB`）
+- [x] **一键生成**：导入成功携带 `generate_case_id`（`st.session_state`）直达 `4_文书生成.py`，附「去生成文书」引导卡片
+- [x] **密钥治理**：`ai_engines.yaml` 明文 MiniMax key → `env://MINIMAX_API_KEY`；
+      `src/ai_engine.py` 新增 `resolve_env_ref`；`src/langchain_llm.py` 回落路径解析 env:// 引用；新增 `.env.example`
+- [x] **注册表治理**：`ports.yaml` case-intelligence 段清理废弃 6 端口（NocoDB/Paperless 时代）仅留 `ui: 18503`；
+      `thunderbox-console` frontend 18503→18506 冲突解除；`module.yaml`/`index.yaml` 版本与 features 同步 3.4.1
+- [x] **文档**：`docs/SPEC-ui-upload.md` 新增；`docs/SPEC.md`/`docs/README.md` 版本头同步；根 `README.md` 重写（旧 v3.0 NocoDB 文案 → v3.4 现状）
+- [x] **测试（TDD）**：`tests/test_upload_ingest.py`（14）+ `test_scan_page_pipeline.py`（2）+ `test_ai_engine_env.py`（8）；
+      全量 `pytest tests/` 135 passed / 5 skipped；`config.py` 尾部疑损坏经 `od -c` 证伪（shell 提示符残留），零修改
+
+### 验收标准
+
+- [x] 上传 ZIP/多文件 → 安全解压落盘 `data/inbox/` → 复用 scanner/parser/extractor/recognizer/importer 管道 → 入库 → 一键生成直达
+- [x] 服务器路径录入行为不回退（管理员克里底）
+- [x] `ai_engines.yaml` 无明文 `sk-` 密钥（安全回归测试锁定）；env 缺失时降级不崩溃
+- [x] 无真实 PII 入库（§6.1）；上传物仅落 `data/inbox/`（gitignore + volume）
+
+### 飞书 Bot 后置（🔴 本轮零代码，追记既有条目）
+
+用户明确：**飞书功能放到最后**，在既有「2026-10-12 飞书 Bot 独立应用申请与上线」
+条目基础上回填目标形态：
+
+1. **最高优先**：通过 Bot 将新案件按知识库 + 模板生成多维文档和分析（`/case generate` 全链路）
+2. **Bot 文件上传**：文档上传 → 下载 file_key → 复用 `upload_ingest` 落盘 → 提取新 data（`lark-oapi` 已在 requirements.txt）
+3. **文件夹上传调研项**：飞书消息不支持文件夹附件；候选路径 = 飞书云盘文件夹分享链接 → drive API 遍历下载（待调研，目标能力）
+4. 既有 fb01–fb08 清单与 Bot 生成/文件命令合并重排（开工前先更新该条目）
+
+---
+
 ## 2026-10-13 case-intelligence 功能补齐（UI 能力对齐 CLI + 缺陷清零）
 
 **类型**: feat + fix（功能补齐）
@@ -122,6 +171,11 @@ v3.3.0 主干闭环齐全，但功能面不全：CLI 有 12 类能力 UI 未暴�
 ---
 
 ## 2026-10-12 case-intelligence 飞书 Bot 独立应用申请与上线（含命名）
+
+> **2026-10-14 追记**：用户裁定飞书功能整体后置（本条目保持 proposed，开工前先完成后置重排）：
+> ① Bot 最高优先链路 = 文件上传 → 提取 → 按知识库+模板生成多维文档分析；
+> ② 文件消息支持下载 file_key（<lark-oapi> 已有）；③ 文件夹上传需调研（消息不支持，候选 = 云盘链接）；
+> ④ 详见 2026-10-14 v3.4.1 条目「飞书 Bot 后置」段。
 
 **类型**: feat（通道接入）
 **模块**: case-intelligence

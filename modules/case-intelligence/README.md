@@ -1,77 +1,93 @@
-# 同质化案件文档检索与规则系统 — 技术方案
+# case-intelligence — 案例智能分析模块
 
-> 版本: v3.0（文档检索 + 规则化知识库）
-> 日期: 2026-08-12
-> 目标服务器: `pengming@10.10.11.37`（Ubuntu 22.04 / 62GB RAM / 无需 GPU）
+> **版本**: v3.4.1 | **状态**: active | **更新时间**: 2026-10-14
+> **形态**: Python CLI + Streamlit Web UI（`:18503`）+ SQLite
+> **部署**: thunderbox · [`legal-case.tbox.ktvsky.com`](https://legal-case.tbox.ktvsky.com)（internal，GitHub 源码）
 
 ---
 
-## 核心结论
+## 模块定位
 
-| 维度 | 决策 |
+从案件材料中按 **D1-D5 五维度**（事实认定 / 法律依据 / 攻防策略 / 证据体系 / 赔偿裁量）提取结构化知识，沉淀为提取物知识库，并按固定模板（答辩状 / 质证意见 / 当庭陈述 / 证据目录）生成文书与分析。
+
+**核心原则：提取物是燃料、维度固定内容随案由变化、Prompts 是系统大脑。**
+
+## 核心能力
+
+| 能力 | 说明 |
 |------|------|
-| 核心方向 | 结构化案件数据库 + 文档全文检索 + 规则/检查清单，**不做 AI/LLM** |
-| 案件管理 | NocoDB（开源 Airtable，42K+ Stars） |
-| 文档管理 | Paperless-ngx（开源，44K+ Stars） |
-| 部署 | Docker Compose，7 个容器 |
-| 服务器 | 10.10.11.37（已有 Docker 环境） |
-| 资源新增 | ~2GB RAM / ~10GB 磁盘 / **无需 GPU** |
-| 用户门槛 | 极低（像 Excel 操作表格 + 拖拽上传 + 搜索关键词） |
+| 案源管理 | 注册 / 查询 / 画像标签，录入方式 CLI / UI / AI 三种 |
+| **UI 上传录入（v3.4.1）** | 浏览器直接上传多文件或 ZIP（文件夹打包）→ 安全解压 → 自动提取 → 查重 → 导入 |
+| **一键生成（v3.4.1）** | 导入成功后携带 case_id 直达文书生成页 |
+| 五维度提取 | D1 事实 / D2 法律 / D3 攻防 / D4 证据 / D5 赔偿，mock/basic/ollama/openai/minimax 五引擎可切换 |
+| 模板归纳 | 4 类固定文书模板，从提取物自动归档沉淀 |
+| 文书生成 | MD + DOCX 双格式，三级降级（模板 → 模板+LLM → LLM → fallback） |
+| 相似案件匹配 | `src/case_matcher.py` 规则打分（案由/年份/场景/D1-D5 覆盖） |
+| 目录扫描 | 服务器路径扫描兜底（递归扫描 + 文件分类 + 元数据推断） |
 
-**核心原则：搜得到、看得懂、用得上。不做 AI，只做检索。**
+## 快速上手
 
----
+```bash
+cd modules/case-intelligence
+
+# 首次：创建虚拟环境 + 安装依赖
+uv venv .venv --python 3.12
+uv pip install -p .venv -r requirements.txt pytest
+
+# 配置（复制后填写，勿提交真实值）
+cp .env.example .env            # MINIMAX_API_KEY / AUTH_USERS
+# 或直接导出环境变量（生产部署走 thunderbox env_vars 注入）
+export MINIMAX_API_KEY=sk-xxx
+
+# 启动 Web UI（后台，PID/日志在 .run/）
+python3 bin/start.py
+# → http://localhost:18503（登录账号见 AUTH_USERS 或默认 admin/admin123）
+
+# 状态 / 停止 / 重启
+python3 bin/status.py && python3 bin/stop.py && python3 bin/restart.py
+
+# CLI（16 子命令）
+python3 bin/extract.py --help
+
+# 测试（TDD 全量）
+.venv/bin/python -m pytest tests/ -v
+```
 
 ## 文档索引
 
 | 文档 | 内容 |
 |------|------|
+| [docs/README.md](docs/README.md) | 用户手册（目录结构/使用/运维） |
+| [docs/SPEC.md](docs/SPEC.md) | 模块规格 v3.4.1（对象模型/数据库/流程/健康检查） |
+| [docs/SPEC-ui-upload.md](docs/SPEC-ui-upload.md) | **UI 上传提取与生成链路增补规格（v3.4.1）** |
+| [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md) | 需求基线（MoSCoW + 用户故事） |
 | [requirements/01-原始需求.md](requirements/01-原始需求.md) | v1 原始需求（归档基线） |
-| [spec/01-方案设计v3.md](spec/01-方案设计v3.md) | **v3 方案设计**（架构/表结构/操作流程/部署/运维） |
-| requirements/02-需求v3.md | v3 需求文档（**待补**：尚未产出，规划中） |
-| research/01-文档检索与规则化方案调研.md | v3 技术调研（**待补**：尚未产出，规划中） |
+| [SPEC-UI.md](SPEC-UI.md) | Web UI 页面规格 |
+| [reference_index.yaml](reference_index.yaml) | 外部数据源引用索引 |
 
----
+## 安全红线（§6.2）
 
-## 架构概览
+- `ai_engines.yaml` 中密钥一律 `env://MINIMAX_API_KEY` 引用，**不明文入库**
+- `.env` 不提交；thunderbox 部署经 `env_vars` 注入 `MINIMAX_API_KEY` / `AUTH_USERS` / `DATA_DIR`
+- 上传物落盘 `data/inbox/`（volume 内持久，已 gitignore）；ZIP 解压含路径穿越 / 符号链接 / 大小 / 文件数四重校验
+
+## 目录结构（关键路径）
 
 ```
-                        用户浏览器
-                  ┌───────┴───────┐
-                  │               │
-         http://10.10.11.37:8090  http://10.10.11.37:8091
-         (NocoDB 案件+规则)       (Paperless-ngx 文档)
-                  │               │
-         ┌────────▼────────┐  ┌───▼──────────────────┐
-         │    NocoDB       │  │   Paperless-ngx       │
-         │  • 案件表        │  │  • 文档上传/OCR       │
-         │  • 检查清单表    │  │  • 全文检索           │
-         │  • 审核记录表    │  │  • 标签分类           │
-         │  • 经验规则表    │  │                       │
-         └─────────────────┘  └───────────────────────┘
+modules/case-intelligence/
+├── app.py                    # Streamlit 多页入口
+├── pages/                    # 7 页：登录/案件列表/详情/扫描录入/文书生成/模板管理/案件匹配/统计看板
+├── src/                      # 内核：database / scanner / parser / extractor / importer /
+│   │                         #      case_recognizer / case_matcher / document_generator /
+│   │                         #      upload_ingest（v3.4.1 上传落盘）/ ai_engine / langchain_llm
+├── bin/                      # 服务 4 件套 + extract CLI + health 探针
+├── prompts/                  # AI 提示词规则库（系统大脑，不可随意修改）
+├── data/                     # SQLite + inbox/ + 提取物（gitignore，部署挂卷 /data）
+├── tests/                    # pytest 全量（135+ passed）
+└── .streamlit/config.toml    # maxUploadSize=500MB（v3.4.1）
 ```
 
----
+## 遗留与规划（详见 backlog）
 
-## 版本历史
-
-| 版本 | 日期 | 方向 |
-|------|------|------|
-| v1 | - | AI 辅助分析（LangChain + PyMuPDF + FAISS） |
-| v2 | 2026-08-10 | MaxKB + Ollama + Qwen3 8B RAG 方案 |
-| **v3** | **2026-08-12** | **结构化案件数据库 + 文档检索 + 规则/检查清单** |
-
----
-
-## 部署与域名（thunderbox / 雷石盒子）
-
-> 本 README 为 v3 方案（NocoDB + Paperless 多容器）归档；模块现状已收敛为 **Python CLI + SQLite 轻量形态**（v3.3，`bin/extract.py` + Streamlit UI `:18503`）。
-
-云平台部署统一走雷石 **thunderbox**：
-
-- **本模块域名（唯一）**：`legal-case.tbox.ktvsky.com` · `access_mode=internal`
-- **代码来源**：**仅支持 GitHub** —— 部署前须先把代码迁移到 GitHub 仓库
-- **平台信息**：控制台 `https://box.tbox.ktvsky.com/` · MCP 端点 `https://api-box.tbox.ktvsky.com/mcp`
-
-> 🔴 **域名规则**：每个模块**有且仅有一个域名**，不得随意创建；域名统一登记 `shared/config/domains.yaml`（详见 `AGENTS.md §10.4.5`）。
-> 📖 系统级部署手册：[docs/deployment-thunderbox.md](../../docs/deployment-thunderbox.md)
+- 飞书 Bot 主线（文件上传→提取→生成，`fb01`-`fb08`）——**整体后置**，见 `docs/requirements/backlog.md`
+- 文件夹上传：当前以 ZIP 打包替代（浏览器限制），飞书云盘文件夹分享链路待调研

@@ -25,13 +25,26 @@ def load_llm_config() -> Dict[str, Any]:
 
 
 def get_minimax_api_key() -> Optional[str]:
-    """获取 MiniMax API Key（优先环境变量，回落 ai_engines.yaml）"""
+    """获取 MiniMax API Key（优先环境变量，回落 ai_engines.yaml 的 env:// 引用）。
+
+    yaml 中 api_key 为 `env://MINIMAX_API_KEY` 且环境变量未设置 → 返回 None
+    （调用方 is_available() 检查后降级到 Basic 引擎）。
+    """
     if os.environ.get("MINIMAX_API_KEY"):
         return os.environ["MINIMAX_API_KEY"]
     config = load_llm_config()
     engines = config.get("engines", {})
     minimax = engines.get("minimax", {})
-    return minimax.get("api_key")
+    raw_key = minimax.get("api_key") or ""
+    # 解析 env:// 引用（兼容包/顶层双导入模式）
+    try:
+        from .ai_engine import resolve_env_ref
+    except ImportError:
+        from ai_engine import resolve_env_ref
+    try:
+        return resolve_env_ref(raw_key)
+    except KeyError:
+        return None
 
 
 def get_minimax_config() -> Dict[str, Any]:

@@ -16,7 +16,7 @@ engines:
   # ============================================================
   minimax:
     enabled: true
-    api_key: "sk-cp-aRsZSVErQAJ8ckzGlHpVV1S-2FV2hAWDhcrk1efzjujmHx2gv37-ry05V7OQpC_kB_DHHn4D-bvwc9zRvU814Iw6ADpPRBeB6LCXY0mUIy6T1DV96u4MCXU"
+    api_key: "env://MINIMAX_API_KEY"  # 密钥走环境变量（§6.2 红线，不明文入库）
     base_url: "https://api.minimax.cn/v1"
     model: "MiniMax-Text-01"
     timeout: 120
