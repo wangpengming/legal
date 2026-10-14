@@ -1,8 +1,8 @@
-# case-intelligence 模块规格文档 v3.3.0
+# case-intelligence 模块规格文档 v3.4.0
 
-> **版本**: 3.3.0 | **更新**: 2026-10-12
+> **版本**: 3.4.0 | **更新**: 2026-10-13
 > **状态**: active
-> **架构**: 五维度提取 + prompts 驱动 + 固定模板输出
+> **架构**: 五维度提取 + prompts 驱动 + 固定模板输出 + Streamlit Web UI
 > **部署/域名**: thunderbox · `legal-case.tbox.ktvsky.com`（唯一域名 / `internal`），代码来源 GitHub（见 `AGENTS.md §10.4.5`）
 
 ---
@@ -32,11 +32,20 @@
 modules/case-intelligence/
 ├── src/
 │   ├── __init__.py
-│   ├── database.py              # SQLite: cases + artifacts + templates
-│   ├── artifact_store.py         # 提取物 CRUD
-│   ├── template_store.py         # 模板 CRUD（output_templates/）
-│   ├── case_recognizer.py        # 案件匹配（D1-D5 画像）
+│   ├── database.py              # SQLite: cases + artifacts + templates（含 update_case/delete_case）
+│   ├── artifact_store.py         # 提取物 CRUD（+ purge_case_dir）
+│   ├── template_store.py         # 模板 CRUD（output_templates/，含 update/delete）
+│   ├── case_recognizer.py        # 案件查重（check）
+│   ├── case_matcher.py           # 相似案件匹配（规则打分，Top-N）
+│   ├── extractor.py             # AI 提取（+ extracted_from_dict）
+│   ├── document_generator.py     # 文书生成（模板→模板+LLM→LLM→fallback）
 │   └── extractor_cli.py          # CLI 工具
+├── app.py                       # Streamlit 多页入口
+├── config.py                    # UI 配置（PORT / AUTH_USERS / PAGE_SIZE）
+├── SPEC-UI.md                   # UI 规格
+├── ui/                          # UI 工具层（auth / nav / utils）
+├── pages/                       # Streamlit 页面（1_登录 / 2_案件列表 / 2_案件详情 /
+│                                #   3_扫描录入 / 4_文书生成 / 5_统计看板 / 6_模板管理 / 7_案件匹配）
 ├── data/
 │   ├── case_registry.db          # SQLite 数据库
 │   └── artifacts/                # 提取物文件（按 case_id 目录）
@@ -90,14 +99,18 @@ modules/case-intelligence/
 | plaintiff | TEXT | 原告 |
 | defendant | TEXT | 被告 |
 | cause | TEXT | 案由 |
+| court | TEXT | 管辖法院（LLM 提取或案号派生） |
+| year | TEXT | 案件年份 |
 | result | TEXT | 案件结果 |
 | source_path | TEXT | 原始材料路径 |
+| source_files | TEXT | 原始材料文件清单（JSON） |
 | status | TEXT | pending / extracted / archived |
 | extracted_at | TEXT | 提取时间 |
 | notes | TEXT | 备注 |
 | created_at | TEXT | 创建时间 |
 | entry_method | TEXT | 录入方式（CLI / UI / AI） |
 | scene | TEXT | 涉案场景 |
+| quality | TEXT | 提取质量（A/B/C） |
 | plaintiff_auth_level | TEXT | 原告授权层级 |
 | defendant_auth_status | TEXT | 被告授权状态 |
 
@@ -212,7 +225,7 @@ office-workflow-litigation-doc（诉讼文书生成）
 {
   "status": "ok",
   "module": "case-intelligence",
-  "version": "3.3.0",
+  "version": "3.4.0",
   "ui": { "running": true, "port": 18503, "endpoint": "/_stcore/health", "http_status": 200, "ok": true },
   "db": { "ok": true, "initialized": true, "total_cases": 93, "total_artifacts": 12, "total_templates": 7 }
 }

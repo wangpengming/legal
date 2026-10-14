@@ -308,6 +308,47 @@ def update_case_status(
     conn.close()
 
 
+# update_case 白名单（防止任意列注入）
+CASE_UPDATABLE_FIELDS = (
+    "case_number", "case_name", "plaintiff", "defendant", "cause", "court",
+    "year", "result", "source_path", "source_files", "status", "notes",
+    "entry_method", "scene", "plaintiff_auth_level", "defendant_auth_status",
+    "quality",
+)
+
+
+def update_case(
+    case_id: str, db_path: Optional[Path] = None, **fields
+) -> Optional[dict]:
+    """按白名单更新案件字段，返回更新后的记录（无有效字段则原样返回）。"""
+    updates = {k: v for k, v in fields.items() if k in CASE_UPDATABLE_FIELDS}
+    if not updates:
+        return get_case(case_id, db_path)
+    conn = _get_conn(db_path)
+    try:
+        assignments = ", ".join(f"{k} = ?" for k in updates)
+        params = list(updates.values()) + [case_id]
+        try:
+            conn.execute(f"UPDATE cases SET {assignments} WHERE id = ?", params)
+            conn.commit()
+        except sqlite3.IntegrityError as e:
+            raise ValueError(f"案号冲突或数据错误: {e}")
+    finally:
+        conn.close()
+    return get_case(case_id, db_path)
+
+
+def delete_case(case_id: str, db_path: Optional[Path] = None) -> None:
+    """删除案件及其全部提取物记录（级联）；文件层由调用方清理。"""
+    conn = _get_conn(db_path)
+    try:
+        conn.execute("DELETE FROM artifacts WHERE case_id = ?", (case_id,))
+        conn.execute("DELETE FROM cases WHERE id = ?", (case_id,))
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def search_cases(
     query: str, db_path: Optional[Path] = None
 ) -> list[dict]:
@@ -576,6 +617,36 @@ def increment_usage(
     )
     conn.commit()
     conn.close()
+
+
+# update_template 白名单
+TEMPLATE_UPDATABLE_FIELDS = ("name", "category", "content")
+
+
+def update_template(
+    template_id: str, db_path: Optional[Path] = None, **fields
+) -> Optional[dict]:
+    """按白名单更新模板（None 值忽略），返回更新后的记录。"""
+    updates = {
+        k: v for k, v in fields.items()
+        if k in TEMPLATE_UPDATABLE_FIELDS and v is not None
+    }
+    if "category" in updates and updates["category"] not in TEMPLATE_CATEGORIES:
+        raise ValueError(f"无效 category: {updates['category']}")
+    if not updates:
+        return get_template(template_id, db_path)
+    updates["updated_at"] = datetime.now(timezone.utc).isoformat()
+    conn = _get_conn(db_path)
+    try:
+        assignments = ", ".join(f"{k} = ?" for k in updates)
+        conn.execute(
+            f"UPDATE templates SET {assignments} WHERE id = ?",
+            list(updates.values()) + [template_id],
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    return get_template(template_id, db_path)
 
 
 def delete_template(

@@ -1,13 +1,13 @@
 ---
 type: requirements
 module: case-intelligence
-version: 3.3.0
-updated: 2026-10-12
+version: 3.4.0
+updated: 2026-10-13
 ---
 
-# case-intelligence 需求基线 v3.3.0
+# case-intelligence 需求基线 v3.4.0
 
-> **版本**: 3.3.0 | **更新**: 2026-10-12
+> **版本**: 3.4.0 | **更新**: 2026-10-13
 > **状态**: active
 > **模块**: case-intelligence
 
@@ -175,23 +175,24 @@ updated: 2026-10-12
 
 ### 5.2 Prompts 规则库
 
-- [ ] 3个以上提示词实际测试通过
-- [ ] prompts.yaml 版本更新到 v1.3
+- [x] 3个以上提示词实际测试通过（提取 D1-D5 提示词已用于批量提取；`tests/test_extraction_prompt.py` 覆盖）
+- [ ] prompts.yaml 版本更新到 v1.3（当前固化 **v1.2**；升版单独立项）
 
 ### 5.3 固定模板库
 
-- [ ] 每类模板 ≥ 2 个（通用版 + 专用版）
-- [ ] 所有模板含 YAML 头部元数据
+- [x] 每类模板 ≥ 2 个（通用版 + 专用版）——答辩状/质证意见/当庭陈述/证据目录 各 2（另有「其他」1）
+- [x] 所有模板含 YAML 头部元数据（`template_id`/`name`/`category`/`source_artifacts`/`source_case_ids`）
 
 ### 5.4 文档
 
-- [ ] docs/REQUIREMENTS.md 完成
-- [ ] docs/README.md 完成
+- [x] docs/REQUIREMENTS.md 完成
+- [x] docs/README.md 完成
+- [x] SPEC-UI.md 更新至 v3.4.0（7 导航页 + 详情页、PAGE_SIZE=20、健康度口径）——见 `SPEC-UI.md`
 
 ### 5.5 基础设施
 
-- [ ] ai_engines.yaml 配置完成
-- [ ] 单元测试覆盖率 ≥ 70%
+- [x] ai_engines.yaml 配置完成
+- [ ] 单元测试覆盖率 ≥ 70%（本机无 pytest/coverage，覆盖率未测量；v3.4.0 已补 `test_case_crud`/`test_case_matcher`/`test_template_crud`/`test_ui_utils` 等 stdlib 单测，可独立运行）
 
 ---
 
@@ -199,6 +200,7 @@ updated: 2026-10-12
 
 | 版本 | 日期 | 更新内容 |
 |------|------|---------|
+| 3.4.0 | 2026-10-13 | 功能补齐（对齐 CLI）：UI 案件 CRUD + 详情页；模板管理页（增删改 + JSON 导入）；相似案件匹配（`case_matcher` + CLI `match` + UI）；文书生成三级降级；AI 引擎可切换；缺陷 C1-C9 清零；§5.2/5.3/5.4/5.5 复核 |
 | 3.3.0 | 2026-10-12 | Streamlit Web UI + 目录扫描录入 + AI 引擎配置 + LangChain 文书生成 + prompts 固化 v1.2 + 飞书 Bot |
 | 3.2.0 | 2026-09-27 | 历史案件88个入库，OCR批量提取完善 |
 | 3.1.0 | 2026-09-22 | CLI框架、数据库、Prompts初始化 |

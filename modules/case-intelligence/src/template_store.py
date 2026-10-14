@@ -154,6 +154,42 @@ def increment_usage(
     db.increment_usage(template_id, db_path)
 
 
+def update_template(
+    template_id: str,
+    name: Optional[str] = None,
+    content: Optional[str] = None,
+    category: Optional[str] = None,
+    db_path: Optional[Path] = None,
+) -> Optional[dict]:
+    """更新模板：改 DB + 重写 Markdown 文件（分类/名称变化时删旧文件）。"""
+    old = db.get_template(template_id, db_path)
+    if not old:
+        return None
+    template = db.update_template(
+        template_id, db_path=db_path, name=name, content=content, category=category
+    )
+    old_fp = get_template_file_path(old)
+    if old_fp and old_fp.exists():
+        old_fp.unlink()
+    d = _ensure_dir(TEMPLATES_ROOT / template["category"])
+    filepath = d / f"{template['id'][:8]}_{_slug(template['name'])}.md"
+    filepath.write_text(_build_template_md(template), encoding="utf-8")
+    template["file_path"] = str(filepath)
+    return template
+
+
+def delete_template(
+    template_id: str, db_path: Optional[Path] = None
+) -> None:
+    """删除模板：删 DB + 删 Markdown 文件。"""
+    t = db.get_template(template_id, db_path)
+    if t:
+        fp = get_template_file_path(t)
+        if fp and fp.exists():
+            fp.unlink()
+    db.delete_template(template_id, db_path)
+
+
 def search_templates(
     query: str, db_path: Optional[Path] = None
 ) -> list[dict]:

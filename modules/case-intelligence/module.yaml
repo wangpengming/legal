@@ -1,34 +1,36 @@
 name: case-intelligence
-version: 3.3.0
+version: 3.4.0
 status: active
-description: 案例智能分析模块（五维度提取+目录扫描+AI辅助录入+prompts驱动+固定模板输出，CLI工具）
+description: 案例智能分析模块（五维度提取+目录扫描+AI辅助录入+prompts驱动+固定模板输出，CLI + Streamlit Web UI）
 entry: bin/extract.py
 deps: []
 created: 2026-08-10
 integrated: 2026-08-17
-updated: 2026-09-26
+updated: 2026-10-13
 tech_stack:
-  - Python 3（CLI工具，无Web服务）
+  - Python 3（CLI 工具 + Streamlit Web UI，端口 18503）
   - SQLite（case_registry.db，三表：cases/artifacts/templates）
   - Markdown（提取物/模板/提示词存储格式，含YAML frontmatter）
   - prompts/（AI提示词规则库，8个提示词文件，v1.2.0）
   - python-docx（Word文档解析）
   - pdfplumber/pymupdf（PDF解析）
 features:
-  - 案源管理（注册+识别+画像标签，录入方式CLI/UI/AI）
+  - 案源管理（注册+识别+画像标签，录入方式CLI/UI/AI；**UI 新建/编辑/删除闭环**）
   - 五维度提取（D1事实认定/D2法律依据/D3攻防策略/D4证据体系/D5赔偿裁量，固定维度内容随案由变化）
-  - 提取物知识库（按D1-D5组织，写DB+写MD文件）
+  - 提取物知识库（按D1-D5组织，写DB+写MD文件；**UI 手动提取 + 归档为模板**）
   - 模板归纳（output_templates/，4种固定模板：答辩状/质证意见/当庭陈述/证据目录）
-  - 文书生成（output/，按案件+日期组织，MD+DOCX格式）
+  - 文书生成（output/，按案件+日期组织，MD+DOCX格式；**三级降级：模板→模板+LLM→LLM→fallback**）
   - prompts驱动（prompts/，AI操作的规则大脑，不可随意修改）
-  - 案件匹配（D1-D5画像标签匹配合相似案件）
+  - 相似案件匹配（`src/case_matcher.py` 规则打分 + CLI `match` + UI 匹配页）
+  - 模板管理 UI（list/search/show + 新增/编辑/删除 + JSON 导入）
   - 外部数据源引用（reference_index.yaml索引，不移动原文件）
-  - 半自动CLI（register/extract/promote/complete/search/check/report/list/templates）
+  - 半自动CLI（register/link/extract/promote/complete/list/search/check/health/report/artifacts/match/export/templates/import/scan）
   - 提取操作日志（EXTRACTION_LOG.md）
   - 目录扫描（scan命令，递归扫描+文件分类+OCR噪音过滤+元数据推断）
   - 文件解析（docx/pdf/txt/md，支持 python-docx + pdfplumber）
   - AI辅助录入（scan --ai --import，调用 LLM 按 D1-D5 提取结构化信息）
-  - AI引擎支持（Mock测试引擎 + Ollama本地引擎 + 抽象接口可扩展）
+  - AI引擎支持（UI/CLI 引擎可切换：mock/basic/ollama/openai/minimax）
+  - Streamlit Web UI（`:18503`，7 页：登录/案件列表/案件详情/扫描录入/文书生成/模板管理/案件匹配/统计看板）
 port:
   ui: 18503       # Streamlit Web UI（与 shared/config/ports.yaml 一致）
 domain:
@@ -39,4 +41,6 @@ domain:
 readme: docs/README.md
 spec: docs/SPEC.md
 spec_scan: docs/SPEC-scan-intake.md
+spec_feature_completion: docs/SPEC-feature-completion.md
+spec_ui: SPEC-UI.md
 reference: reference_index.yaml

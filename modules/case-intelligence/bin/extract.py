@@ -30,6 +30,7 @@ from src import scanner
 from src import parser
 from src import extractor
 from src import importer
+from src import case_matcher
 
 
 # 引擎 → artifact generation_method（写入 artifacts.generation_method）
@@ -664,6 +665,25 @@ def cmd_artifacts(args) -> None:
         )
 
 
+def cmd_match(args) -> None:
+    """列出与某案件相似的案件（规则打分）。"""
+    case = db.get_case(args.case_id)
+    if not case:
+        print(f"❌ 案件不存在: {args.case_id}")
+        sys.exit(1)
+    matches = case_matcher.match_cases(args.case_id, limit=args.limit)
+    print(f"\n🔗 相似案件（基准: {case['case_name']} | 案由: {case.get('cause') or '未知'}）")
+    print("=" * 60)
+    if not matches:
+        print("未找到相似案件")
+        return
+    for i, m in enumerate(matches, 1):
+        print(f"  {i}. [{m['score']}分] {m['case_name']}（{m.get('case_number') or '无案号'}）")
+        print(f"     案由: {m.get('cause') or '未知'} | 年份: {m.get('year') or '未知'} | ID: {m['id']}")
+        if m.get("reasons"):
+            print(f"     依据: {'；'.join(m['reasons'])}")
+
+
 # =============================================
 # import 命令（从JSON增量导入）
 # =============================================
@@ -705,14 +725,7 @@ def cmd_import(args) -> None:
         print(f"\r[{bar}] {progress}% | {i}/{total} | {case_name}", end='', flush=True)
         
         # 构建 ExtractedCase（共用解析器，保证字段与 AI 提取一致）
-        extracted = extractor.ExtractedCase()
-        extractor._apply_case_scalars(extracted, case_data)
-        extracted.source_files = case_data.get("source_files", [])
-        extracted.plaintiffs = extractor._party_list(case_data.get("plaintiffs"), "原告")
-        extracted.defendants = extractor._party_list(case_data.get("defendants"), "被告")
-        extractor._apply_dims(extracted, case_data)
-        if case_data.get("quality"):
-            extracted.quality = str(case_data.get("quality"))
+        extracted = extractor.extracted_from_dict(case_data)
         
         # 增量导入（跳过已存在）
         if extracted.case_number:
@@ -985,6 +998,12 @@ def main() -> None:
     p = sub.add_parser("artifacts", help="列出案件下所有提取物")
     p.add_argument("--case-id", required=True, dest="case_id")
     p.set_defaults(func=cmd_artifacts)
+
+    # match
+    p = sub.add_parser("match", help="查找相似案件（规则打分）")
+    p.add_argument("--case-id", required=True, dest="case_id")
+    p.add_argument("--limit", type=int, default=5, help="返回条数（默认5）")
+    p.set_defaults(func=cmd_match)
 
     # export
     p = sub.add_parser("export", help="导出提取物为 DOCX/Markdown")

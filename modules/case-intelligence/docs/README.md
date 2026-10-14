@@ -1,6 +1,6 @@
 # case-intelligence 模块用户手册
 
-> **版本**: 3.3.0 | **更新**: 2026-10-12
+> **版本**: 3.4.0 | **更新**: 2026-10-13
 > **模块**: 案件智能分析系统
 
 ---
@@ -21,10 +21,15 @@ case-intelligence 是法务部工程化系统的案件智能分析模块，提�
 ```
 modules/case-intelligence/
 ├── bin/
-│   ├── extract.py          # CLI 入口（register/scan/search/report…）
+│   ├── extract.py          # CLI 入口（register/link/extract/promote/complete/list/search/…）
 │   ├── start|stop|restart|status.py     # 服务 4 件套（另有 .sh/.bat 跨平台壳层）
 │   ├── start_ui|stop_ui|restart_ui|status_ui.py  # Streamlit UI 服务实现（被 4 件套委托）
 │   └── health.py           # 健康探针（JSON，只读）
+├── app.py                  # Streamlit 多页应用入口
+├── config.py               # UI 配置（PORT / AUTH_USERS / PAGE_SIZE）
+├── SPEC-UI.md              # Web UI 规格
+├── ui/                      # UI 工具层（auth / nav 导航 / utils 健康度）
+├── pages/                   # 页面：登录/案件列表/案件详情/扫描录入/文书生成/模板管理/案件匹配/统计看板
 ├── data/
 │   └── case_registry.db    # SQLite 数据库
 ├── prompts/                 # AI 提示词规则库
@@ -35,11 +40,14 @@ modules/case-intelligence/
 ├── output_templates/        # 固定文书模板
 ├── output/                 # 生成的文书
 ├── scripts/                 # 工具脚本
+├── tests/                   # 单测（stdlib，可用 python3 直接运行）
 ├── src/                     # 核心代码
-│   ├── database.py         # 数据库操作
+│   ├── database.py         # 数据库操作（+ update_case / delete_case）
 │   ├── scanner.py          # 目录扫描
 │   ├── parser.py          # 文件解析
 │   ├── extractor.py        # AI 提取
+│   ├── case_matcher.py     # 相似案件匹配（规则打分）
+│   ├── document_generator.py  # 文书生成（三级降级）
 │   └── importer.py         # 数据导入
 └── docs/                   # 文档
 ```
@@ -80,21 +88,30 @@ python bin/extract.py --help
 输出：
 
 ```
-usage: extract.py [-h] {scan,register,extract,promote,complete,check,search,list,report} ...
+usage: extract.py [-h]
+                  {register,link,extract,promote,complete,list,search,check,health,report,artifacts,match,export,templates,import,scan}
+                  ...
 
-案件智能分析 CLI
+case-intelligence 提取 CLI
 
 positional arguments:
-  {scan,register,extract,promote,complete,check,search,list,report}
-    scan       扫描目录，发现案件材料
-    register   登记新案件
-    extract    从案件材料提取 D1-D5 维度
-    promote    将提取物提升为模板
-    complete   标记案件为已完成
-    check      查询案件详情
-    search     搜索案件
-    list       列出所有案件
-    report     生成统计报告
+  {register,link,extract,promote,complete,list,search,check,health,report,artifacts,match,export,templates,import,scan}
+    register            注册新案件
+    link                关联原始材料路径
+    extract             提取 Artifact
+    promote             将 Artifact 归纳为 Template
+    complete            标记案件为 extracted
+    list                列出所有案件
+    search              搜索案件
+    check               识别新案件是否重复
+    health              检查案件健康度
+    report              生成统计报告
+    artifacts           列出案件下所有提取物
+    match               查找相似案件（规则打分）
+    export              导出提取物为 DOCX/Markdown
+    templates           模板管理（list/search/show）
+    import              从JSON文件增量导入案件
+    scan                扫描目录并 AI 辅助录入案件
 ```
 
 ---
@@ -214,6 +231,33 @@ python bin/extract.py report
   C级（一般）：3
 ```
 
+### 4.7 match - 相似案件匹配
+
+```bash
+# 查找与指定案件相似的 Top-5 案件（按案由/年份/场景/D1-D5 覆盖规则打分）
+python bin/extract.py match --case-id <case_id>
+
+# 指定返回条数
+python bin/extract.py match --case-id <case_id> --limit 10
+```
+
+> 规则打分（非向量检索）：案由 40（等值）/20（包含）、年份邻近 15/10/5、场景命中 15、
+> D1-D5 维度覆盖重合度按比例折算（最高 30），总分封顶 100。输出含分值 + 命中理由。
+
+### 4.8 其他命令速查
+
+| 命令 | 用途 |
+|------|------|
+| `link --case-id <id> --source-path <path>` | 关联原始材料路径 |
+| `health --case-id <id>` | 案件健康度（6 项：案号/原告/被告/案由/法院/提取物） |
+| `artifacts --case-id <id>` | 列出案件下所有提取物 |
+| `export --case-id <id> [--docx]` | 导出提取物为 Markdown / DOCX |
+| `templates list\|search\|show` | 模板管理（只读三命令） |
+| `import --file <path.json>` | 从 JSON 文件增量导入案件 |
+
+> **Web UI 等价能力**：`2_案件列表`（新建/筛选/分页/健康度）、`2_案件详情`（编辑/删除/关联/
+> 手动提取/导出/标记完成/相似案件入口）、`6_模板管理`（增删改 + JSON 导入）、`7_案件匹配`。
+
 ---
 
 ## 5. 批量工具脚本
@@ -324,6 +368,7 @@ cp data/case_registry.db data/case_registry.db.bak
 
 | 版本 | 日期 | 更新内容 |
 |------|------|---------|
+| 3.4.0 | 2026-10-13 | 功能补齐：UI 新增「案件详情/模板管理/案件匹配」3 页；案件 CRUD（新建/编辑/删除）；模板增删改 + JSON 导入；相似案件匹配（规则打分，CLI `match` + UI）；文书生成三级降级（模板→模板+LLM→LLM→fallback）；AI 引擎可切换；缺陷修复 C1-C9（分页/健康度口径/查重/DOCX 临时文件/`AUTH_USERS` 环境变量等） |
 | 3.3.0 | 2026-10-12 | Streamlit Web UI + 目录扫描录入 + AI 引擎配置 + LangChain 文书生成 + prompts 固化 v1.2 + 飞书 Bot |
 | 3.2.0 | 2026-09-27 | 历史案件88个入库，OCR批量提取 |
 | 3.1.0 | 2026-09-22 | CLI框架、数据库、Prompts初始化 |

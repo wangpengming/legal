@@ -1215,3 +1215,16 @@ def extract_case(
     """提取案件信息"""
     engine = get_engine(engine_type)
     return engine.extract(contents, case_name)
+
+
+def extracted_from_dict(case_data: dict) -> ExtractedCase:
+    """从 JSON dict 构建 ExtractedCase（字段解析与 AI 提取共用）。"""
+    extracted = ExtractedCase()
+    _apply_case_scalars(extracted, case_data)
+    extracted.source_files = case_data.get("source_files", [])
+    extracted.plaintiffs = _party_list(case_data.get("plaintiffs"), "原告")
+    extracted.defendants = _party_list(case_data.get("defendants"), "被告")
+    _apply_dims(extracted, case_data)
+    if case_data.get("quality"):
+        extracted.quality = str(case_data.get("quality"))
+    return extracted

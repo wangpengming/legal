@@ -1,7 +1,15 @@
 # 统计看板页
+import sys
+from pathlib import Path
+
 import streamlit as st
-from ui.auth import require_auth, logout
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from ui.auth import require_auth
+from ui.nav import render_sidebar
 from ui.utils import get_summary, get_cause_distribution, get_pending_cases
+from src import database as db
 
 require_auth()
 
@@ -11,17 +19,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# 侧边栏
-with st.sidebar:
-    st.title("📋 导航")
-    st.page_link("pages/2_案件列表.py", label="案件列表", icon="📋")
-    st.page_link("pages/3_扫描录入.py", label="扫描录入", icon="📁")
-    st.page_link("pages/4_文书生成.py", label="文书生成", icon="📝")
-    st.page_link("pages/5_统计看板.py", label="统计看板", icon="📊")
-    st.divider()
-    if st.button("退出登录"):
-        logout()
-        st.rerun()
+render_sidebar()
 
 st.title("📊 统计看板")
 
@@ -63,6 +61,34 @@ if pending:
         st.caption(f"  案号: {case.get('case_number', '无')}")
 else:
     st.success("🎉 所有案件已提取完成！")
+
+st.divider()
+
+# 最近操作记录（按入库时间倒序取案件 + 最近写入的提取物）
+st.subheader("🕒 最近操作记录")
+recent_cases = db.list_cases()[:5]
+if recent_cases:
+    for case in recent_cases:
+        st.write(f"- 🗂️ **{case.get('case_name', '未命名')[:40]}** ｜ {case.get('created_at', '')[:19]}")
+else:
+    st.caption("暂无记录")
+
+recent_artifacts = db.list_all_artifacts()[:5]
+if recent_artifacts:
+    st.caption("最近写入的提取物：")
+    for art in recent_artifacts:
+        st.write(f"  - 📦 {art.get('title', art.get('artifact_type'))}（{art.get('artifact_type')}）｜ {art.get('created_at', '')[:19]}")
+
+st.divider()
+
+# 扫描历史（本次会话，最近 5 条）
+st.subheader("📁 扫描历史（本次会话）")
+history = st.session_state.get("scan_history", [])
+if history:
+    for h in history[:5]:
+        st.write(f"- {h.get('time', '')} ｜ {h.get('case_name', '未命名')} ｜ {h.get('path', '')}")
+else:
+    st.caption("暂无扫描记录")
 
 st.divider()
 

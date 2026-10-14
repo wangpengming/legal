@@ -23,7 +23,7 @@ st.success(f"已登录: {st.session_state.username}")
 st.info("请从侧边栏选择功能")
 
 # 导航链接
-col1, col2, col3, col4 = st.columns(4)
+col1, col2, col3, col4, col5, col6 = st.columns(6)
 with col1:
     st.page_link("pages/2_案件列表.py", label="📋 案件列表")
 with col2:
@@ -31,4 +31,8 @@ with col2:
 with col3:
     st.page_link("pages/4_文书生成.py", label="📝 文书生成")
 with col4:
+    st.page_link("pages/6_模板管理.py", label="🧩 模板管理")
+with col5:
+    st.page_link("pages/7_案件匹配.py", label="🔗 案件匹配")
+with col6:
     st.page_link("pages/5_统计看板.py", label="📊 统计看板")

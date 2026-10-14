@@ -184,6 +184,13 @@ def delete_artifact(
     db.delete_artifact(artifact_id, db_path)
 
 
+def purge_case_dir(case_id: str) -> None:
+    """删除案件的提取物目录（随案例删除清理文件层）。"""
+    d = _artifact_dir(case_id)
+    if d.exists():
+        shutil.rmtree(d, ignore_errors=True)
+
+
 def export_case_artifacts(
     case_id: str, db_path: Optional[Path] = None
 ) -> dict:

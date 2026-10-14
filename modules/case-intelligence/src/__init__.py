@@ -7,6 +7,7 @@ from . import scanner
 from . import parser
 from . import extractor
 from . import importer
+from . import case_matcher
 
 __all__ = [
     "database",
@@ -17,4 +18,5 @@ __all__ = [
     "parser",
     "extractor",
     "importer",
+    "case_matcher",
 ]

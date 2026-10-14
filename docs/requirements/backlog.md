@@ -4,6 +4,53 @@
 
 ---
 
+## 2026-10-13 case-intelligence 功能补齐（UI 能力对齐 CLI + 缺陷清零）
+
+**类型**: feat + fix（功能补齐）
+**模块**: case-intelligence
+**状态**: done
+**优先级**: P0（缺陷）/ P1（功能面）/ P2（增强）
+**版本**: 3.3.0 → 3.4.0
+**关联 SPEC**: `modules/case-intelligence/docs/SPEC-feature-completion.md`
+**关联提交**: 见 `CHANGELOG.md` 1.17.0
+**排除**: 🔴 飞书 Bot 全部工作（`fb01`–`fb08`、`src/lark_bot.py`）——本轮零改动。
+
+### 背景
+
+v3.3.0 主干闭环齐全，但功能面不全：CLI 有 12 类能力 UI 未暴露；需求文档声明 4 项未实现；9 处缺陷；
+`module.yaml` 声称的「案件匹配」「4 类固定模板生成」未落地。本条目 + SPEC 定义补齐范围。
+
+### 缺口分类（详见 SPEC §3）
+
+| 类 | 数量 | 摘要 |
+|----|------|------|
+| A CLI 有 / UI 无 | 12 | register/link/extract/promote/complete/check/health/export/templates/import/案件编辑删除/匹配 |
+| B 需求声明未实现 | 4 | US-03 匹配、US-02 引擎切换、US-04 模板增删改、模板化生成 |
+| C 缺陷 | 9 | 分页 bug、健康度口径、扫描无查重、死按钮、DOCX 泄漏、硬编码账号、PROJECT_ROOT、source_ref 截断、PAGE_SIZE 漂移 |
+| D 文档漂移 | 2 | SPEC-UI（扫描历史/最近操作/每页20）、REQUIREMENTS §5 勾选 |
+
+### 落地清单
+
+- [x] **FC-01** M0 缺陷清零：C1–C9（分页/健康度/查重/死按钮/DOCX/账号 env/PROJECT_ROOT/source_ref/PAGE_SIZE）
+- [x] **FC-02** `src/database.py`：`update_case` + `delete_case`（级联）
+- [x] **FC-03** 详情页：编辑/删除/关联/手动提取/归档模板/标记完成/导出提取物/相似入口
+- [x] **FC-04** 列表页：分页修复 + 健康度统一 + 新建案件表单 + 标记完成
+- [x] **FC-05** 扫描录入：接入查重 + AI 引擎下拉 + 「选择文件夹」（改为路径提示，去死按钮）
+- [x] **FC-06** 文书生成：接 `DocumentGenerator` 三级降级 + 引擎下拉 + DOCX 清理
+- [x] **FC-07** 新增 `pages/6_模板管理.py`：list/search/show + 增删改 + promote + JSON 导入
+- [x] **FC-08** 新增 `pages/7_案件匹配.py` + `src/case_matcher.py` + CLI `match`（US-03）
+- [x] **FC-09** 统计看板：最近操作记录 + 扫描历史
+- [x] **FC-10** D 类：SPEC-UI / REQUIREMENTS / module.yaml 更新
+
+### 验收标准
+
+- 见 SPEC §6（缺陷 9 项 / 案件闭环 8 项 / 模板生成 4 项 / 匹配增强 2 项 / 兼容红线 4 项）
+- [x] 现有 CLI 16 命令行为不回退（`bin/extract.py --help` 16 子命令齐备）
+- [x] 无明文密钥 / 无真实 PII 入库（§6.1/§6.2）；`config.USERS` 走 `AUTH_USERS` 环境变量
+- [x] 🔴 飞书相关零改动
+
+---
+
 ## 2026-10-13 case-intelligence 提取功能缺陷修复 + 异地验证闭环
 
 **类型**: fix + feat（工程质量 + 协作机制）
