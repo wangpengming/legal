@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.run/
+.pytest-data/
+tests/
+docs/
+spec/
+requirements/
+.git/
+*.log
+*.tmp

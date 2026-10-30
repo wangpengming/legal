@@ -1,0 +1,189 @@
+# AI 引擎配置
+# case-intelligence 模块 AI 引擎管理
+# 支持 Ollama / OpenAI / Anthropic 多引擎切换
+
+version: "1.0.0"
+updated: 2026-09-27
+
+# 默认引擎
+default_engine: minimax
+
+# 引擎配置
+engines:
+  # ============================================================
+  # MiniMax API（推荐）
+  # 模型: MiniMax M3.1-Flash（推理模型，正文在 message.content）
+  # ============================================================
+  minimax:
+    enabled: true
+    api_key: "${MINIMAX_API_KEY}"  # 环境变量（🔴 严禁明文入库，见 AGENTS.md §6.2）
+    base_url: "https://api.minimax.cn/v1"
+    model: "MiniMax-M3.1-Flash"
+    timeout: 120
+    max_tokens: 8192
+    temperature: 0.7
+    retry: 3
+    retry_delay: 2
+    
+    use_cases:
+      - "D1-D5 维度提取"
+      - "相似案件匹配"
+      - "文书生成（复杂）"
+    
+    pros:
+      - "中文理解能力强"
+      - "速度快"
+      - "中文法律场景适配"
+    
+    cons:
+      - "付费"
+      - "数据外传"
+
+  # ============================================================
+  # Ollama 本地模型
+  # 安装：brew install ollama
+  # 启动：ollama serve
+  # 模型：ollama pull qwen2.5:14b
+  # ============================================================
+  ollama:
+    enabled: false
+    base_url: "http://localhost:11434"
+    model: "qwen2.5:14b"
+    timeout: 120  # 秒
+    max_tokens: 4096
+    temperature: 0.7
+    retry: 3
+    retry_delay: 2  # 秒
+    
+    # 适用场景
+    use_cases:
+      - "D1-D5 维度提取"
+      - "相似案件匹配"
+      - "文书生成（简单）"
+    
+    # 优点
+    pros:
+      - "本地运行，数据不外传"
+      - "免费"
+      - "可离线使用"
+    
+    # 缺点
+    cons:
+      - "中文法律场景能力有限"
+      - "需要较大内存（14B模型约10GB）"
+
+  # ============================================================
+  # OpenAI API
+  # 申请：https://platform.openai.com
+  # ============================================================
+  openai:
+    enabled: false
+    api_key: "${OPENAI_API_KEY}"  # 环境变量
+    model: "gpt-4o"
+    timeout: 60
+    max_tokens: 4096
+    temperature: 0.7
+    retry: 3
+    retry_delay: 1
+    
+    use_cases:
+      - "D1-D5 维度提取"
+      - "相似案件匹配"
+      - "文书生成（复杂）"
+    
+    pros:
+      - "模型能力强"
+      - "中文理解好"
+    
+    cons:
+      - "付费"
+      - "数据外传"
+
+  # ============================================================
+  # Anthropic Claude
+  # 申请：https://www.anthropic.com
+  # ============================================================
+  anthropic:
+    enabled: false
+    api_key: "${ANTHROPIC_API_KEY}"  # 环境变量
+    model: "claude-3-5-sonnet"
+    timeout: 60
+    max_tokens: 4096
+    temperature: 0.7
+    retry: 3
+    retry_delay: 1
+    
+    use_cases:
+      - "复杂法律文书生成"
+      - "长文本分析"
+    
+    pros:
+      - "长文本处理能力强"
+      - "逻辑推理好"
+    
+    cons:
+      - "付费"
+      - "数据外传"
+
+# 引擎选择策略
+engine_strategy:
+  # 按任务类型自动选择引擎
+  by_task:
+    "D1-D5提取":
+      preferred: ollama
+      fallback: openai
+    
+    "相似案匹配":
+      preferred: ollama
+      fallback: openai
+    
+    "答辩状生成":
+      preferred: openai
+      fallback: ollama
+    
+    "质证意见生成":
+      preferred: openai
+      fallback: ollama
+    
+    "当庭陈述生成":
+      preferred: openai
+      fallback: ollama
+    
+    "证据目录生成":
+      preferred: ollama
+      fallback: openai
+
+# 提示词配置
+prompts:
+  # Prompts 规则库路径
+  base_path: "prompts"
+  
+  # 提取类提示词
+  extraction:
+    D1_D5: "prompts/提取/1_新案材料提取_D1-D5.md"
+    cross_case: "prompts/提取/2_跨案归纳_Artifact汇聚.md"
+    quality_check: "prompts/提取/3_质量检查_提取物审核.md"
+  
+  # 匹配类提示词
+  matching:
+    similar_case: "prompts/匹配/4_新案匹配_相似案源检索.md"
+  
+  # 生成类提示词
+  generation:
+    defense: "prompts/生成/5_答辩状生成.md"
+    evidence_objection: "prompts/生成/6_质证意见生成.md"
+    court_statement: "prompts/生成/7_当庭陈述生成.md"
+    evidence_index: "prompts/生成/8_证据目录生成.md"
+
+# 日志配置
+logging:
+  level: "INFO"
+  format: "[%(asctime)s] [%(levelname)s] %(message)s"
+  
+  # API 调用日志（敏感信息脱敏）
+  api_call_log: true
+  mask_sensitive: true
+  sensitive_fields:
+    - "api_key"
+    - "case_number"
+    - "id_card"

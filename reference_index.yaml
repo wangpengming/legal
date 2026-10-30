@@ -1,0 +1,81 @@
+# =============================================
+# 外部数据源引用索引
+# Reference Index — 原始案件文件索引（不移动原文件）
+# =============================================
+# 说明：原始案件文件留在原位，此文件仅记录索引引用。
+# 新增数据源时请在此添加条目。
+# =============================================
+
+sources:
+  # ─────────────────────────────────────────────
+  - id: case_tencent
+    case_name: 腾讯音乐诉北京雷石侵权纠纷案
+    case_number: "2023京0491民初23751号"
+    plaintiff: 腾讯音乐娱乐（珠海）有限公司
+    defendant: 北京雷石天地电子技术有限公司
+    cause: 侵害作品信息网络传播权纠纷
+    result: 待结案
+    original_path: /Users/zhangyang/Desktop/Ai工作/2.案件分析/4.腾讯音乐诉北京雷石侵权纠纷案/
+    artifacts_count: 7          # Phase 2 已提取
+    extracted_at: "2026-09-22"
+    db_case_id: f843bae6-3c1d-4bb7-8c52-b37ce7744ce4
+    notes: >
+      核心文件：答辩状-第一部分-原告权利基础.docx / 240415-质证意见.docx /
+      240929-补充质证意见-FHY.docx /极致唱响打击办.docx
+      提炼产出：六层抗辩矩阵 / 主体不适格四层论证 / 质证意见四性格式 /
+      补充质证三层退守 / 反向维权九维武器
+
+  # ─────────────────────────────────────────────
+  - id: case_zhejiang_tv
+    case_name: 浙江广电诉雷石:广汽埃安案件
+    case_number: null
+    plaintiff: 浙江广电集团
+    defendant: 北京雷石天地电子技术有限公司
+    cause: 侵害作品信息网络传播权纠纷
+    result: 待结案
+    original_path: /Users/zhangyang/Desktop/Ai工作/2.案件分析/2.浙江广电诉雷石:广汽埃安案件/
+    artifacts_count: 5          # Phase 2 已提取
+    extracted_at: "2026-09-22"
+    db_case_id: 0bf66137-731a-4359-b60d-628239d14346
+    notes: >
+      核心文件：1.主观无过错抗辩.docx / 2.赔偿数额抗辩.docx /
+      极致唱响打击办.docx / 证据公证书等
+      提炼产出：双主线（主观无过错 + 赔偿数额）当庭陈述 / 应变准备体系 /
+      赔偿数额六点论证
+
+  # ─────────────────────────────────────────────
+  - id: case_anhui_yuxing
+    case_name: 安徽酝醒追偿权纠纷
+    case_number: "2025-18841号"
+    plaintiff: 安徽酝醒信息技术有限公司
+    defendant: 北京雷石天地电子技术有限公司
+    cause: 追偿权纠纷
+    result: 驳回（裁定）
+    original_path: /Users/zhangyang/Desktop/Ai工作/2.案件分析/legal_case_analyzer/红日蓝月:安徽酝醒追偿权纠纷/
+    artifacts_count: 0          # 待提取
+    extracted_at: null
+    notes: >
+      核心文件：申请书（回避）/ 庭后意见 / 咨询答案 / 裁定书 / 上诉状
+      当前状态：已结案（驳回），上诉中
+
+  # ─────────────────────────────────────────────
+  - id: case_haifan
+    case_name: 海帆案答辩意见
+    case_number: null
+    plaintiff: 海帆
+    defendant: 北京雷石天地电子技术有限公司
+    cause: 著作权纠纷
+    result: 已结案
+    original_path: /Users/zhangyang/Desktop/Ai工作/2.案件分析/
+    artifacts_count: 0
+    extracted_at: null
+    notes: >
+      核心文件：3、答辩意见-海帆-终稿.docx
+      当前状态：已结案，待提取
+
+# =============================================
+# 添加新数据源操作步骤
+# 1. 在上方 sources 列表追加新条目
+# 2. 在 backlog.md 登记提取需求（proposed 状态）
+# 3. 运行: python bin/extract.py register --name "案件名" ...
+# =============================================
